@@ -34,13 +34,13 @@ const WORKS = [
     title: '作業を楽しむ机',
     desc: '作る時間そのものを楽しむための場所。',
     image: '/images/lp-work-desk.jpg',
-    alt: '木製デスクでノートに書き込む手元',
+    alt: 'モニターやタブレットが整然と並んだ俯瞰のデスク周り',
   },
   {
     title: '家族で使う家具',
     desc: '毎日の思い出と一緒に育つ作品。',
     image: '/images/lp-work-family.jpg',
-    alt: '木のスプーンで蜂蜜をすくう様子',
+    alt: '木製のサイドテーブルに置かれたお茶とカメラ',
   },
 ];
 
@@ -195,7 +195,7 @@ export default function LpPage() {
           {/* TODO: フリー素材の仮画像。後日、実際の工房写真に差し替え予定 */}
           <Image
             src="/images/lp-hero.jpg"
-            alt="ノートパソコンとメモ帳が置かれた木製デスク"
+            alt="木製デスクに置かれたノートパソコンとメガネ、マウス"
             fill
             priority
             sizes="(max-width: 1024px) 100vw, 900px"
