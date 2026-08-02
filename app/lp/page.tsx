@@ -22,10 +22,26 @@ const FLOW_STEPS = [
   { icon: '🔨', title: '制作', desc: 'アイデアを現実へ変える' },
 ];
 
+// TODO: いずれもフリー素材の仮画像。後日、実際の制作事例の写真に差し替え予定
 const WORKS = [
-  { title: '暮らしを変える棚', desc: '空間や生活に合わせて考えた、世界にひとつの収納。' },
-  { title: '作業を楽しむ机', desc: '作る時間そのものを楽しむための場所。' },
-  { title: '家族で使う家具', desc: '毎日の思い出と一緒に育つ作品。' },
+  {
+    title: '暮らしを変える棚',
+    desc: '空間や生活に合わせて考えた、世界にひとつの収納。',
+    image: '/images/lp-work-shelf.jpg',
+    alt: '木の棚に並べられたヴィンテージカメラ',
+  },
+  {
+    title: '作業を楽しむ机',
+    desc: '作る時間そのものを楽しむための場所。',
+    image: '/images/lp-work-desk.jpg',
+    alt: '木製デスクでノートに書き込む手元',
+  },
+  {
+    title: '家族で使う家具',
+    desc: '毎日の思い出と一緒に育つ作品。',
+    image: '/images/lp-work-family.jpg',
+    alt: '木のスプーンで蜂蜜をすくう様子',
+  },
 ];
 
 const TANEI_FLOW = ['相談', '完成イメージ', '設計', '木取り', '制作'];
@@ -39,7 +55,7 @@ const TANEI_FEATURES = [
 ];
 
 const FUTURE_LINKS: { icon: string; label: string; desc: string; href?: string }[] = [
-  { icon: '🌱', label: 'TANE:i', desc: 'アイデアをカタチにするAIパートナー', href: '/' },
+  { icon: '🌱', label: 'TANE:i', desc: 'アイデアをカタチにするAIパートナー（近日公開）' },
   { icon: '🪑', label: '作品', desc: 'ユーザーの制作事例（近日公開）' },
   { icon: '📚', label: '学び', desc: '木工・DIYの知識（近日公開）' },
   { icon: '🤝', label: 'つながり', desc: 'コミュニティ（近日公開）' },
@@ -50,26 +66,6 @@ const CONTACT_HREF = 'https://line.me/R/ti/p/@your_line_id';
 
 function SectionEyebrow({ children }: { children: ReactNode }) {
   return <p className="text-[12px] tracking-[0.3em] text-[#5B655F] text-center">{children}</p>;
-}
-
-function PhotoPlaceholder({
-  label,
-  icon = '🖼️',
-  className = '',
-}: {
-  label: string;
-  icon?: string;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`relative flex flex-col items-center justify-center gap-2 overflow-hidden border border-dashed border-[#1F3028]/15 bg-gradient-to-br from-[#EFE9DC] to-[#E1D9C7] text-[#8A9088] ${className}`}
-    >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.55),transparent_55%)]" />
-      <span className="relative text-2xl">{icon}</span>
-      <p className="relative text-[11px] tracking-[0.15em] text-center px-6 leading-relaxed">{label}</p>
-    </div>
-  );
 }
 
 export default function LpPage() {
@@ -195,14 +191,15 @@ export default function LpPage() {
 
       {/* ================= HERO ================= */}
       <section className="flex min-h-screen flex-col items-center justify-center px-6 pb-20 pt-32 text-center">
-        <div className="relative mb-14 aspect-[3/1] w-full max-w-4xl overflow-hidden rounded-[28px] border border-[#1F3028]/10 bg-gradient-to-br from-[#EFE9DC] to-[#E1D9C7] p-4 sm:p-6">
+        <div className="relative mb-14 aspect-[4/3] w-full max-w-4xl overflow-hidden rounded-[28px] border border-[#1F3028]/10 sm:aspect-[16/9]">
+          {/* TODO: フリー素材の仮画像。後日、実際の工房写真に差し替え予定 */}
           <Image
-            src="/images/tomishin-channel-banner.jpg"
-            alt="とみしんチャンネルDIY"
+            src="/images/lp-hero.jpg"
+            alt="ノートパソコンとメモ帳が置かれた木製デスク"
             fill
             priority
             sizes="(max-width: 1024px) 100vw, 900px"
-            className="object-contain"
+            className="object-cover"
           />
         </div>
 
@@ -329,7 +326,15 @@ export default function LpPage() {
                 key={item.title}
                 className="group overflow-hidden rounded-[24px] bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_48px_rgba(31,48,40,0.1)]"
               >
-                <PhotoPlaceholder label="写真エリア" className="h-56 w-full" />
+                <div className="relative h-56 w-full overflow-hidden">
+                  <Image
+                    src={item.image}
+                    alt={item.alt}
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    className="object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                </div>
                 <div className="p-8">
                   <h3 className="text-[19px] font-medium">{item.title}</h3>
                   <p className="mt-2 text-[14px] leading-[1.8] text-[#55645B]">{item.desc}</p>
@@ -378,13 +383,9 @@ export default function LpPage() {
           ))}
         </div>
 
-        <Link
-          href="/"
-          className="mt-16 inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-[14px] font-semibold tracking-[0.05em] text-[#1F3028] transition-transform duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(0,0,0,0.25)]"
-        >
-          TANE:iを使ってみる
-          <span>→</span>
-        </Link>
+        <div className="mt-16 inline-flex items-center gap-2 rounded-full border border-white/30 px-8 py-3.5 text-[14px] font-semibold tracking-[0.05em] text-white/70">
+          近日公開
+        </div>
       </section>
 
       {/* ================= FUTURE / CTA ================= */}
