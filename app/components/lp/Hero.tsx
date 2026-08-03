@@ -2,91 +2,42 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import RevealText from './motion/RevealText';
 
 // TODO: 実際のブランドムービー素材（種→発芽→木→木材→制作→完成→暮らし の実写・実撮影動画）が
-// 用意できたら、背景写真をこのアニメーション演出ごと <video autoPlay muted loop playsInline> に差し替える。
-// 各ステップは意図的に短い名詞句にしてあるので、動画の字幕/チャプター名にもそのまま流用できる
-const STORY_STEPS = [
-  { icon: '🌱', label: '小さな種' },
-  { icon: '🌍', label: '土へ落ちる' },
-  { icon: '🌿', label: '芽が出る' },
-  { icon: '🌳', label: '木になる' },
-  { icon: '🪵', label: '木材になる' },
-  { icon: '📐', label: '設計図' },
-  { icon: '🛠️', label: 'DIY制作' },
-  { icon: '🏠', label: '完成作品' },
-  { icon: '😊', label: '暮らし' },
-  { icon: '🌱', label: '新しいアイデアが生まれる' },
-] as const;
-
-const STEP_DURATION_MS = 2200;
-const MESSAGE_DURATION_MS = 3400;
-
+// 用意できたら、この背景動画を差し替える
 export default function Hero() {
   const shouldReduceMotion = useReducedMotion();
-  const [stepIndex, setStepIndex] = useState(0);
-  const [showClosingMessage, setShowClosingMessage] = useState(false);
-
-  useEffect(() => {
-    // 動きに敏感なユーザー向けには、自動サイクルせず最初のフレームで静止させる
-    if (shouldReduceMotion) return;
-
-    const isLastStep = stepIndex === STORY_STEPS.length - 1;
-    const duration = showClosingMessage ? MESSAGE_DURATION_MS : STEP_DURATION_MS;
-
-    const timer = setTimeout(() => {
-      if (isLastStep && !showClosingMessage) {
-        setShowClosingMessage(true);
-      } else {
-        setShowClosingMessage(false);
-        setStepIndex((prev) => (prev + 1) % STORY_STEPS.length);
-      }
-    }, duration);
-
-    return () => clearTimeout(timer);
-  }, [stepIndex, showClosingMessage, shouldReduceMotion]);
-
-  const currentStep = STORY_STEPS[stepIndex];
 
   return (
     <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#FAF8F4] px-6 pt-24 text-center">
-      {/* 背景写真：種から木へ育つ物語に重ねる、ごく淡いアンビエント背景 */}
+      {/* 背景動画：種が土から芽吹く様子を、ごく淡いアンビエント背景として敷く */}
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
         <motion.div
           initial={{ scale: 1.08, opacity: 0 }}
-          animate={{ scale: shouldReduceMotion ? 1.08 : 1, opacity: 0.16 }}
+          animate={{ scale: shouldReduceMotion ? 1.08 : 1, opacity: 0.22 }}
           transition={{ duration: 3, ease: [0.16, 1, 0.3, 1] }}
           className="absolute inset-0"
         >
-          <Image
-            src="/images/lp-hero-bg.jpg"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover grayscale"
-          />
+          {shouldReduceMotion ? (
+            <Image src="/images/lp-hero-bg-poster.jpg" alt="" fill priority sizes="100vw" className="object-cover" />
+          ) : (
+            <video
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="auto"
+              poster="/images/lp-hero-bg-poster.jpg"
+              className="h-full w-full object-cover"
+            >
+              <source src="/videos/lp-hero-seed.mp4" type="video/mp4" />
+            </video>
+          )}
         </motion.div>
-        <div className="absolute inset-0 bg-[#FAF8F4]/55" />
+        <div className="absolute inset-0 bg-[#FAF8F4]/60" />
       </div>
-
-      {showClosingMessage && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-6" aria-hidden="true">
-          <motion.p
-            key="closing"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1 }}
-            className="max-w-3xl text-center text-[clamp(28px,5vw,56px)] font-light leading-relaxed text-[#1F3028]/[0.07]"
-          >
-            一人の挑戦が、誰かの新しい種になる。
-          </motion.p>
-        </div>
-      )}
 
       {/* 前面：見出し・説明・CTA */}
       <div className="relative z-10 flex flex-col items-center">
@@ -131,25 +82,6 @@ export default function Hero() {
           </div>
         </FadeInSmall>
       </div>
-
-      {/* 現在のストーリーステップのキャプション（動画の字幕のような位置づけ） */}
-      {!shouldReduceMotion && (
-        <div className="absolute bottom-10 left-1/2 z-10 -translate-x-1/2">
-          <AnimatePresence mode="wait">
-            <motion.p
-              key={showClosingMessage ? 'closing-caption' : stepIndex}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.4 }}
-              className="flex items-center gap-2 text-[11px] tracking-[0.3em] text-[#8A8A8A]"
-            >
-              {!showClosingMessage && <span aria-hidden="true">{currentStep.icon}</span>}
-              {showClosingMessage ? 'TANE PROJECT' : currentStep.label}
-            </motion.p>
-          </AnimatePresence>
-        </div>
-      )}
     </section>
   );
 }
