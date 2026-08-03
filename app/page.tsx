@@ -121,9 +121,12 @@ export default function LpPage() {
         }`}
       >
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 sm:px-10 h-[72px]">
-          <a href="#" className="flex flex-col leading-tight">
-            <span className="text-[15px] font-semibold tracking-[0.12em] text-[#1F3028]">🌱 TANE PROJECT</span>
-            <span className="text-[9px] tracking-[0.25em] text-[#7A867C]">Ideas into Reality.</span>
+          <a href="#" className="flex items-center gap-2">
+            <span className="text-xl leading-none">🌱</span>
+            <span className="flex flex-col leading-tight">
+              <span className="text-[15px] font-semibold tracking-[0.12em] text-[#1F3028]">TANE PROJECT</span>
+              <span className="text-[10px] tracking-[0.2em] text-[#7A867C]">Ideas into Reality.</span>
+            </span>
           </a>
 
           <nav className="hidden md:flex items-center gap-9">
