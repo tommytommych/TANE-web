@@ -10,8 +10,8 @@ const STORY = [
     step: '01',
     title: '相談',
     desc: '頭の中にある想いを、言葉にして伝える。',
-    image: '/images/lp-work-desk.jpg',
-    alt: 'モニターやタブレットが整然と並んだ俯瞰のデスク周り',
+    image: '/images/lp-work-consult.jpg',
+    alt: '俯瞰で見たデスク。ノートパソコンとノート、ペン、スマートフォンが並ぶ',
   },
   {
     step: '02',
@@ -24,15 +24,15 @@ const STORY = [
     step: '03',
     title: '設計図',
     desc: 'アイデアを、作れる形へ落とし込む。',
-    image: '/images/lp-work-shelf.jpg',
-    alt: '木の棚に並べられたヴィンテージカメラ',
+    image: '/images/lp-work-blueprint.jpg',
+    alt: '地図を手に取り、指差しながら確認する様子',
   },
   {
     step: '04',
     title: '完成作品',
     desc: '暮らしの中に、新しい種が根づく。',
-    image: '/images/lp-work-family.jpg',
-    alt: '木製のサイドテーブルに置かれたお茶とカメラ',
+    image: '/images/lp-work-shelf.jpg',
+    alt: '木の棚に並べられたヴィンテージカメラ',
   },
 ];
 
