@@ -1,8 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #faf8f4;
+  --foreground: #1f3028;
+
+  /* TANE PROJECT公式サイト（LP）のデザイントークン */
+  --color-lp-accent: #5f8d69;
+  --color-lp-muted: #8a8a8a;
 
   /* TANE:i デザイントークン（自社UIの配色・角丸・余白をここに集約し、色数を抑える） */
   --color-tanei-brand: #8c6d53;
@@ -27,6 +31,9 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
+  --color-lp-accent: var(--color-lp-accent);
+  --color-lp-muted: var(--color-lp-muted);
+
   --color-tanei-brand: var(--color-tanei-brand);
   --color-tanei-brand-dark: var(--color-tanei-brand-dark);
   --color-tanei-brand-soft: var(--color-tanei-brand-soft);
@@ -45,8 +52,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #14201a;
+    --foreground: #f2efe9;
   }
 }
 
