@@ -3,6 +3,22 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* TANE:i デザイントークン（自社UIの配色・角丸・余白をここに集約し、色数を抑える） */
+  --color-tanei-brand: #8c6d53;
+  --color-tanei-brand-dark: #5c4b40;
+  --color-tanei-brand-soft: #ebe3d5;
+  --color-tanei-accent: #2563eb;
+  --color-tanei-accent-dark: #1d4ed8;
+  --color-tanei-surface: #ffffff;
+  --color-tanei-surface-muted: #f6f1e7;
+  --color-tanei-bg: #fdfbf7;
+  --color-tanei-border: #e6dec9;
+  --color-tanei-ink: #3a2f27;
+  --color-tanei-ink-muted: #7a6b5d;
+
+  --radius-tanei-card: 1rem;
+  --radius-tanei-control: 0.75rem;
 }
 
 @theme inline {
@@ -10,6 +26,21 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-tanei-brand: var(--color-tanei-brand);
+  --color-tanei-brand-dark: var(--color-tanei-brand-dark);
+  --color-tanei-brand-soft: var(--color-tanei-brand-soft);
+  --color-tanei-accent: var(--color-tanei-accent);
+  --color-tanei-accent-dark: var(--color-tanei-accent-dark);
+  --color-tanei-surface: var(--color-tanei-surface);
+  --color-tanei-surface-muted: var(--color-tanei-surface-muted);
+  --color-tanei-bg: var(--color-tanei-bg);
+  --color-tanei-border: var(--color-tanei-border);
+  --color-tanei-ink: var(--color-tanei-ink);
+  --color-tanei-ink-muted: var(--color-tanei-ink-muted);
+
+  --radius-tanei-card: var(--radius-tanei-card);
+  --radius-tanei-control: var(--radius-tanei-control);
 }
 
 @media (prefers-color-scheme: dark) {
