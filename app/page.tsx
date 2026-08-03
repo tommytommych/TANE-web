@@ -430,19 +430,23 @@ export default function LpPage() {
       </section>
 
       {/* ================= FOOTER ================= */}
-      <footer className="bg-[#F7F4EE] px-6 py-20 text-center text-[#7A867C]">
+      <footer className="bg-[#F7F4EE] px-6 py-24 text-center text-[#7A867C]">
         <a
           href={CONTACT_HREF}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-full border border-[#1F3028]/15 px-5 py-2.5 text-[13px] font-medium text-[#1F3028] transition-colors hover:bg-[#1F3028] hover:text-white"
+          className="inline-flex items-center gap-2 rounded-full border border-[#1F3028]/15 px-6 py-3 text-[13px] font-medium text-[#1F3028] transition-colors hover:bg-[#1F3028] hover:text-white"
         >
           <span>💬</span> ご意見、リクエストはこちらから
         </a>
 
-        <div className="mt-14 text-[16px] font-semibold tracking-[0.15em] text-[#1F3028]">🌱 TANE PROJECT</div>
-        <p className="mt-2 text-[12px] tracking-[0.2em]">Ideas into Reality.</p>
-        <p className="mt-8 text-[11px]">© 2026 TANE PROJECT</p>
+        <div className="mt-16 flex items-center justify-center gap-2">
+          <span className="text-xl leading-none">🌱</span>
+          <span className="text-[16px] font-semibold tracking-[0.15em] text-[#1F3028]">TANE PROJECT</span>
+        </div>
+        <p className="mt-3 text-[12px] tracking-[0.2em] text-[#5B655F]">Ideas into Reality.</p>
+
+        <p className="mt-12 text-[11px] tracking-[0.05em]">© 2026 TANE PROJECT</p>
       </footer>
     </main>
   );
