@@ -1,446 +1,495 @@
 'use client';
 
-import Image from 'next/image';
-import Link from 'next/link';
-import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 
-// TANE PROJECT ランディングページ。TANE:iアプリ本体とは独立した、ブランド訴求用の1枚もの
-// マーケティングページ（配色・トーンは意図的にアプリ本体のtanei-*トークンと分離している）。
+import { KOHNAN_WOOD_LIST, AMAZON_TOOLS, shuffleArray } from './lib/constants';
+import {
+  type Message,
+  type MaterialGroup,
+  type SheetLayout,
+  type AssemblyManual,
+  extractContextFromContent,
+  stripInternalBlocks,
+} from './lib/cutlist';
+import { deriveProjectFlags } from './lib/projectStatus';
+import { buildUniversalCutSheetPdf } from './lib/cutSheetPdf';
+import { buildBlankCutSheetPdf } from './lib/blankCutSheetPdf';
+import { buildAssemblyInstructionsPdf } from './lib/assemblyPdf';
+import type { SavedItem, SavedItemType } from './lib/types';
+import {
+  loadAllSavedItems,
+  putSavedItem,
+  deleteSavedItem,
+  migrateLegacyLocalStorageItems,
+  bytesToDataUrl,
+} from './lib/savedItemsStore';
+import { downloadPdfBytes } from './lib/download';
 
-const NAV_ITEMS = [
-  { id: 'story', label: '物語' },
-  { id: 'flow', label: '流れ' },
-  { id: 'works', label: '作品' },
-  { id: 'tane-i', label: 'TANE:i' },
-  { id: 'future', label: '未来' },
-] as const;
+import TopBar from './components/layout/TopBar';
+import LeftSidebar from './components/layout/LeftSidebar';
+import RightPanel from './components/layout/RightPanel';
+import SavedItemsModal from './components/layout/SavedItemsModal';
+import MessageList from './components/chat/MessageList';
+import ChatInput from './components/chat/ChatInput';
+import StartCards from './components/chat/StartCards';
 
-const FLOW_STEPS = [
-  { icon: '💬', title: '相談', desc: '頭の中にある想いを整理する' },
-  { icon: '✨', title: '完成イメージ', desc: '未来の形を見えるようにする' },
-  { icon: '📐', title: '設計', desc: '作れる形へ落とし込む' },
-  { icon: '🔨', title: '制作', desc: 'アイデアを現実へ変える' },
-];
+const WELCOME_MESSAGE: Message = {
+  role: 'assistant',
+  content: '🌱ようこそ、TANE:i（たねあい）へ。\nあなたの「作りたい」を、一緒にカタチにします。\n作りたいもの、悩んでいること、または「写真で相談」からお部屋の写真を送ってください😊',
+};
 
-// TODO: いずれもフリー素材の仮画像。後日、実際の制作事例の写真に差し替え予定
-const WORKS = [
-  {
-    title: '暮らしを変える棚',
-    desc: '空間や生活に合わせて考えた、世界にひとつの収納。',
-    image: '/images/lp-work-shelf.jpg',
-    alt: '木の棚に並べられたヴィンテージカメラ',
-  },
-  {
-    title: '作業を楽しむ机',
-    desc: '作る時間そのものを楽しむための場所。',
-    image: '/images/lp-work-desk.jpg',
-    alt: 'モニターやタブレットが整然と並んだ俯瞰のデスク周り',
-  },
-  {
-    title: '家族で使う家具',
-    desc: '毎日の思い出と一緒に育つ作品。',
-    image: '/images/lp-work-family.jpg',
-    alt: '木製のサイドテーブルに置かれたお茶とカメラ',
-  },
-];
+export default function Home() {
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
+  const [input, setInput] = useState('');
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [remainingCount, setRemainingCount] = useState(10);
+  const [remainingImageCount, setRemainingImageCount] = useState(5);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  // ProjectStatusの導出に使う「生成実績」。会話履歴からは分からない（PDFはクライアント側で
+  // 生成するため）ので、専用のstateとして持つ。新しい相談を始めたらリセットする
+  const [hasGeneratedPdf, setHasGeneratedPdf] = useState(false);
+  const [hasGeneratedAssembly, setHasGeneratedAssembly] = useState(false);
 
-const TANEI_FLOW = ['相談', '完成イメージ', '設計', '木取り', '制作'];
+  const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
+  const [activeModal, setActiveModal] = useState<SavedItemType | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // SSRとの整合性のため初期値はfalse（閉）にしておき、デスクトップ幅の場合だけ
+  // マウント後に開く。true始まりだとモバイルで初回表示時に全画面ドロワーが
+  // かぶさってしまうため（スマホ体験の改善）
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(false);
+  const [shuffledTools, setShuffledTools] = useState(AMAZON_TOOLS);
 
-const TANEI_FEATURES = [
-  { icon: '💬', label: 'アイデア相談' },
-  { icon: '🖼️', label: '完成イメージ' },
-  { icon: '📐', label: '設計図' },
-  { icon: '📏', label: '木取り図' },
-  { icon: '📋', label: '材料リスト' },
-];
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-const FUTURE_LINKS: { icon: string; label: string; desc: string; href?: string }[] = [
-  { icon: '🌱', label: 'TANE:i', desc: 'アイデアをカタチにするAIパートナー（近日公開）' },
-  { icon: '🪑', label: '作品', desc: 'ユーザーの制作事例（近日公開）' },
-  { icon: '📚', label: '学び', desc: '木工・DIYの知識（近日公開）' },
-  { icon: '🤝', label: 'つながり', desc: 'コミュニティ（近日公開）' },
-];
-
-// TODO: 正式に運用するLINE公式アカウント等のURLが決まり次第、ここを差し替える
-const CONTACT_HREF = 'https://line.me/R/ti/p/@your_line_id';
-
-function SectionEyebrow({ children }: { children: ReactNode }) {
-  return <p className="text-[12px] tracking-[0.3em] text-[#5B655F] text-center">{children}</p>;
-}
-
-export default function LpPage() {
-  const [activeSection, setActiveSection] = useState<string>('');
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  // ヘッダーの背景・影は、ページ先頭にいる間は透明にして、スクロール後だけ実体化させる
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 16);
-    handleScroll();
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    (async () => {
+      try {
+        await migrateLegacyLocalStorageItems();
+        const items = await loadAllSavedItems();
+        setSavedItems(items.sort((a, b) => Number(b.id) - Number(a.id)));
+      } catch (e) {
+        console.error(e);
+      }
+    })();
   }, []);
 
-  // 現在ビューポート内にあるセクションに応じて、ナビの表示をハイライトする（スクロール連動）
   useEffect(() => {
-    const sections = NAV_ITEMS.map((item) => document.getElementById(item.id)).filter(
-      (el): el is HTMLElement => el !== null
-    );
-    if (sections.length === 0) return;
+    // SSR時とクライアントでMath.random()の結果が異なりhydrationエラーになるため、
+    // マウント後（クライアント側のみ）にシャッフルする。意図的なクライアント専用処理のため、
+    // react-hooks/set-state-in-effect（外部システム同期以外でのsetState呼び出しを警告するルール）を明示的に抑制する
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShuffledTools(shuffleArray(AMAZON_TOOLS));
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) setActiveSection(entry.target.id);
-        });
-      },
-      { rootMargin: '-20% 0px -70% 0px', threshold: 0 }
-    );
-
-    sections.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
+    // デスクトップ幅（Tailwindのlgブレークポイント=1024px）の場合のみ、
+    // 左サイドバーを開いた状態にする
+    if (window.innerWidth >= 1024) {
+      setIsLeftSidebarOpen(true);
+    }
   }, []);
 
-  const handleNavClick = (e: MouseEvent<HTMLAnchorElement>, id: string) => {
-    e.preventDefault();
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    setIsMobileMenuOpen(false);
+  // 以下のハンドラはすべてuseCallbackでメモ化している。MessageList/MessageBubbleに
+  // React.memoを適用しても、渡す関数の参照が毎レンダー変わってしまうと意味がないため
+  // （例：チャット入力欄への1文字入力のたびに、無関係なメッセージ履歴全体が再レンダーされてしまう）
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
+  }, []);
+
+  const handleNewConversation = useCallback(() => {
+    if (messages.length > 1 && !window.confirm('現在の会話をリセットして、新しい相談を始めますか？\n（これまでの相談内容は「相談履歴」に保存されています）')) {
+      return;
+    }
+    setMessages([WELCOME_MESSAGE]);
+    setSelectedImage(null);
+    setInput('');
+    setHasGeneratedPdf(false);
+    setHasGeneratedAssembly(false);
+    showToast('新しい相談を始めましょう🌱');
+  }, [messages.length, showToast]);
+
+  // 木取り図・PDF・組立説明書の各生成機能は、必要な状態に達するまで実行できないようにする
+  // （ProjectStatus: Draft → Interviewing → DesignReady → CutListReady → PdfReady → AssemblyReady）
+  const projectFlags = useMemo(
+    () => deriveProjectFlags(messages, hasGeneratedPdf, hasGeneratedAssembly),
+    [messages, hasGeneratedPdf, hasGeneratedAssembly]
+  );
+
+  const addItem = useCallback(
+    async (type: SavedItemType, title: string, content: string, file?: { dataUrl: string; mimeType: string }) => {
+      const newItem: SavedItem = {
+        id: Date.now().toString(),
+        type,
+        title,
+        content,
+        fileDataUrl: file?.dataUrl,
+        fileMimeType: file?.mimeType,
+        date: new Date().toLocaleDateString('ja-JP') + ' ' + new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+      };
+      // IndexedDBへの保存に失敗しても（プライベートブラウジング等）、画面上の表示は継続させる
+      try {
+        await putSavedItem(newItem);
+      } catch (e) {
+        console.error(e);
+        showToast('データの保存に失敗しました（ブラウザの設定をご確認ください）。');
+      }
+      setSavedItems((prev) => [newItem, ...prev]);
+    },
+    [showToast]
+  );
+
+  const removeItem = useCallback(
+    async (id: string) => {
+      try {
+        await deleteSavedItem(id);
+      } catch (e) {
+        console.error(e);
+        showToast('削除に失敗しました。時間をおいて再度お試しください。');
+        return;
+      }
+      setSavedItems((prev) => prev.filter((item) => item.id !== id));
+    },
+    [showToast]
+  );
+
+  const updateItem = useCallback(
+    async (id: string, updates: { title?: string; content?: string }) => {
+      const existing = savedItems.find((item) => item.id === id);
+      if (!existing) return;
+      const updated: SavedItem = { ...existing, ...updates };
+      try {
+        await putSavedItem(updated);
+      } catch (e) {
+        console.error(e);
+        showToast('更新の保存に失敗しました。時間をおいて再度お試しください。');
+        return;
+      }
+      setSavedItems((prev) => prev.map((item) => (item.id === id ? updated : item)));
+    },
+    [savedItems, showToast]
+  );
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
+
+  const handleImageSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          setSelectedImage(reader.result as string);
+          showToast('写真を添付しました。「写真で相談」内容を入力して送信してください。');
+        };
+        reader.onerror = () => {
+          showToast('写真の読み込みに失敗しました。別の画像でお試しください。');
+        };
+        reader.readAsDataURL(file);
+      }
+    },
+    [showToast]
+  );
+
+  const handleDownloadCutSheetPdf = useCallback(async (
+    materialGroups?: MaterialGroup[] | 'blank',
+    sheetLayouts?: SheetLayout[]
+  ) => {
+    const isBlank = materialGroups === 'blank';
+    const usingChatData = !isBlank && ((!!materialGroups && materialGroups.length > 0) || (!!sheetLayouts && sheetLayouts.length > 0));
+    setIsGeneratingPdf(true);
+    showToast(
+      isBlank
+        ? 'TANE:iカット申込書（原紙）を生成しています…'
+        : usingChatData
+        ? 'この会話の木取り図をもとにPDFを生成しています…'
+        : 'TANE:iオリジナル汎用カット申込書PDFを生成しています…'
+    );
+
+    try {
+      const pdfBytes = isBlank
+        ? await buildBlankCutSheetPdf()
+        : usingChatData
+        ? await buildUniversalCutSheetPdf(
+            materialGroups && materialGroups.length > 0 ? (materialGroups as MaterialGroup[]) : [],
+            sheetLayouts
+          )
+        : await buildUniversalCutSheetPdf();
+
+      const pdfByteArray = new Uint8Array(pdfBytes);
+      downloadPdfBytes(pdfByteArray, 'TANEi_Universal_Cut_Sheet.pdf');
+
+      await addItem(
+        'pdf',
+        isBlank ? 'カット申込書（原紙）' : '①ホームセンター提出用PDF',
+        isBlank
+          ? '手書き記入用の白紙カット申込書です。'
+          : usingChatData
+          ? 'この会話の木取り図データをもとに生成したカット申込書です。'
+          : 'サンプルデータで生成したカット申込書です。',
+        { dataUrl: bytesToDataUrl(pdfByteArray, 'application/pdf'), mimeType: 'application/pdf' }
+      );
+
+      showToast(
+        isBlank
+          ? 'TANE:iカット申込書（原紙）のダウンロードが完了しました！手書きでご記入いただけます。'
+          : usingChatData
+          ? 'この会話の内容を反映したカット申込書のダウンロードが完了しました！'
+          : 'TANE:iオリジナル汎用カット申込書のダウンロードが完了しました！（サンプルデータで作成）'
+      );
+    } catch (error) {
+      console.error(error);
+      showToast('PDFの生成に失敗しました。時間をおいて再度お試しください。');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  }, [addItem, showToast]);
+
+  const handleDownloadAssemblyManualPdf = useCallback(async (manual?: AssemblyManual) => {
+    const usingChatData = !!manual;
+    setIsGeneratingPdf(true);
+    showToast(
+      usingChatData
+        ? 'この会話の内容をもとに組立説明書PDFを生成しています…'
+        : 'TANE:i組立説明書PDFを生成しています…'
+    );
+
+    try {
+      const pdfBytes = usingChatData ? await buildAssemblyInstructionsPdf(manual) : await buildAssemblyInstructionsPdf();
+
+      const pdfByteArray = new Uint8Array(pdfBytes);
+      downloadPdfBytes(pdfByteArray, 'TANEi_Assembly_Manual.pdf');
+
+      await addItem(
+        'pdf',
+        '②組立説明書PDF',
+        usingChatData ? 'この会話の内容をもとに生成した組立説明書です。' : 'サンプルデータで生成した組立説明書です。',
+        { dataUrl: bytesToDataUrl(pdfByteArray, 'application/pdf'), mimeType: 'application/pdf' }
+      );
+
+      showToast(
+        usingChatData
+          ? 'この会話の内容を反映した組立説明書のダウンロードが完了しました！'
+          : 'TANE:i組立説明書のダウンロードが完了しました！（サンプルデータで作成）'
+      );
+    } catch (error) {
+      console.error(error);
+      showToast('PDFの生成に失敗しました。時間をおいて再度お試しください。');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  }, [addItem, showToast]);
+
+  const sendMessage = useCallback(async (textToSend: string, countUp: boolean = false) => {
+    if ((!textToSend.trim() && !selectedImage) || isLoading) return;
+
+    if (textToSend.includes('コーナン') && (textToSend.includes('木材') || textToSend.includes('価格') || textToSend.includes('サイズ') || textToSend.includes('リスト'))) {
+      const woodText = KOHNAN_WOOD_LIST.map(w => `■ ${w.name}\n・特徴: ${w.feature}\n・サイズ: ${w.size}\n・長さ: ${w.length}\n・価格目安: ${w.price}\n`).join('\n');
+      const replyText = `コーナンで取り扱われている代表的な木材のリストです。\n\n${woodText}\n（※価格は店舗や時期によって前後します。）`;
+
+      const newMessages = [...messages, { role: 'user', content: textToSend, image: selectedImage || undefined }, { role: 'assistant', content: replyText }];
+      setMessages(newMessages);
+      setInput('');
+      setSelectedImage(null);
+      addItem('history', textToSend, replyText);
+      if (countUp) setRemainingCount((prev) => Math.max(0, prev - 1));
+      return;
+    }
+
+    const currentImg = selectedImage;
+    const newMessages = [...messages, { role: 'user', content: textToSend, image: currentImg || undefined }];
+    setMessages(newMessages);
+    setInput('');
+    setSelectedImage(null);
+    setIsLoading(true);
+    if (currentImg) setIsAnalyzingPhoto(true);
+
+    if (countUp) {
+      setRemainingCount((prev) => Math.max(0, prev - 1));
+    }
+
+    addItem('history', textToSend, textToSend);
+
+    try {
+      const history = newMessages.map((m) => ({
+        role: m.role,
+        content: stripInternalBlocks(m.content),
+        image: m.image,
+      }));
+
+      const lastAssistantContent = [...newMessages].reverse().find((m) => m.role === 'assistant')?.content;
+      const context = lastAssistantContent ? extractContextFromContent(lastAssistantContent) : null;
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ history, context }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // サーバー側で分類済みの、初心者にも分かるエラーメッセージをそのまま使う
+        // （例：AI利用回数の上限に達した場合など）。再送信ボタンを出すため元のテキストを保持する
+        const friendlyMessage =
+          data && typeof data.reply === 'string' ? data.reply : '通信エラーが発生しました。もう一度お試しください。';
+        setMessages([
+          ...newMessages,
+          { role: 'assistant', content: friendlyMessage, isError: true, retryText: textToSend },
+        ]);
+        return;
+      }
+
+      const replyText = data && data.reply ? data.reply : '回答を受け取れませんでした。';
+
+      setMessages([...newMessages, { role: 'assistant', content: replyText }]);
+    } catch (error) {
+      console.error(error);
+      setMessages([
+        ...newMessages,
+        {
+          role: 'assistant',
+          content: '通信できませんでした。インターネット接続をご確認のうえ、もう一度お試しください。',
+          isError: true,
+          retryText: textToSend,
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+      setIsAnalyzingPhoto(false);
+    }
+  }, [messages, selectedImage, isLoading, addItem]);
+
+  // 現状はベータ版のため、画像生成は外部のGemini Web版に任せる（プロンプトをコピーして新規タブで開く）。
+  // 本格稼働時にAPI化する想定で、promptOverrideを渡せば任意のプロンプト（カメオのデザイン案など）でも同じ導線を使える
+  const handleOpenGeminiImage = useCallback((promptOverride?: string) => {
+    if (remainingImageCount <= 0) {
+      showToast('本日の画像生成回数が上限（5回）に達しました。');
+      return;
+    }
+
+    let promptText = promptOverride;
+    if (!promptText) {
+      const lastAssistantMsg = messages.slice().reverse().find((m) => m.role === 'assistant');
+      const context = lastAssistantMsg ? extractContextFromContent(lastAssistantMsg.content) : null;
+      const lastUserMsg = messages.slice().reverse().find((m) => m.role === 'user')?.content || 'DIYの完成イメージ';
+      promptText = context?.item
+        ? `画像生成：${context.item}の完成イメージ、木製DIY家具、ナチュラルテイスト、高品質レンダリング`
+        : `画像生成：${lastUserMsg}のリアルな完成イメージ、木製DIY家具、ナチュラルテイスト、高品質レンダリング`;
+    }
+
+    navigator.clipboard.writeText(promptText).then(() => {
+      showToast(`「${promptText}」をコピーしました！Geminiに貼り付けてください。`);
+    }).catch(() => {
+      showToast(`Geminiのページを開きます。`);
+    });
+
+    setRemainingImageCount((prev) => Math.max(0, prev - 1));
+    window.open('https://gemini.google.com/', '_blank');
+  }, [messages, remainingImageCount, showToast]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      sendMessage(input, true);
+    }
   };
 
   return (
-    <main
-      className="min-h-screen bg-[#F7F4EE] text-[#1D1D1F]"
-      style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif' }}
-    >
-      {/* ================= HEADER ================= */}
-      <header
-        className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
-          isScrolled || isMobileMenuOpen
-            ? 'bg-[#F7F4EE]/90 backdrop-blur-md border-b border-[#1F3028]/10 shadow-[0_1px_0_rgba(31,48,40,0.04)]'
-            : 'bg-transparent border-b border-transparent'
-        }`}
-      >
-        <div className="max-w-6xl mx-auto flex items-center justify-between px-6 sm:px-10 h-[72px]">
-          <a href="#" className="flex flex-col leading-tight">
-            <span className="text-[15px] font-semibold tracking-[0.12em] text-[#1F3028]">🌱 TANE PROJECT</span>
-            <span className="text-[9px] tracking-[0.25em] text-[#7A867C]">Ideas into Reality.</span>
-          </a>
-
-          <nav className="hidden md:flex items-center gap-9">
-            {NAV_ITEMS.map((item) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                onClick={(e) => handleNavClick(e, item.id)}
-                className={`relative pb-1 text-[13px] font-medium transition-colors ${
-                  activeSection === item.id ? 'text-[#1F3028]' : 'text-[#7A867C] hover:text-[#1F3028]'
-                }`}
-              >
-                {item.label}
-                <span
-                  className={`absolute inset-x-0 -bottom-0.5 h-[1.5px] origin-left bg-[#1F3028] transition-transform duration-300 ${
-                    activeSection === item.id ? 'scale-x-100' : 'scale-x-0'
-                  }`}
-                />
-              </a>
-            ))}
-          </nav>
-
+    <div className="flex h-screen bg-tanei-bg text-tanei-ink font-sans relative overflow-hidden">
+      {toastMessage && (
+        <div
+          role="status"
+          className="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 bg-tanei-brand-dark text-white px-5 py-3 rounded-2xl shadow-xl text-sm flex items-center gap-3 animate-fade-in border border-tanei-brand max-w-[90vw]"
+        >
+          <span>🌱</span>
+          <span>{toastMessage}</span>
           <button
-            type="button"
-            onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-            className="md:hidden flex h-9 w-9 flex-col items-center justify-center gap-1.5"
-            aria-label={isMobileMenuOpen ? 'メニューを閉じる' : 'メニューを開く'}
-            aria-expanded={isMobileMenuOpen}
+            onClick={() => setToastMessage(null)}
+            aria-label="通知を閉じる"
+            className="text-white/70 hover:text-white text-xs font-bold flex-shrink-0"
           >
-            <span
-              className={`block h-[1.5px] w-5 bg-[#1F3028] transition-transform duration-200 ${
-                isMobileMenuOpen ? 'translate-y-[6.5px] rotate-45' : ''
-              }`}
-            />
-            <span
-              className={`block h-[1.5px] w-5 bg-[#1F3028] transition-opacity duration-200 ${
-                isMobileMenuOpen ? 'opacity-0' : 'opacity-100'
-              }`}
-            />
-            <span
-              className={`block h-[1.5px] w-5 bg-[#1F3028] transition-transform duration-200 ${
-                isMobileMenuOpen ? '-translate-y-[6.5px] -rotate-45' : ''
-              }`}
-            />
+            ✕
           </button>
         </div>
+      )}
 
-        {isMobileMenuOpen && (
-          <nav className="md:hidden border-t border-[#1F3028]/10 bg-[#F7F4EE]/95 px-6 py-2 backdrop-blur-md">
-            {NAV_ITEMS.map((item) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                onClick={(e) => handleNavClick(e, item.id)}
-                className={`block border-b border-[#1F3028]/5 py-3.5 text-base font-medium last:border-0 ${
-                  activeSection === item.id ? 'text-[#1F3028]' : 'text-[#55645B]'
-                }`}
-              >
-                {item.label}
-              </a>
-            ))}
-          </nav>
-        )}
-      </header>
+      <LeftSidebar
+        isOpen={isLeftSidebarOpen}
+        onClose={() => setIsLeftSidebarOpen(false)}
+        remainingCount={remainingCount}
+        remainingImageCount={remainingImageCount}
+        onSendMessage={sendMessage}
+        onDownloadBlankCutSheet={() => handleDownloadCutSheetPdf('blank')}
+        isGeneratingPdf={isGeneratingPdf}
+        onOpenModal={(type) => setActiveModal(type)}
+      />
 
-      {/* ================= HERO ================= */}
-      <section className="flex min-h-screen flex-col items-center justify-center px-6 pb-20 pt-32 text-center">
-        <div className="relative mb-14 aspect-[4/3] w-full max-w-4xl overflow-hidden rounded-[28px] border border-[#1F3028]/10 sm:aspect-[16/9]">
-          {/* TODO: フリー素材の仮画像。後日、実際の工房写真に差し替え予定 */}
-          <Image
-            src="/images/lp-hero.jpg"
-            alt="木製デスクに置かれたノートパソコンとメガネ、マウス"
-            fill
-            priority
-            sizes="(max-width: 1024px) 100vw, 900px"
-            className="object-cover"
+      {/* メインチャット画面 */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <TopBar
+          isLeftSidebarOpen={isLeftSidebarOpen}
+          onToggleSidebar={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
+          onNewConversation={handleNewConversation}
+        />
+
+        <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4">
+          <MessageList
+            messages={messages}
+            isLoading={isLoading}
+            isAnalyzingPhoto={isAnalyzingPhoto}
+            messagesEndRef={messagesEndRef}
+            onOpenGeminiImage={handleOpenGeminiImage}
+            onSendMessage={sendMessage}
+            onDownloadCutSheet={handleDownloadCutSheetPdf}
+            onDownloadAssemblyManual={handleDownloadAssemblyManualPdf}
+            isGeneratingPdf={isGeneratingPdf}
+            addItem={addItem}
+            showToast={showToast}
           />
-        </div>
 
-        <p className="text-[13px] tracking-[0.35em] text-[#7A867C]">Ideas into Reality.</p>
-
-        <h1 className="my-8 text-[clamp(42px,7vw,96px)] font-light leading-[1.15] tracking-[-0.03em]">
-          アイデアの種を、
-          <br />
-          カタチに。
-        </h1>
-
-        <p className="max-w-md text-lg leading-loose text-[#4B564E]">
-          TANE PROJECTは、
-          <br />
-          DIYを起点に、
-          <br />
-          アイデアを現実へ変えるブランドです。
-        </p>
-
-        <a
-          href="#flow"
-          onClick={(e) => handleNavClick(e, 'flow')}
-          className="group mt-16 inline-flex items-center gap-2 text-[13px] font-medium tracking-[0.1em] text-[#1F3028]"
-        >
-          流れを見る
-          <span className="inline-block transition-transform duration-300 group-hover:translate-y-1">↓</span>
-        </a>
-      </section>
-
-      {/* ================= STORY ================= */}
-      <section id="story" className="scroll-mt-24 bg-white px-6 py-32 sm:py-40">
-        <div className="mx-auto max-w-[800px]">
-          <SectionEyebrow>TANE PROJECT</SectionEyebrow>
-
-          <h2 className="mt-5 text-center text-[clamp(32px,5vw,55px)] font-light leading-[1.4]">
-            小さなひらめきを、
-            <br />
-            未来のカタチへ。
-          </h2>
-
-          <p className="mt-10 text-[17px] leading-[2.2] text-[#4B564E]">
-            人は毎日の暮らしの中で、ふとアイデアを思いつきます。
-            <br />
-            <br />
-            「こんな棚があったら便利なのに。」
-            <br />
-            「もっと簡単に作れたらいいのに。」
-            <br />
-            <br />
-            その小さなひらめきは、まだ形になっていない種。
-            <br />
-            <br />
-            考え、設計し、作る。
-            <br />
-            その過程を通して、新しい価値へ育てていきます。
-          </p>
-        </div>
-      </section>
-
-      {/* ================= STORY MESSAGE ================= */}
-      <section className="relative px-6 py-28 text-center sm:py-32">
-        <div className="mx-auto max-w-2xl">
-          <span className="text-4xl text-[#1F3028]/15">”</span>
-          <h2 className="text-[clamp(28px,4vw,44px)] font-light leading-[1.5]">
-            TANE PROJECTは、
-            <br />
-            アイデアを育てる場所。
-          </h2>
-          <p className="mt-8 text-[17px] leading-[2] text-[#4B564E]">
-            一人ひとりの挑戦が、
-            <br />
-            誰かの新しい種になる。
-          </p>
-        </div>
-      </section>
-
-      {/* ================= FLOW ================= */}
-      <section id="flow" className="scroll-mt-24 bg-white px-6 py-32 sm:py-40">
-        <SectionEyebrow>Flow</SectionEyebrow>
-        <h2 className="mt-5 text-center text-[clamp(30px,4.5vw,46px)] font-light leading-[1.3]">
-          アイデアが、
-          <br className="sm:hidden" />
-          カタチになるまで。
-        </h2>
-
-        <div className="relative mx-auto mt-16 grid max-w-5xl grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {FLOW_STEPS.map((item, index) => (
-            <div
-              key={item.title}
-              className="group relative rounded-[24px] border border-[#1F3028]/8 bg-[#F7F4EE] p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(31,48,40,0.08)]"
-            >
-              <div className="mb-5 flex items-center justify-between">
-                <span className="text-2xl">{item.icon}</span>
-                <span className="text-[11px] font-medium tracking-[0.15em] text-[#7A867C]">
-                  STEP 0{index + 1}
-                </span>
-              </div>
-              <h3 className="text-[19px] font-medium">{item.title}</h3>
-              <p className="mt-2 text-[14px] leading-relaxed text-[#55645B]">{item.desc}</p>
-
-              {index < FLOW_STEPS.length - 1 && (
-                <span className="pointer-events-none absolute right-[-14px] top-1/2 hidden -translate-y-1/2 text-lg text-[#1F3028]/25 lg:block">
-                  →
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ================= WORKS ================= */}
-      <section id="works" className="scroll-mt-24 bg-[#F7F4EE] px-6 py-32 sm:py-40">
-        <div className="mx-auto max-w-5xl">
-          <SectionEyebrow>作品</SectionEyebrow>
-          <h2 className="mt-5 text-center text-[clamp(30px,4.5vw,46px)] font-light leading-[1.4]">
-            生まれたアイデアが、
-            <br />
-            暮らしを変える。
-          </h2>
-
-          <div className="mt-16 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {WORKS.map((item) => (
-              <div
-                key={item.title}
-                className="group overflow-hidden rounded-[24px] bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_48px_rgba(31,48,40,0.1)]"
-              >
-                <div className="relative h-56 w-full overflow-hidden">
-                  <Image
-                    src={item.image}
-                    alt={item.alt}
-                    fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                    className="object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                </div>
-                <div className="p-8">
-                  <h3 className="text-[19px] font-medium">{item.title}</h3>
-                  <p className="mt-2 text-[14px] leading-[1.8] text-[#55645B]">{item.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ================= TANE:i ================= */}
-      <section id="tane-i" className="scroll-mt-24 bg-[#1F3028] px-6 py-32 text-center text-white sm:py-40">
-        <p className="text-[12px] tracking-[0.4em] text-white/60">TANE:i</p>
-
-        <h2 className="my-5 text-[clamp(64px,10vw,130px)] font-light leading-none tracking-[-0.04em]">TANE:i</h2>
-
-        <p className="mx-auto max-w-lg text-[20px] leading-[2] text-white/90">
-          あなたの中にある、
-          <br />
-          まだ見えないアイデアを、
-          <br />
-          一緒に育てるパートナー。
-        </p>
-
-        {/* TANE:i FLOW */}
-        <div className="mx-auto mt-16 flex max-w-4xl flex-wrap items-center justify-center gap-3">
-          {TANEI_FLOW.map((item, index) => (
-            <div key={item} className="flex items-center gap-3">
-              <div className="min-w-[110px] rounded-[16px] border border-white/25 bg-white/[0.04] px-6 py-5 text-[15px] font-medium transition-colors hover:border-white/50 hover:bg-white/[0.08]">
-                {item}
-              </div>
-              {index < TANEI_FLOW.length - 1 && <span className="text-lg text-white/40">→</span>}
-            </div>
-          ))}
-        </div>
-
-        <div className="mx-auto mt-12 grid max-w-4xl grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          {TANEI_FEATURES.map((item) => (
-            <div
-              key={item.label}
-              className="flex flex-col items-center gap-2 rounded-[16px] bg-white/[0.06] px-4 py-6 text-[14px] transition-colors hover:bg-white/[0.1]"
-            >
-              <span className="text-xl">{item.icon}</span>
-              {item.label}
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-16 inline-flex items-center gap-2 rounded-full border border-white/30 px-8 py-3.5 text-[14px] font-semibold tracking-[0.05em] text-white/70">
-          近日公開
-        </div>
-      </section>
-
-      {/* ================= FUTURE / CTA ================= */}
-      <section id="future" className="scroll-mt-24 bg-white px-6 py-32 text-center sm:py-40">
-        <h2 className="text-[clamp(32px,5vw,55px)] font-light leading-[1.4]">次のアイデアの種へ。</h2>
-
-        <p className="mx-auto mt-8 max-w-md text-[17px] leading-[2] text-[#4B564E]">
-          TANE PROJECTは、
-          <br />
-          ものづくりを通じて、
-          <br />
-          新しい挑戦を育てていきます。
-        </p>
-
-        <div className="mx-auto mt-16 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4">
-          {FUTURE_LINKS.map((item) =>
-            item.href ? (
-              <Link
-                key={item.label}
-                href={item.href}
-                className="group flex flex-col items-center gap-2 rounded-[20px] border border-[#1F3028]/8 bg-[#F7F4EE] px-5 py-8 text-left transition-all duration-300 hover:-translate-y-1 hover:border-[#1F3028]/20 hover:shadow-[0_16px_36px_rgba(31,48,40,0.08)]"
-              >
-                <span className="text-2xl">{item.icon}</span>
-                <span className="mt-1 text-[15px] font-semibold text-[#1F3028]">{item.label}</span>
-                <span className="text-[11px] leading-snug text-[#7A867C]">{item.desc}</span>
-              </Link>
-            ) : (
-              <div
-                key={item.label}
-                className="flex flex-col items-center gap-2 rounded-[20px] border border-[#1F3028]/8 bg-[#F7F4EE] px-5 py-8 text-left opacity-60"
-              >
-                <span className="text-2xl">{item.icon}</span>
-                <span className="mt-1 text-[15px] font-semibold text-[#1F3028]">{item.label}</span>
-                <span className="text-[11px] leading-snug text-[#7A867C]">{item.desc}</span>
-              </div>
-            )
+          {messages.length === 1 && (
+            <StartCards
+              onSendMessage={sendMessage}
+              onOpenPhotoPicker={() => fileInputRef.current?.click()}
+            />
           )}
         </div>
-      </section>
 
-      {/* ================= FOOTER ================= */}
-      <footer className="bg-[#F7F4EE] px-6 py-20 text-center text-[#7A867C]">
-        <a
-          href={CONTACT_HREF}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-full border border-[#1F3028]/15 px-5 py-2.5 text-[13px] font-medium text-[#1F3028] transition-colors hover:bg-[#1F3028] hover:text-white"
-        >
-          <span>💬</span> ご意見、リクエストはこちらから
-        </a>
+        <ChatInput
+          input={input}
+          onInputChange={setInput}
+          onKeyDown={handleKeyDown}
+          onSend={() => sendMessage(input, true)}
+          isLoading={isLoading}
+          selectedImage={selectedImage}
+          onSelectImage={handleImageSelect}
+          onClearImage={() => setSelectedImage(null)}
+          fileInputRef={fileInputRef}
+          onOpenGeminiImage={() => handleOpenGeminiImage()}
+          remainingImageCount={remainingImageCount}
+        />
+      </div>
 
-        <div className="mt-14 text-[16px] font-semibold tracking-[0.15em] text-[#1F3028]">🌱 TANE PROJECT</div>
-        <p className="mt-2 text-[12px] tracking-[0.2em]">Ideas into Reality.</p>
-        <p className="mt-8 text-[11px]">© 2026 TANE PROJECT</p>
-      </footer>
-    </main>
+      <RightPanel woodList={KOHNAN_WOOD_LIST} tools={shuffledTools} />
+
+      <SavedItemsModal
+        activeModal={activeModal}
+        savedItems={savedItems}
+        onClose={() => setActiveModal(null)}
+        onRemove={removeItem}
+        onUpdate={updateItem}
+        onAdd={addItem}
+      />
+    </div>
   );
 }
