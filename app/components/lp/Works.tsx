@@ -25,14 +25,14 @@ const STORY = [
     title: '設計図',
     desc: 'アイデアを、作れる形へ落とし込む。',
     image: '/images/lp-work-blueprint.jpg',
-    alt: '地図を手に取り、指差しながら確認する様子',
+    alt: '木の作業台に置かれたコンパスと図面',
   },
   {
     step: '04',
     title: '完成作品',
     desc: '暮らしの中に、新しい種が根づく。',
-    image: '/images/lp-work-shelf.jpg',
-    alt: '木の棚に並べられたヴィンテージカメラ',
+    image: '/images/lp-workshop.jpg',
+    alt: '完成したウッドデッキを歩く人の足元',
   },
 ];
 

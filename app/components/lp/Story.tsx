@@ -57,8 +57,8 @@ export default function Story() {
           <div className="relative aspect-[4/5] w-full overflow-hidden rounded-sm lg:aspect-[3/4]">
             {/* TODO: フリー素材の仮画像。後日、とみしんの制作風景写真に差し替え予定 */}
             <Image
-              src="/images/lp-workshop.jpg"
-              alt="木の板が敷かれたウッドデッキを歩く人の足元"
+              src="/images/lp-craft-tools.jpg"
+              alt="木の作業台に並べられた金槌やメジャーなどの手道具"
               fill
               sizes="(max-width: 1024px) 100vw, 50vw"
               className="object-cover"
