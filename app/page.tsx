@@ -121,12 +121,10 @@ export default function LpPage() {
         }`}
       >
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 sm:px-10 h-[72px]">
-          <a href="#" className="flex items-center gap-2">
+          <a href="#" className="inline-grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-0.5">
             <span className="text-xl leading-none">🌱</span>
-            <span className="flex flex-col leading-tight">
-              <span className="text-[15px] font-semibold tracking-[0.12em] text-[#1F3028]">TANE PROJECT</span>
-              <span className="text-[10px] tracking-[0.2em] text-[#7A867C]">Ideas into Reality.</span>
-            </span>
+            <span className="col-start-2 text-[15px] font-semibold tracking-[0.12em] text-[#1F3028]">TANE PROJECT</span>
+            <span className="col-start-2 text-[10px] tracking-[0.2em] text-[#7A867C]">Ideas into Reality.</span>
           </a>
 
           <nav className="hidden md:flex items-center gap-9">
@@ -440,11 +438,11 @@ export default function LpPage() {
           <span>💬</span> ご意見、リクエストはこちらから
         </a>
 
-        <div className="mt-16 flex items-center justify-center gap-2">
+        <div className="mt-16 grid w-fit grid-cols-[auto_1fr] items-center gap-x-2 gap-y-3 mx-auto">
           <span className="text-xl leading-none">🌱</span>
-          <span className="text-[16px] font-semibold tracking-[0.15em] text-[#1F3028]">TANE PROJECT</span>
+          <span className="col-start-2 text-[16px] font-semibold tracking-[0.15em] text-[#1F3028]">TANE PROJECT</span>
+          <span className="col-start-2 text-[12px] tracking-[0.2em] text-[#5B655F]">Ideas into Reality.</span>
         </div>
-        <p className="mt-3 text-[12px] tracking-[0.2em] text-[#5B655F]">Ideas into Reality.</p>
 
         <p className="mt-12 text-[11px] tracking-[0.05em]">© 2026 TANE PROJECT</p>
       </footer>
