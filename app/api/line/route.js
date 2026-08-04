@@ -32,6 +32,39 @@ const IMAGE_PROMPT =
 // LINEのメッセージ1通あたりの上限文字数。超えるとreplyMessageが失敗するため安全に切り詰める
 const LINE_TEXT_MESSAGE_LIMIT = 5000;
 
+// TANE:i本体(app/app/page.tsx)の「本日の無料相談 10回」と同じ回数・仕様に合わせる。
+// LINE bot側はサーバーで完結する必要があるため、ユーザーごと・日付ごとにサーバー側で実カウントする
+// （本体側はブラウザのstateだけで実際には強制されていないカウンターだが、こちらは実際に上限まで制限する）
+const DAILY_MESSAGE_LIMIT = 10;
+const LIMIT_REACHED_MESSAGE =
+  '本日の無料相談回数の上限（10回）に達しました🙏 また明日、あらためてご相談ください。';
+
+// メモリ上の簡易カウンター。Vercelなどサーバーレス環境では、インスタンスの入れ替わりにより
+// カウントが完全には引き継がれない場合がある点に注意（永続化が必要な場合はKV/DB導入を検討）
+const usageByUser = new Map();
+
+function getJstDateKey() {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(new Date());
+}
+
+// userIdごとに当日の利用回数をチェックし、上限内であればカウントを1つ消費してtrueを返す
+function consumeDailyQuota(userId) {
+  const today = getJstDateKey();
+  const usage = usageByUser.get(userId);
+
+  if (!usage || usage.date !== today) {
+    usageByUser.set(userId, { date: today, count: 1 });
+    return true;
+  }
+
+  if (usage.count >= DAILY_MESSAGE_LIMIT) {
+    return false;
+  }
+
+  usage.count += 1;
+  return true;
+}
+
 // このAPIキーのアカウントでは "gemini-2.5-flash" が
 // "no longer available to new users" (404) となり使用できないため、
 // 同じ世代のFlashモデルを指す常時最新のエイリアスを使用する（app/api/chatと同じ方針）
@@ -85,16 +118,28 @@ async function handleMessageEvent(event) {
     return;
   }
 
+  if (event.message.type !== 'text' && event.message.type !== 'image') {
+    return;
+  }
+
   try {
+    const userId = event.source?.userId;
+
+    if (userId && !consumeDailyQuota(userId)) {
+      await lineClient.replyMessage({
+        replyToken: event.replyToken,
+        messages: [{ type: 'text', text: LIMIT_REACHED_MESSAGE }],
+      });
+      return;
+    }
+
     let replyText;
 
     if (event.message.type === 'text') {
       replyText = await generateReplyText(event.message.text);
-    } else if (event.message.type === 'image') {
+    } else {
       const { base64, mimeType } = await fetchLineImageAsBase64(event.message);
       replyText = await generateReplyForImage(base64, mimeType);
-    } else {
-      return;
     }
 
     await lineClient.replyMessage({
