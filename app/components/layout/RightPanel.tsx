@@ -134,7 +134,7 @@ function PanelFooter() {
       </Card>
 
       <a
-        href="https://line.me/R/ti/p/@your_line_id"
+        href="https://line.me/R/ti/p/@mdo9046l"
         target="_blank"
         rel="noopener noreferrer"
         className="mt-3 flex items-center justify-center gap-1.5 text-xs font-bold text-tanei-ink-muted hover:text-tanei-ink hover:underline transition-colors px-1 py-1"

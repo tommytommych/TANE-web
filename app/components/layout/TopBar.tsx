@@ -36,7 +36,7 @@ export default function TopBar({ isLeftSidebarOpen, onToggleSidebar, onNewConver
 
       <div className="flex items-center gap-3">
         <a
-          href="https://line.me/R/ti/p/@your_line_id"
+          href="https://line.me/R/ti/p/@mdo9046l"
           target="_blank"
           rel="noopener noreferrer"
           className="bg-[#06C755] hover:bg-[#05b34c] text-white text-xs font-bold px-3 py-2 rounded-tanei-control shadow-sm transition-all flex items-center gap-1.5"

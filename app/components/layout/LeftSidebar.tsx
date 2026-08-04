@@ -102,7 +102,7 @@ export default function LeftSidebar({
 
             {/* LINE公式アカウント連携ボタン */}
             <a
-              href="https://line.me/R/ti/p/@your_line_id"
+              href="https://line.me/R/ti/p/@mdo9046l"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-2 bg-[#06C755] hover:bg-[#05b34c] text-white p-3 rounded-tanei-control font-bold text-sm shadow-md transition-all"

@@ -2,8 +2,7 @@
 
 import FadeIn from './motion/FadeIn';
 
-// TODO: 正式に運用するLINE公式アカウント等のURLが決まり次第、ここを差し替える
-const CONTACT_HREF = 'https://line.me/R/ti/p/@your_line_id';
+const CONTACT_HREF = 'https://line.me/R/ti/p/@mdo9046l';
 // 既存のとみしんチャンネルDIY（YouTube）を流用。Instagram/Xは開設後に差し替え
 const SOCIAL_LINKS = [
   { label: 'YouTube', href: 'https://www.youtube.com/@tomishin_channel_DIY', icon: YoutubeIcon },
