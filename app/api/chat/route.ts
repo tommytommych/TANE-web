@@ -6,10 +6,15 @@ import {
   type Content,
   type Part,
 } from '@google/genai';
+import { getOrCreateAnonymousUserId } from '../../lib/anonymousUser';
+import { consumeUsage, getRemainingCount } from '../../lib/rateLimit';
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY!,
 });
+
+const DAILY_LIMIT_MESSAGE =
+  '本日の無料相談回数の上限（10回）に達しました🙏 また明日、あらためてご相談ください。';
 
 const SYSTEM_INSTRUCTION = `
 あなたは「TANE:i」、初心者向け木工DIYの専門家・アドバイザーです。
@@ -235,6 +240,9 @@ export async function POST(req: Request) {
     const rawBody = typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
     const history: HistoryTurn[] = Array.isArray(rawBody.history) ? rawBody.history.filter(isValidHistoryTurn) : [];
     const context: DesignContext | null = isValidDesignContext(rawBody.context) ? rawBody.context : null;
+    // クイックスタートカード等、本来の「無料相談」としてカウントしない送信ではfalseを渡す
+    // （フロント側のcountUpと対応。未指定時はカウントする）
+    const countUsage = rawBody.countUsage !== false;
 
     // 「シルエットカメオデザイン」メニューから始まる相談、または会話中に言及された場合は
     // カメオモードに切り替え、木取り図・組立説明書ではなくデザイン候補を提案させる
@@ -270,6 +278,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ reply: 'メッセージが空です。' }, { status: 400 });
     }
 
+    // 実際にGeminiを呼ぶ直前で利用回数をチェック・消費する
+    // （空メッセージなど、そもそもAPIを呼ばないケースでは消費しない）
+    const userId = await getOrCreateAnonymousUserId();
+    const remaining = countUsage ? await consumeUsage(userId) : await getRemainingCount(userId);
+
+    if (remaining === null) {
+      return NextResponse.json(
+        { reply: DAILY_LIMIT_MESSAGE, errorType: 'daily-limit', remaining: 0 },
+        { status: 429 }
+      );
+    }
+
     // フロントエンドが直前の回答から抽出したContextを、システムインストラクションに明示的に注入する。
     // 会話履歴の文章から毎回推測させるより、構造化データとして渡す方が精度が安定する。
     const contextNote = context
@@ -288,7 +308,7 @@ export async function POST(req: Request) {
 
     const replyText = response.text || 'DIYの提案を作成しました。';
 
-    return NextResponse.json({ reply: replyText });
+    return NextResponse.json({ reply: replyText, remaining });
   } catch (error) {
     console.error('API Error:', error);
 

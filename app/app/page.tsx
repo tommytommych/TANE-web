@@ -77,6 +77,23 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    // 「本日の無料相談」の残り回数はサーバー（Vercel KV）が真実のソース。
+    // ブラウザのstateだけに頼ると更新のたびに10回へ戻ってしまうため、
+    // マウント時に実際の残り回数を取得して同期する
+    (async () => {
+      try {
+        const res = await fetch('/api/usage');
+        const data = await res.json();
+        if (typeof data?.remaining === 'number') {
+          setRemainingCount(data.remaining);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
     // SSR時とクライアントでMath.random()の結果が異なりhydrationエラーになるため、
     // マウント後（クライアント側のみ）にシャッフルする。意図的なクライアント専用処理のため、
     // react-hooks/set-state-in-effect（外部システム同期以外でのsetState呼び出しを警告するルール）を明示的に抑制する
@@ -291,6 +308,13 @@ export default function Home() {
   const sendMessage = useCallback(async (textToSend: string, countUp: boolean = false) => {
     if ((!textToSend.trim() && !selectedImage) || isLoading) return;
 
+    // サーバー(Vercel KV)が管理する「本日の無料相談」の残り回数を、ここでも即座にチェックする
+    // （実際の上限判定は/api/chat側で行うが、明らかに0回のときは通信せず先にお知らせする）
+    if (countUp && remainingCount <= 0) {
+      showToast('本日の無料相談回数の上限（10回）に達しました🙏 また明日ご利用ください。');
+      return;
+    }
+
     if (textToSend.includes('コーナン') && (textToSend.includes('木材') || textToSend.includes('価格') || textToSend.includes('サイズ') || textToSend.includes('リスト'))) {
       const woodText = KOHNAN_WOOD_LIST.map(w => `■ ${w.name}\n・特徴: ${w.feature}\n・サイズ: ${w.size}\n・長さ: ${w.length}\n・価格目安: ${w.price}\n`).join('\n');
       const replyText = `コーナンで取り扱われている代表的な木材のリストです。\n\n${woodText}\n（※価格は店舗や時期によって前後します。）`;
@@ -312,10 +336,6 @@ export default function Home() {
     setIsLoading(true);
     if (currentImg) setIsAnalyzingPhoto(true);
 
-    if (countUp) {
-      setRemainingCount((prev) => Math.max(0, prev - 1));
-    }
-
     addItem('history', textToSend, textToSend);
 
     try {
@@ -331,10 +351,15 @@ export default function Home() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ history, context }),
+        body: JSON.stringify({ history, context, countUsage: countUp }),
       });
 
       const data = await response.json();
+
+      // 残り回数はサーバー側の実データが正なので、返ってきていれば必ず同期する
+      if (typeof data?.remaining === 'number') {
+        setRemainingCount(data.remaining);
+      }
 
       if (!response.ok) {
         // サーバー側で分類済みの、初心者にも分かるエラーメッセージをそのまま使う
@@ -366,7 +391,7 @@ export default function Home() {
       setIsLoading(false);
       setIsAnalyzingPhoto(false);
     }
-  }, [messages, selectedImage, isLoading, addItem]);
+  }, [messages, selectedImage, isLoading, addItem, remainingCount, showToast]);
 
   // 現状はベータ版のため、画像生成は外部のGemini Web版に任せる（プロンプトをコピーして新規タブで開く）。
   // 本格稼働時にAPI化する想定で、promptOverrideを渡せば任意のプロンプト（カメオのデザイン案など）でも同じ導線を使える
