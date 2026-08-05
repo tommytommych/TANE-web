@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import FadeIn from '../components/lp/motion/FadeIn';
-import TaneminMascot from '../components/lp/TaneminMascot';
 import Footer from '../components/lp/Footer';
 
 export const metadata: Metadata = {
@@ -27,12 +27,6 @@ const ROLES = [
     description: 'アイデアという種を、一緒に育てる仲間たち。',
   },
 ] as const;
-
-const MASCOT_PALETTE = [
-  { leaf: '#6BAA4A', seed: '#5A3E1E', bg: '#F6EAD1', cheek: '#F08A2A' },
-  { leaf: '#F08A2A', seed: '#5A3E1E', bg: '#F6EAD1', cheek: '#6BAA4A' },
-  { leaf: '#6BAA4A', seed: '#F08A2A', bg: '#F6EAD1', cheek: '#5A3E1E' },
-];
 
 const MOTIFS = [
   { title: '双葉', description: '芽吹いたばかりの、これから伸びていく可能性。' },
@@ -69,26 +63,23 @@ export default function TaneminPage() {
           <p className="text-[12px] tracking-[0.4em] text-[#8A8A8A]">Community</p>
         </FadeIn>
         <FadeIn delay={0.1}>
-          <h1 className="mt-6 text-[clamp(48px,9vw,120px)] font-light leading-none tracking-[-0.03em]">
-            たねみん
-          </h1>
+          <div className="mx-auto mt-10 w-full max-w-[360px] rounded-sm border border-[#1F3028]/10 bg-white p-8 sm:max-w-[420px]">
+            <Image
+              src="/images/tanemin-logo.jpg"
+              alt="たねみんのロゴ。芽が伸びた種のキャラクターを中心に「たねみん・TANE PROJECTの仲間」の文字と「Grow Ideas. Grow Together.」のタグラインが添えられている"
+              width={1252}
+              height={759}
+              className="h-auto w-full"
+              priority
+            />
+          </div>
         </FadeIn>
         <FadeIn delay={0.2}>
-          <p className="mx-auto mt-10 max-w-xl text-[17px] leading-[2.1] text-[#1F3028]/75">
+          <p className="mx-auto mt-12 max-w-xl text-[17px] leading-[2.1] text-[#1F3028]/75">
             たねみんとは、TANE PROJECTでアイデアという
             <br className="hidden sm:block" />
             「種」を一緒に育てる仲間のことです。
           </p>
-        </FadeIn>
-        <FadeIn delay={0.3}>
-          <div className="mx-auto mt-14 inline-flex flex-col items-center rounded-sm border border-[#1F3028]/10 bg-white px-10 py-8">
-            <p className="text-[20px] font-light tracking-[-0.01em] sm:text-[26px]">
-              Grow Ideas. Grow Together.
-            </p>
-            <p className="mt-3 text-[13px] tracking-wide text-[#8A8A8A]">
-              アイデアの種を、みんなで育てよう。
-            </p>
-          </div>
         </FadeIn>
       </section>
 
@@ -137,14 +128,6 @@ export default function TaneminPage() {
             たねみんのやわらかい佇まいをつくっています。
           </p>
         </FadeIn>
-
-        <div className="mx-auto mt-16 grid max-w-[900px] grid-cols-3 gap-4 sm:gap-8">
-          {MASCOT_PALETTE.map((colors, index) => (
-            <FadeIn key={index} delay={index * 0.1}>
-              <TaneminMascot {...colors} className="mx-auto w-full max-w-[180px]" />
-            </FadeIn>
-          ))}
-        </div>
 
         <div className="mx-auto mt-16 grid max-w-[900px] grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-4">
           {MOTIFS.map((motif, index) => (
