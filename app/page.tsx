@@ -3,6 +3,7 @@ import Hero from './components/lp/Hero';
 import Story from './components/lp/Story';
 import Concept from './components/lp/Concept';
 import TaneI from './components/lp/TaneI';
+import TaneIGlimpse from './components/lp/TaneIGlimpse';
 import Community from './components/lp/Community';
 import Future from './components/lp/Future';
 import Footer from './components/lp/Footer';
@@ -21,6 +22,7 @@ export default function LpPage() {
       <Story />
       <Concept />
       <TaneI />
+      <TaneIGlimpse />
       <Community />
       <Future />
       <Footer />
