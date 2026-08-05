@@ -7,7 +7,7 @@ const NAV_ITEMS = [
   { id: 'story', label: '物語' },
   { id: 'concept', label: 'コンセプト' },
   { id: 'tane-i', label: 'TANE:i' },
-  { id: 'flow', label: '流れ' },
+  { id: 'flow', label: 'TANE:iの流れ' },
   { id: 'works', label: '作品' },
   { id: 'community', label: 'コミュニティ' },
   { id: 'future', label: '未来' },

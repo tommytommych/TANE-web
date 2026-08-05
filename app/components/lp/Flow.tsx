@@ -17,7 +17,7 @@ export default function Flow() {
   return (
     <section id="flow" className="scroll-mt-24 bg-white px-6 py-32 sm:py-40">
       <FadeIn>
-        <p className="text-center text-[12px] tracking-[0.3em] text-[#8A8A8A]">Flow</p>
+        <p className="text-center text-[12px] tracking-[0.3em] text-[#8A8A8A]">TANE:iの流れ</p>
         <h2 className="mt-6 text-center text-[clamp(30px,4.5vw,48px)] font-light leading-[1.3] tracking-[-0.02em] text-[#1F3028]">
           TANE:iを使うと、
           <br className="sm:hidden" />
