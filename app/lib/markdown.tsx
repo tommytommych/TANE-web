@@ -25,13 +25,17 @@ export const getMarkdownComponents = (isUser: boolean): Components => {
     hr: ({ ...props }: ComponentProps<'hr'>) => <hr className={`my-3 ${borderClass}`} {...props} />,
     code: ({ className, ...props }: ComponentProps<'code'>) =>
       className ? (
-        // コードブロック（```で囲まれた複数行）: rehype/remark が親の <pre> に className を付けるため、ここは素のまま表示
-        <code className={`${className} font-mono text-xs`} {...props} />
+        // コードブロック（```で囲まれた複数行）: 設計図・木取り図などのアスキーアートを
+        // 崩さず表示するため、等幅フォント・ホワイトスペース維持を明示する
+        <code className={`${className} font-mono text-xs whitespace-pre`} {...props} />
       ) : (
         <code className={`${codeClass} rounded px-1.5 py-0.5 font-mono text-xs`} {...props} />
       ),
     pre: ({ ...props }: ComponentProps<'pre'>) => (
-      <pre className={`${codeClass} rounded-lg p-3 my-2 overflow-x-auto text-xs`} {...props} />
+      <pre
+        className={`${codeClass} rounded-lg p-3 my-2 overflow-x-auto text-xs font-mono leading-normal whitespace-pre`}
+        {...props}
+      />
     ),
     table: ({ ...props }: ComponentProps<'table'>) => (
       <div className="overflow-x-auto my-2">
