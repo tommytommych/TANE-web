@@ -32,6 +32,10 @@ const IMAGE_PROMPT =
 // LINEのメッセージ1通あたりの上限文字数。超えるとreplyMessageが失敗するため安全に切り詰める
 const LINE_TEXT_MESSAGE_LIMIT = 5000;
 
+// リッチメニュー等からこのテキストが送られてきた場合は、Geminiによる自動応答を行わず
+// LINE公式アカウントマネージャーでの手動チャット対応に委ねる
+const HUMAN_HANDOFF_MESSAGE = 'ご意見・リクエストを送ります';
+
 // TANE:i本体(app/app/page.tsx)の「本日の無料相談 10回」と同じ回数・仕様に合わせる。
 // LINE bot側はサーバーで完結する必要があるため、ユーザーごと・日付ごとにサーバー側で実カウントする
 // （本体側はブラウザのstateだけで実際には強制されていないカウンターだが、こちらは実際に上限まで制限する）
@@ -119,6 +123,11 @@ async function handleMessageEvent(event) {
   }
 
   if (event.message.type !== 'text' && event.message.type !== 'image') {
+    return;
+  }
+
+  // Geminiを呼ばず、200 OKのみ返してLINE側の手動チャットに委ねる
+  if (event.message.type === 'text' && event.message.text === HUMAN_HANDOFF_MESSAGE) {
     return;
   }
 
