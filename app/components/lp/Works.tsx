@@ -46,14 +46,6 @@ const STORY = [
     src: '/images/lp-work-build.mp4',
     poster: '/images/lp-work-build-poster.jpg',
   },
-  {
-    step: '06',
-    title: '完成作品',
-    desc: '暮らしの中に、新しい種が根づく。',
-    type: 'image' as const,
-    src: '/images/lp-workshop.jpg',
-    alt: '完成したウッドデッキを歩く人の足元',
-  },
 ];
 
 export default function Works() {
