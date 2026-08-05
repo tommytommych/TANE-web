@@ -42,11 +42,11 @@ export default function Works() {
   return (
     <section id="works" className="scroll-mt-24 bg-[#FAF8F4] px-6 py-32 sm:py-40">
       <FadeIn>
-        <p className="text-center text-[12px] tracking-[0.3em] text-[#8A8A8A]">作品</p>
+        <p className="text-center text-[12px] tracking-[0.3em] text-[#8A8A8A]">Example</p>
         <h2 className="mt-6 text-center text-[clamp(30px,4.5vw,48px)] font-light leading-[1.4] tracking-[-0.02em] text-[#1F3028]">
-          相談から完成まで、
+          ある日の相談が、
           <br />
-          物語で見る。
+          作品になるまで。
         </h2>
       </FadeIn>
 

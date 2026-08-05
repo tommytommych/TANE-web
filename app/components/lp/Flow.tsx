@@ -19,9 +19,9 @@ export default function Flow() {
       <FadeIn>
         <p className="text-center text-[12px] tracking-[0.3em] text-[#8A8A8A]">Flow</p>
         <h2 className="mt-6 text-center text-[clamp(30px,4.5vw,48px)] font-light leading-[1.3] tracking-[-0.02em] text-[#1F3028]">
-          アイデアが、
+          TANE:iを使うと、
           <br className="sm:hidden" />
-          カタチになるまで。
+          こんな流れで進みます。
         </h2>
       </FadeIn>
 
