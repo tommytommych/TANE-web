@@ -117,6 +117,31 @@ async function fetchLineImageAsBase64(message) {
   return { base64: buffer.toString('base64'), mimeType };
 }
 
+// Gemini呼び出し失敗時に、初心者にも分かる言葉で「時間をおいて」と案内する
+// （レート上限か、それ以外の通信エラーかで文言を分ける。app/api/chatと同じ方針・同じ文言）
+function buildGeminiErrorReplyText(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  const isQuotaError =
+    message.includes('RESOURCE_EXHAUSTED') || message.includes('429') || message.toLowerCase().includes('quota');
+
+  return isQuotaError
+    ? '本日のAI利用回数の上限に達したようです🙏 しばらく時間をおいてから、もう一度お試しください。'
+    : '通信エラーが発生しました。少し時間をおいてから、もう一度お試しください。';
+}
+
+// LINEへの返信自体が失敗しても（replyTokenの期限切れ・認証エラーなど）、
+// 全体の処理は止めずログだけ残す
+async function replySafely(replyToken, text) {
+  try {
+    await lineClient.replyMessage({
+      replyToken,
+      messages: [{ type: 'text', text }],
+    });
+  } catch (error) {
+    console.error('LINE bot reply error:', error);
+  }
+}
+
 async function handleMessageEvent(event) {
   if (event.type !== 'message') {
     return;
@@ -131,33 +156,28 @@ async function handleMessageEvent(event) {
     return;
   }
 
+  const userId = event.source?.userId;
+
+  if (userId && !consumeDailyQuota(userId)) {
+    await replySafely(event.replyToken, LIMIT_REACHED_MESSAGE);
+    return;
+  }
+
+  let replyText;
+
   try {
-    const userId = event.source?.userId;
-
-    if (userId && !consumeDailyQuota(userId)) {
-      await lineClient.replyMessage({
-        replyToken: event.replyToken,
-        messages: [{ type: 'text', text: LIMIT_REACHED_MESSAGE }],
-      });
-      return;
-    }
-
-    let replyText;
-
     if (event.message.type === 'text') {
       replyText = await generateReplyText(event.message.text);
     } else {
       const { base64, mimeType } = await fetchLineImageAsBase64(event.message);
       replyText = await generateReplyForImage(base64, mimeType);
     }
-
-    await lineClient.replyMessage({
-      replyToken: event.replyToken,
-      messages: [{ type: 'text', text: replyText }],
-    });
   } catch (error) {
-    console.error('LINE bot reply error:', error);
+    console.error('LINE bot Gemini error:', error);
+    replyText = buildGeminiErrorReplyText(error);
   }
+
+  await replySafely(event.replyToken, replyText);
 }
 
 export async function POST(req) {
