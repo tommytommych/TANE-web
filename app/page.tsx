@@ -1,6 +1,7 @@
 import Header from './components/lp/Header';
 import Hero from './components/lp/Hero';
 import Story from './components/lp/Story';
+import Concept from './components/lp/Concept';
 import Flow from './components/lp/Flow';
 import Works from './components/lp/Works';
 import TaneI from './components/lp/TaneI';
@@ -20,6 +21,7 @@ export default function LpPage() {
       <Header />
       <Hero />
       <Story />
+      <Concept />
       <Flow />
       <Works />
       <TaneI />
