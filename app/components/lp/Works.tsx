@@ -3,35 +3,55 @@
 import Image from 'next/image';
 import { motion, useReducedMotion } from 'framer-motion';
 import FadeIn from './motion/FadeIn';
+import LazyVideo from './motion/LazyVideo';
 
-// TODO: いずれもフリー素材の仮画像。後日、実際の相談〜完成までの制作事例写真に差し替え予定
 const STORY = [
   {
     step: '01',
     title: '相談',
     desc: '頭の中にある想いを、言葉にして伝える。',
-    image: '/images/lp-work-consult.jpg',
-    alt: '俯瞰で見たデスク。ノートパソコンとノート、ペン、スマートフォンが並ぶ',
+    type: 'video' as const,
+    src: '/images/lp-work-consult.mov',
+    poster: '/images/lp-work-consult-poster.jpg',
   },
   {
     step: '02',
     title: 'AI完成イメージ',
     desc: 'まだ見えない完成形を、AIと一緒に思い描く。',
-    image: '/images/lp-hero.jpg',
+    type: 'image' as const,
+    src: '/images/lp-hero.jpg',
     alt: '木製デスクに置かれたノートパソコンとメガネ、マウス',
   },
   {
     step: '03',
     title: '設計図',
     desc: 'アイデアを、作れる形へ落とし込む。',
-    image: '/images/lp-work-blueprint.jpg',
-    alt: '木の作業台に置かれたコンパスと図面',
+    type: 'image' as const,
+    src: '/images/lp-work-measure.jpg',
+    alt: '木材の上に置かれたさしがねとメジャー、鉛筆',
   },
   {
     step: '04',
+    title: '材料調達',
+    desc: '必要な木材を、ホームセンターで揃える。',
+    type: 'video' as const,
+    src: '/images/lp-work-material.mov',
+    poster: '/images/lp-work-material-poster.jpg',
+  },
+  {
+    step: '05',
+    title: '制作',
+    desc: '一つひとつの工程を、手を動かして進める。',
+    type: 'video' as const,
+    src: '/images/lp-work-build.mp4',
+    poster: '/images/lp-work-build-poster.jpg',
+  },
+  {
+    step: '06',
     title: '完成作品',
     desc: '暮らしの中に、新しい種が根づく。',
-    image: '/images/lp-workshop.jpg',
+    type: 'image' as const,
+    src: '/images/lp-workshop.jpg',
     alt: '完成したウッドデッキを歩く人の足元',
   },
 ];
@@ -68,13 +88,17 @@ export default function Works() {
                 variants={{ hover: { scale: 1.04 } }}
                 transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
               >
-                <Image
-                  src={item.image}
-                  alt={item.alt}
-                  fill
-                  sizes="(max-width: 1024px) 100vw, 1100px"
-                  className="object-cover"
-                />
+                {item.type === 'video' ? (
+                  <LazyVideo src={item.src} poster={item.poster} className="h-full w-full object-cover" />
+                ) : (
+                  <Image
+                    src={item.src}
+                    alt={item.alt}
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 1100px"
+                    className="object-cover"
+                  />
+                )}
               </motion.div>
             </motion.div>
           </FadeIn>

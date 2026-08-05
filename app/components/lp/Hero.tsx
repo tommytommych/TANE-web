@@ -1,14 +1,51 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
 import RevealText from './motion/RevealText';
 
-// TODO: 実際のブランドムービー素材（種→発芽→木→木材→制作→完成→暮らし の実写・実撮影動画）が
-// 用意できたら、背景に敷く演出を検討する
+// TODO: 将来的に「種→発芽→木→木材→制作→完成→暮らし」を通しで撮影した
+// ブランドムービーが用意できたら、この芽の動画と差し替える
 export default function Hero() {
+  const shouldReduceMotion = useReducedMotion();
+
   return (
     <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#FAF8F4] px-6 pt-24 text-center">
+      {/* 背景動画：土から芽吹く様子を、ごく淡いアンビエント背景として敷く */}
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <motion.div
+          initial={{ scale: 1.08, opacity: 0 }}
+          animate={{ scale: shouldReduceMotion ? 1.08 : 1, opacity: 0.28 }}
+          transition={{ duration: 3, ease: [0.16, 1, 0.3, 1] }}
+          className="absolute inset-0"
+        >
+          {shouldReduceMotion ? (
+            <Image
+              src="/images/lp-hero-sprout-poster.jpg"
+              alt=""
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover"
+            />
+          ) : (
+            <video
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="auto"
+              poster="/images/lp-hero-sprout-poster.jpg"
+              className="h-full w-full object-cover"
+            >
+              <source src="/images/lp-hero-sprout.mp4" type="video/mp4" />
+            </video>
+          )}
+        </motion.div>
+        <div className="absolute inset-0 bg-[#FAF8F4]/55" />
+      </div>
+
       {/* 前面：見出し・説明・CTA */}
       <div className="relative z-10 flex flex-col items-center">
         <FadeInSmall>
