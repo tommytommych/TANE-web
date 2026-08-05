@@ -403,9 +403,18 @@ export default function Home() {
 
     let promptText = promptOverride;
     if (!promptText) {
-      const lastAssistantMsg = messages.slice().reverse().find((m) => m.role === 'assistant');
-      const context = lastAssistantMsg ? extractContextFromContent(lastAssistantMsg.content) : null;
-      const lastUserMsg = messages.slice().reverse().find((m) => m.role === 'user')?.content || 'DIYの完成イメージ';
+      const roles = messages.map((m) => m.role);
+      const lastAssistantIndex = roles.lastIndexOf('assistant');
+      const lastUserIndex = roles.lastIndexOf('user');
+      const lastUserMsg = (lastUserIndex >= 0 ? messages[lastUserIndex].content : '') || 'DIYの完成イメージ';
+
+      // アシスタントの最新Context（tanei-context）は、それが生成された時点までの会話しか
+      // 反映していない。ユーザーが直近で話題を変えたばかりでまだAIの返答がついていない場合
+      // （lastUserIndex > lastAssistantIndex）、Contextは古い話題のまま止まっている可能性が
+      // あるため信用せず、最新のユーザーメッセージ自体を優先する
+      const context =
+        lastAssistantIndex > lastUserIndex ? extractContextFromContent(messages[lastAssistantIndex].content) : null;
+
       promptText = context?.item
         ? `画像生成：${context.item}の完成イメージ、木製DIY家具、ナチュラルテイスト、高品質レンダリング`
         : `画像生成：${lastUserMsg}のリアルな完成イメージ、木製DIY家具、ナチュラルテイスト、高品質レンダリング`;
