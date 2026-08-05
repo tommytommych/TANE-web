@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import FadeIn from './motion/FadeIn';
 
 const LOGO_PARTS = [
@@ -48,7 +49,17 @@ export default function Concept() {
     <section id="concept" className="scroll-mt-24 bg-[#FAF8F4] px-6 py-32 sm:py-40">
       <div className="mx-auto max-w-[1100px]">
         <FadeIn>
-          <p className="text-center text-[12px] tracking-[0.3em] text-[#8A8A8A]">Concept</p>
+          <div className="mx-auto w-full max-w-[320px] rounded-sm border border-[#1F3028]/10 bg-white p-8 sm:max-w-[380px]">
+            <Image
+              src="/images/tane-project-logo.png"
+              alt="TANE PROJECTのロゴ。家のシルエットの中に、太陽と回路に見守られながら育つ芽が描かれている"
+              width={1536}
+              height={1024}
+              className="h-auto w-full"
+            />
+          </div>
+
+          <p className="mt-16 text-center text-[12px] tracking-[0.3em] text-[#8A8A8A]">Concept</p>
           <h2 className="mt-6 text-center text-[clamp(30px,4.5vw,48px)] font-light leading-[1.4] tracking-[-0.02em] text-[#1F3028]">
             ロゴに込めた想い
           </h2>
