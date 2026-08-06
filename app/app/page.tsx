@@ -24,6 +24,7 @@ import {
   bytesToDataUrl,
 } from '../lib/savedItemsStore';
 import { downloadPdfBytes } from '../lib/download';
+import { getLocalRemainingCount, consumeLocalUsage, setLocalRemainingCount } from '../lib/localUsage';
 
 import TopBar from '../components/layout/TopBar';
 import LeftSidebar from '../components/layout/LeftSidebar';
@@ -32,6 +33,12 @@ import SavedItemsModal from '../components/layout/SavedItemsModal';
 import MessageList from '../components/chat/MessageList';
 import ChatInput from '../components/chat/ChatInput';
 import StartCards from '../components/chat/StartCards';
+
+// LINE bot(app/api/line/route.js)・app/lib/rateLimit.tsと同じ回数・仕様
+const DAILY_MESSAGE_LIMIT = 10;
+const DAILY_IMAGE_LIMIT = 5;
+const MESSAGE_USAGE_STORAGE_KEY = 'tanei-message-usage-v1';
+const IMAGE_USAGE_STORAGE_KEY = 'tanei-image-usage-v1';
 
 const WELCOME_MESSAGE: Message = {
   role: 'assistant',
@@ -77,15 +84,25 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    // 「本日の無料相談」の残り回数はサーバー（Vercel KV）が真実のソース。
-    // ブラウザのstateだけに頼ると更新のたびに10回へ戻ってしまうため、
-    // マウント時に実際の残り回数を取得して同期する
+    // 画像生成回数はサーバー側で管理していないため、localStorageの値のみで
+    // マウント時に同期する（初期値5のままだとリロードで毎回リセットされてしまうため）。
+    // 意図的なクライアント専用の外部システム同期のため、react-hooks/set-state-in-effectを明示的に抑制する
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRemainingImageCount(getLocalRemainingCount(IMAGE_USAGE_STORAGE_KEY, DAILY_IMAGE_LIMIT));
+
+    // 「本日の無料相談」の残り回数は、本来はサーバー（Vercel KV）が真実のソース。
+    // ただしKV未接続の環境では常に上限値が返ってきてしまうため、localStorageに
+    // 保存した消費済みの回数と突き合わせ、より厳しい（小さい）方を採用する
     (async () => {
+      const localRemaining = getLocalRemainingCount(MESSAGE_USAGE_STORAGE_KEY, DAILY_MESSAGE_LIMIT);
+      setRemainingCount(localRemaining);
       try {
         const res = await fetch('/api/usage');
         const data = await res.json();
         if (typeof data?.remaining === 'number') {
-          setRemainingCount(data.remaining);
+          const merged = Math.min(localRemaining, data.remaining);
+          setRemainingCount(merged);
+          setLocalRemainingCount(MESSAGE_USAGE_STORAGE_KEY, DAILY_MESSAGE_LIMIT, merged);
         }
       } catch (e) {
         console.error(e);
@@ -315,6 +332,13 @@ export default function Home() {
       return;
     }
 
+    // 「本日の無料相談」としてカウントする送信は、ここで即座にlocalStorageへも反映する。
+    // サーバー(Vercel KV)側でも同時に消費するが、KV未接続の環境（本番でKV未接続の場合を含む）
+    // では常に上限値が返ってきてしまい消費が反映されないため、ブラウザ側でも確実に残数を減らす
+    if (countUp) {
+      setRemainingCount(consumeLocalUsage(MESSAGE_USAGE_STORAGE_KEY, DAILY_MESSAGE_LIMIT));
+    }
+
     if (textToSend.includes('コーナン') && (textToSend.includes('木材') || textToSend.includes('価格') || textToSend.includes('サイズ') || textToSend.includes('リスト'))) {
       const woodText = KOHNAN_WOOD_LIST.map(w => `■ ${w.name}\n・特徴: ${w.feature}\n・サイズ: ${w.size}\n・長さ: ${w.length}\n・価格目安: ${w.price}\n`).join('\n');
       const replyText = `コーナンで取り扱われている代表的な木材のリストです。\n\n${woodText}\n（※価格は店舗や時期によって前後します。）`;
@@ -324,7 +348,6 @@ export default function Home() {
       setInput('');
       setSelectedImage(null);
       addItem('history', textToSend, replyText);
-      if (countUp) setRemainingCount((prev) => Math.max(0, prev - 1));
       return;
     }
 
@@ -356,9 +379,15 @@ export default function Home() {
 
       const data = await response.json();
 
-      // 残り回数はサーバー側の実データが正なので、返ってきていれば必ず同期する
+      // サーバー側の値とlocalStorage側の値のうち、より厳しい（小さい）方を残り回数として採用する。
+      // KV未接続時はサーバーが常に上限値を返すためlocalStorage側の値がそのまま使われ、
+      // KV接続済みで他端末等の利用がある場合はサーバー側のより少ない値が優先される
       if (typeof data?.remaining === 'number') {
-        setRemainingCount(data.remaining);
+        setRemainingCount((prev) => {
+          const merged = Math.min(prev, data.remaining);
+          setLocalRemainingCount(MESSAGE_USAGE_STORAGE_KEY, DAILY_MESSAGE_LIMIT, merged);
+          return merged;
+        });
       }
 
       if (!response.ok) {
@@ -426,7 +455,7 @@ export default function Home() {
       showToast(`Geminiのページを開きます。`);
     });
 
-    setRemainingImageCount((prev) => Math.max(0, prev - 1));
+    setRemainingImageCount(consumeLocalUsage(IMAGE_USAGE_STORAGE_KEY, DAILY_IMAGE_LIMIT));
     window.open('https://gemini.google.com/', '_blank');
   }, [messages, remainingImageCount, showToast]);
 
