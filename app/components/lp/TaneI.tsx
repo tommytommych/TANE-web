@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import Link from 'next/link';
 import { motion, useMotionValueEvent, useScroll } from 'framer-motion';
 import FadeIn from './motion/FadeIn';
 
@@ -62,6 +63,16 @@ export default function TaneI() {
             </div>
           ))}
         </div>
+
+        <FadeIn delay={0.3}>
+          <Link
+            href="/tanei"
+            className="mt-12 inline-flex items-center gap-1.5 text-[13px] font-normal text-white/60 transition-colors hover:text-white"
+          >
+            TANE:iについて詳しく見る
+            <span aria-hidden="true">→</span>
+          </Link>
+        </FadeIn>
       </div>
     </section>
   );
