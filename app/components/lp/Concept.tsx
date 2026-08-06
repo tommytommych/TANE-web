@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import FadeIn from './motion/FadeIn';
 
 const LOGO_PARTS = [
@@ -118,6 +119,14 @@ export default function Concept() {
               <br />
               そんな未来を目指して、このロゴはデザインされています。
             </p>
+
+            <Link
+              href="/tane-project"
+              className="mt-10 inline-flex items-center gap-1.5 text-[14px] font-normal text-[#1F3028]/70 transition-colors hover:text-[#1F3028]"
+            >
+              TANE PROJECTについて詳しく見る
+              <span aria-hidden="true">→</span>
+            </Link>
           </div>
         </FadeIn>
       </div>

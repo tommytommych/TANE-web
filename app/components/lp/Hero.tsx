@@ -5,6 +5,14 @@ import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
 import RevealText from './motion/RevealText';
 
+const HERO_VIDEO_PLAYBACK_RATE = 0.4;
+
+// preload="auto"のため、マウント時点で既にメタデータ読み込み済み（loadedmetadataが
+// 発火済み）のケースがあり、そのときはonLoadedMetadataだけでは間に合わないためref callbackでも設定する
+function applySlowPlayback(video: HTMLVideoElement | null) {
+  if (video) video.playbackRate = HERO_VIDEO_PLAYBACK_RATE;
+}
+
 // TODO: 将来的に「種→発芽→木→木材→制作→完成→暮らし」を通しで撮影した
 // ブランドムービーが用意できたら、この芽の動画と差し替える
 export default function Hero() {
@@ -27,17 +35,19 @@ export default function Hero() {
               fill
               priority
               sizes="100vw"
-              className="object-cover"
+              className="object-cover object-[50%_65%]"
             />
           ) : (
             <video
+              ref={applySlowPlayback}
               autoPlay
               muted
               loop
               playsInline
               preload="auto"
               poster="/images/lp-hero-sprout-poster.jpg"
-              className="h-full w-full object-cover"
+              onLoadedMetadata={(e) => applySlowPlayback(e.currentTarget)}
+              className="h-full w-full object-cover object-[50%_65%]"
             >
               <source src="/images/lp-hero-sprout.mp4" type="video/mp4" />
             </video>
