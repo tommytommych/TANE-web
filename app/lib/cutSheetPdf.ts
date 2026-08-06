@@ -126,21 +126,8 @@ export const wrapTextToWidth = (
   return lines;
 };
 
-// 木取り図・カット依頼内容をQRコードで読み取れるよう、簡潔なテキストサマリーに変換する
-const buildCutListSummaryText = (materialGroups: MaterialGroup[], sheetLayouts: SheetLayout[]): string => {
-  const lines: string[] = ['TANE:i カット依頼サマリー'];
-  materialGroups.forEach((group) => {
-    group.parts.forEach((part) => {
-      lines.push(`${group.name} ${part.sizeMm}mm x${part.qty}`);
-    });
-  });
-  sheetLayouts.forEach((layout) => {
-    layout.parts.forEach((part) => {
-      lines.push(`${layout.name} ${part.widthMm}x${part.heightMm}mm x${part.qty}`);
-    });
-  });
-  return lines.join('\n');
-};
+// YouTubeチャンネルへのリンク。フッターのQRコード・表記に使用する
+const TOMISHIN_CHANNEL_URL = 'https://www.youtube.com/@tomishin_channel_DIY';
 
 // コーナン・カインズ・コメリなど主要ホームセンターで共通して使える、
 // TANE:iオリジナルの汎用カット申込書を1枚にまとめて生成する
@@ -167,14 +154,14 @@ export const buildUniversalCutSheetPdf = async (
   const fontRegular = await pdfDoc.embedFont(regularFontBytes);
   const fontBold = await pdfDoc.embedFont(boldFontBytes);
 
-  // カット依頼内容をスキャンで確認できるQRコードを生成して埋め込む
-  const qrDataUrl = await QRCode.toDataURL(buildCutListSummaryText(materialGroups, sheetLayouts), {
+  // フッターに表示するとみしんチャンネルDIY（YouTube）へのQRコードを生成して埋め込む
+  const youtubeQrDataUrl = await QRCode.toDataURL(TOMISHIN_CHANNEL_URL, {
     margin: 1,
     width: 200,
     color: { dark: '#3A2F27', light: '#FFFFFF' },
   });
-  const qrPngBytes = Uint8Array.from(atob(qrDataUrl.split(',')[1]), (c) => c.charCodeAt(0));
-  const qrImage = await pdfDoc.embedPng(qrPngBytes);
+  const youtubeQrPngBytes = Uint8Array.from(atob(youtubeQrDataUrl.split(',')[1]), (c) => c.charCodeAt(0));
+  const youtubeQrImage = await pdfDoc.embedPng(youtubeQrPngBytes);
 
   const margin = 40;
   const tableWidth = width - margin * 2;
@@ -220,29 +207,6 @@ export const buildUniversalCutSheetPdf = async (
     size: 11,
     font: fontRegular,
     color: rgb(1, 1, 1),
-  });
-
-  // ヘッダー右上：カット依頼内容を確認できるQRコード
-  const qrSize = 56;
-  const qrBoxX = width - margin - qrSize - 8;
-  const qrBoxY = height - headerHeight + (headerHeight - qrSize - 16) / 2;
-  page.drawRectangle({
-    x: qrBoxX - 4,
-    y: qrBoxY - 4,
-    width: qrSize + 8,
-    height: qrSize + 8 + 12,
-    color: rgb(1, 1, 1),
-  });
-  page.drawImage(qrImage, { x: qrBoxX, y: qrBoxY + 12, width: qrSize, height: qrSize });
-  const qrCaption = 'カット内容を確認';
-  const qrCaptionSize = 6.5;
-  const qrCaptionWidth = fontRegular.widthOfTextAtSize(qrCaption, qrCaptionSize);
-  page.drawText(qrCaption, {
-    x: qrBoxX + qrSize / 2 - qrCaptionWidth / 2,
-    y: qrBoxY,
-    size: qrCaptionSize,
-    font: fontRegular,
-    color: rgb(0.3, 0.3, 0.3),
   });
 
   cursorY = height - headerHeight - 16;
@@ -682,7 +646,9 @@ export const buildUniversalCutSheetPdf = async (
 
   // ---------- お名前 / 店舗記入欄 ----------
   const bottomBoxHeight = 42;
-  ensureSpace(bottomBoxHeight + 28);
+  const footerQrSize = 42;
+  const footerBlockHeight = 16 + footerQrSize + 20;
+  ensureSpace(bottomBoxHeight + footerBlockHeight);
 
   const nameBoxWidth = tableWidth * 0.5;
   const staffBoxWidth = (tableWidth - nameBoxWidth) / 2;
@@ -749,11 +715,28 @@ export const buildUniversalCutSheetPdf = async (
     color: gray,
   });
 
-  // ---------- フッター ----------
+  // ---------- フッター：ブランド表記 + とみしんチャンネルDIY（YouTube）QRコード ----------
+  const footerQrY = cursorY - bottomBoxHeight - 16 - footerQrSize;
+  page.drawImage(youtubeQrImage, { x: margin, y: footerQrY, width: footerQrSize, height: footerQrSize });
+  page.drawText('TANE PROJECT', {
+    x: margin + footerQrSize + 12,
+    y: footerQrY + footerQrSize - 13,
+    size: 11,
+    font: fontBold,
+    color: black,
+  });
+  page.drawText('Powered by とみしんチャンネルDIY', {
+    x: margin + footerQrSize + 12,
+    y: footerQrY + footerQrSize - 28,
+    size: 9,
+    font: fontRegular,
+    color: gray,
+  });
+
   const today = new Date().toLocaleDateString('ja-JP');
   page.drawText(`作成日: ${today}　TANE:iが作成しました`, {
     x: margin,
-    y: cursorY - bottomBoxHeight - 20,
+    y: footerQrY - 14,
     size: 8,
     font: fontRegular,
     color: gray,
