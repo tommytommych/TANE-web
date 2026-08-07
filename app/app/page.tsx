@@ -471,6 +471,13 @@ export default function Home() {
     window.open('https://gemini.google.com/', '_blank');
   }, [messages, remainingImageCount, showToast]);
 
+  // RightPanel「ご意見、リクエストはこちらから」用。LINE公式アカウントへ遷移する前に、
+  // 何が起きるか一言添えることでLINE Bot側のハンドオフ受付メッセージと体験を揃える（docs/survey-schema.md参照）
+  const handleOpenFeedbackLink = useCallback(() => {
+    showToast('LINE公式アカウントを開きます。ご意見・ご要望をお気軽にお送りください🌱');
+    window.open('https://line.me/R/ti/p/@mdo9046l', '_blank');
+  }, [showToast]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.nativeEvent.isComposing) return;
     if (e.key === 'Enter') {
@@ -555,7 +562,7 @@ export default function Home() {
         />
       </div>
 
-      <RightPanel woodList={KOHNAN_WOOD_LIST} tools={shuffledTools} />
+      <RightPanel woodList={KOHNAN_WOOD_LIST} tools={shuffledTools} onOpenFeedbackLink={handleOpenFeedbackLink} />
 
       <SavedItemsModal
         activeModal={activeModal}

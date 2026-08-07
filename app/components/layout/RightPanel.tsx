@@ -13,6 +13,7 @@ type ToolItem = (typeof AMAZON_TOOLS)[number];
 interface RightPanelProps {
   woodList: WoodItem[];
   tools: ToolItem[];
+  onOpenFeedbackLink: () => void;
 }
 
 const TABS = [
@@ -90,7 +91,7 @@ function PanelContent({ activeTab, woodList, tools }: { activeTab: string; woodL
 }
 
 // おすすめYouTube情報とお問い合わせリンク：パネル内の残ったスペースを埋めるように下部へ寄せる
-function PanelFooter() {
+function PanelFooter({ onOpenFeedbackLink }: { onOpenFeedbackLink: () => void }) {
   return (
     <div className="mt-auto pt-4 border-t border-tanei-border">
       <SectionTitle icon="📺" className="mb-2">
@@ -133,19 +134,18 @@ function PanelFooter() {
         </a>
       </Card>
 
-      <a
-        href="https://line.me/R/ti/p/@mdo9046l"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-3 flex items-center justify-center gap-1.5 text-xs font-bold text-tanei-ink-muted hover:text-tanei-ink hover:underline transition-colors px-1 py-1"
+      <button
+        type="button"
+        onClick={onOpenFeedbackLink}
+        className="mt-3 flex w-full items-center justify-center gap-1.5 text-xs font-bold text-tanei-ink-muted hover:text-tanei-ink hover:underline transition-colors px-1 py-1"
       >
         <span>💬</span> ご意見、リクエストはこちらから
-      </a>
+      </button>
     </div>
   );
 }
 
-export default function RightPanel({ woodList, tools }: RightPanelProps) {
+export default function RightPanel({ woodList, tools, onOpenFeedbackLink }: RightPanelProps) {
   const [activeTab, setActiveTab] = useState('wood');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -155,7 +155,7 @@ export default function RightPanel({ woodList, tools }: RightPanelProps) {
       <div className="hidden xl:flex xl:flex-col w-80 bg-tanei-surface-muted border-l border-tanei-border p-5 gap-4 overflow-y-auto flex-shrink-0">
         <Tabs items={TABS} activeId={activeTab} onChange={setActiveTab} />
         <PanelContent activeTab={activeTab} woodList={woodList} tools={tools} />
-        <PanelFooter />
+        <PanelFooter onOpenFeedbackLink={onOpenFeedbackLink} />
       </div>
 
       {/* モバイル用フローティングトリガー */}
@@ -180,7 +180,7 @@ export default function RightPanel({ woodList, tools }: RightPanelProps) {
             </div>
             <Tabs items={TABS} activeId={activeTab} onChange={setActiveTab} />
             <PanelContent activeTab={activeTab} woodList={woodList} tools={tools} />
-            <PanelFooter />
+            <PanelFooter onOpenFeedbackLink={onOpenFeedbackLink} />
           </div>
         </div>
       )}

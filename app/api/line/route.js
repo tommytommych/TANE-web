@@ -35,6 +35,10 @@ const LINE_TEXT_MESSAGE_LIMIT = 5000;
 // LINE公式アカウントマネージャーでの手動チャット対応に委ねる
 const HUMAN_HANDOFF_MESSAGE = 'ご意見・リクエストを送ります';
 
+// ハンドオフ時に、何も返信されず不安にならないよう受付を伝える定型メッセージ（docs/survey-schema.md参照）
+const HUMAN_HANDOFF_REPLY_MESSAGE =
+  'ご意見・ご要望をお送りいただきありがとうございます🌱\n\n内容を確認し、担当より順次ご返信いたします。今しばらくお待ちください😊';
+
 // TANE:i本体(app/app/page.tsx)の「本日の無料相談 10回」と同じ回数・仕様に合わせる。
 // LINE bot側はサーバーで完結する必要があるため、ユーザーごと・日付ごとにサーバー側で実カウントする
 // （本体側はブラウザのstateだけで実際には強制されていないカウンターだが、こちらは実際に上限まで制限する）
@@ -154,8 +158,9 @@ async function handleMessageEvent(event) {
     return;
   }
 
-  // Geminiを呼ばず、200 OKのみ返してLINE側の手動チャットに委ねる
+  // Geminiは呼ばず、受付を伝える定型メッセージだけ返信してLINE側の手動チャットに委ねる
   if (event.message.type === 'text' && event.message.text === HUMAN_HANDOFF_MESSAGE) {
+    await replySafely(event.replyToken, HUMAN_HANDOFF_REPLY_MESSAGE);
     return;
   }
 
