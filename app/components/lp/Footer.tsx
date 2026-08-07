@@ -3,11 +3,10 @@
 import FadeIn from './motion/FadeIn';
 
 const CONTACT_HREF = 'https://line.me/R/ti/p/@mdo9046l';
-// 既存のとみしんチャンネルDIY（YouTube）を流用。Instagram/Xは開設後に差し替え
 const SOCIAL_LINKS = [
   { label: 'YouTube', href: 'https://www.youtube.com/@tomishin_channel_DIY', icon: YoutubeIcon },
-  { label: 'Instagram', href: '#', icon: InstagramIcon },
-  { label: 'X', href: '#', icon: XIcon },
+  { label: 'Instagram', href: 'https://www.instagram.com/__tomishin__diy/', icon: InstagramIcon },
+  { label: 'X', href: 'https://x.com/tommy_diy2025', icon: XIcon },
 ];
 
 const LEGAL_LINKS = [
