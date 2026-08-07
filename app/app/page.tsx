@@ -40,6 +40,14 @@ const DAILY_IMAGE_LIMIT = 5;
 const MESSAGE_USAGE_STORAGE_KEY = 'tanei-message-usage-v1';
 const IMAGE_USAGE_STORAGE_KEY = 'tanei-image-usage-v1';
 
+// シルエットカメオ5でのカット作業（カス取り）を前提とした固定デザインルール。
+// AIが生成したimagePromptの内容によらず、カメオデザイン案の画像生成には常にこれを付加する
+const CAMEO_DESIGN_FIXED_REQUIREMENTS =
+  'Strict cutting requirements: must be cuttable and weedable on a Silhouette Cameo 5 cutting machine. ' +
+  'Simple, sharp, monochrome (pure black and white only, no gradients, no shading, no color) vector-style design. ' +
+  'Lines must not be too thin, with solid connecting bridges between all parts (no isolated floating islands). ' +
+  'Avoid overly complex fills or overly fine details. Flat die-cut sticker style, white background.';
+
 const WELCOME_MESSAGE: Message = {
   role: 'assistant',
   content: '🌱ようこそ、TANE:i（たねあい）へ。\nあなたの「作りたい」を、一緒にカタチにします。\n作りたいもの、悩んでいること、または「写真で相談」からお部屋の写真を送ってください😊',
@@ -431,7 +439,11 @@ export default function Home() {
     }
 
     let promptText = promptOverride;
-    if (!promptText) {
+    if (promptText) {
+      // シルエットカメオ用デザイン案（CameoDesignGalleryの各案）は、AIが書いたimagePromptの
+      // 内容によらず、カット作業を前提とした固定ルールを必ず末尾に付加してから画像生成に使う
+      promptText = `${promptText}\n\n${CAMEO_DESIGN_FIXED_REQUIREMENTS}`;
+    } else {
       const roles = messages.map((m) => m.role);
       const lastAssistantIndex = roles.lastIndexOf('assistant');
       const lastUserIndex = roles.lastIndexOf('user');

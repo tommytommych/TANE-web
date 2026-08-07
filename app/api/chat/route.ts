@@ -228,8 +228,13 @@ const CAMEO_MODE_INSTRUCTION = `
 ]
 \`\`\`
 
-- imagePromptは必ず英語で書き、"minimalist single-color vector sticker design", "die-cut sticker style", "white background" など、
-  カッティングステッカー/カメオ用のシンプルな線画・ワンポイントデザインとして生成できるようなスタイル指定を必ず含めること
+- imagePromptは必ず英語で書き、「シルエットカメオ5（Silhouette Cameo 5）」でのカット作業（カス取り）を前提とした、以下の固定ルールをすべて満たすデザインになるよう、対応するスタイル指定を必ず含めること：
+  1. シルエットカメオ5のカッティングマシンでカット作業（カス取り）が可能な、モノクロの画像デザインであること
+  2. シンプルでシャープなモノクロ（白黒）のベクトルスタイルを基調とすること
+  3. 線が細すぎず、連結部（ブリッジ）がしっかり確保された「カッティングステッカーに適した」デザインであること
+  4. 複雑すぎる塗りつぶしや細かすぎる線は避け、カッティングプロッターが切り抜きやすいデザインに限定すること
+  例のスタイル指定："minimalist single-color vector sticker design", "die-cut sticker style, weeding-friendly",
+  "bold clean lines with solid connecting bridges, no thin fragile details", "pure black and white only, no gradients, no shading", "white background"
 - title・descriptionは日本語で、初心者にも分かりやすく
 - このモードでは、tanei-cutlist・tanei-sheetlayout・tanei-assemblyのいずれのブロックも絶対に出力しないでください（木取り図・組立説明書はこの相談に不要です）
 `.trim();
