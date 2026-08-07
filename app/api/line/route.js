@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { messagingApi, validateSignature } from '@line/bot-sdk';
 import { GoogleGenAI, createPartFromBase64, createPartFromText } from '@google/genai';
+import { buildSystemInstruction, CAMEO_MODE_TRIGGER_REGEX } from '../../lib/systemPrompt';
+import { stripInternalBlocks } from '../../lib/cutlist';
 
 export const runtime = 'nodejs';
 
@@ -21,9 +23,6 @@ const lineBlobClient = new MessagingApiBlobClient({
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
-
-const SYSTEM_INSTRUCTION =
-  'あなたはAIを活用した木工DIY設計サポートサービス『TANEi（たねあい）』のAIアシスタントです。初心者向けに、親切、丁寧、具体的に木工DIYの相談に乗ってください。';
 
 // ユーザーが写真を送ってきたときにGeminiへ添える固定の指示文
 const IMAGE_PROMPT =
@@ -72,21 +71,25 @@ function consumeDailyQuota(userId) {
 // このAPIキーのアカウントでは "gemini-2.5-flash" が
 // "no longer available to new users" (404) となり使用できないため、
 // 同じ世代のFlashモデルを指す常時最新のエイリアスを使用する（app/api/chatと同じ方針）
-async function generateReply(parts) {
+async function generateReply(parts, { isCameoMode = false } = {}) {
   const response = await ai.models.generateContent({
     model: 'gemini-flash-latest',
     contents: [{ role: 'user', parts }],
     config: {
-      systemInstruction: SYSTEM_INSTRUCTION,
+      systemInstruction: buildSystemInstruction({ isCameoMode }),
     },
   });
 
   const text = response.text || 'うまく回答を生成できませんでした。もう一度お試しください。';
-  return text.slice(0, LINE_TEXT_MESSAGE_LIMIT);
+  // tanei-context等の内部データブロックはWEB版UIの解析専用で、LINEのプレーンテキスト返信には不要かつ
+  // そのまま見せると不自然なため取り除く
+  return stripInternalBlocks(text).slice(0, LINE_TEXT_MESSAGE_LIMIT);
 }
 
 function generateReplyText(userMessage) {
-  return generateReply([createPartFromText(userMessage)]);
+  return generateReply([createPartFromText(userMessage)], {
+    isCameoMode: CAMEO_MODE_TRIGGER_REGEX.test(userMessage),
+  });
 }
 
 function generateReplyForImage(base64Image, mimeType) {
