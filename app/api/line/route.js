@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { messagingApi, validateSignature } from '@line/bot-sdk';
 import { GoogleGenAI, createPartFromBase64, createPartFromText } from '@google/genai';
 import { buildSystemInstruction, CAMEO_MODE_TRIGGER_REGEX } from '../../lib/systemPrompt';
-import { stripInternalBlocks } from '../../lib/cutlist';
+import { stripInternalBlocks, extractContextFromContent } from '../../lib/cutlist';
+import { getConversationState, saveConversationState } from '../../lib/lineConversationHistory';
 
 export const runtime = 'nodejs';
 
@@ -82,29 +83,61 @@ function consumeDailyQuota(userId) {
 // このAPIキーのアカウントでは "gemini-2.5-flash" が
 // "no longer available to new users" (404) となり使用できないため、
 // 同じ世代のFlashモデルを指す常時最新のエイリアスを使用する（app/api/chatと同じ方針）
-async function generateReply(parts, { isCameoMode = false } = {}) {
+//
+// LINEはメッセージごとに独立したWebhookイベントとして届き、WEB版のようにブラウザ側で
+// 会話履歴を持てないため、userIdをキーにサーバー側（app/lib/lineConversationHistory）で
+// 直近の会話履歴と判明済みContextを保持し、毎回Geminiへ引き継ぐ。これにより、設置場所や
+// 家具の種類などを何度も聞き直してしまうループを防ぐ（app/api/chatのcontextNoteと同じ方針）
+async function generateReply(userId, currentUserText, parts, { isCameoMode = false } = {}) {
+  const state = await getConversationState(userId);
+
+  const contents = [
+    ...state.turns.map((turn) => ({ role: turn.role, parts: [createPartFromText(turn.text)] })),
+    { role: 'user', parts },
+  ];
+
+  const contextNote = state.context
+    ? `\n\n【これまでに判明している情報（Context）】\n${JSON.stringify(state.context)}\n上記のうち値がnullの項目を優先して、次の質問を1つだけしてください。item・size・place・budget・experienceが埋まっていれば設計を開始してください。`
+    : '';
+
   const response = await ai.models.generateContent({
     model: 'gemini-flash-latest',
-    contents: [{ role: 'user', parts }],
+    contents,
     config: {
-      systemInstruction: buildSystemInstruction({ isCameoMode }),
+      systemInstruction: buildSystemInstruction({ isCameoMode }) + contextNote,
     },
   });
 
-  const text = response.text || 'うまく回答を生成できませんでした。もう一度お試しください。';
+  const rawText = response.text || 'うまく回答を生成できませんでした。もう一度お試しください。';
   // tanei-context等の内部データブロックはWEB版UIの解析専用で、LINEのプレーンテキスト返信には不要かつ
   // そのまま見せると不自然なため取り除く
-  return stripInternalBlocks(text).slice(0, LINE_TEXT_MESSAGE_LIMIT);
+  const strippedText = stripInternalBlocks(rawText);
+
+  // 次回の呼び出しに引き継ぐため、今回のやり取りを履歴へ追加して保存する。
+  // 履歴にはstripped後のテキストのみを保持し（tanei-*ブロックはGeminiへの再入力にも不要）、
+  // Contextだけはtanei-contextブロックから抽出した最新の値で更新する
+  const newContext = extractContextFromContent(rawText) ?? state.context;
+  await saveConversationState(userId, {
+    turns: [...state.turns, { role: 'user', text: currentUserText }, { role: 'model', text: strippedText }],
+    context: newContext,
+  });
+
+  return strippedText.slice(0, LINE_TEXT_MESSAGE_LIMIT);
 }
 
-function generateReplyText(userMessage) {
-  return generateReply([createPartFromText(userMessage)], {
+function generateReplyText(userId, userMessage) {
+  return generateReply(userId, userMessage, [createPartFromText(userMessage)], {
     isCameoMode: CAMEO_MODE_TRIGGER_REGEX.test(userMessage),
   });
 }
 
-function generateReplyForImage(base64Image, mimeType) {
-  return generateReply([createPartFromText(IMAGE_PROMPT), createPartFromBase64(base64Image, mimeType)]);
+function generateReplyForImage(userId, base64Image, mimeType) {
+  // 画像バイナリ自体は容量が大きく、履歴に保存する意味も薄いため、履歴上のユーザー発言としては
+  // プレースホルダーのテキストのみを残す（写真から読み取った内容はAIの返答テキスト側に残る）
+  return generateReply(userId, '（写真を送信しました）', [
+    createPartFromText(IMAGE_PROMPT),
+    createPartFromBase64(base64Image, mimeType),
+  ]);
 }
 
 async function streamToBuffer(stream) {
@@ -182,10 +215,10 @@ async function handleMessageEvent(event) {
 
   try {
     if (event.message.type === 'text') {
-      replyText = await generateReplyText(event.message.text);
+      replyText = await generateReplyText(userId, event.message.text);
     } else {
       const { base64, mimeType } = await fetchLineImageAsBase64(event.message);
-      replyText = await generateReplyForImage(base64, mimeType);
+      replyText = await generateReplyForImage(userId, base64, mimeType);
     }
   } catch (error) {
     console.error('LINE bot Gemini error:', error);
