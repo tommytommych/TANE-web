@@ -35,9 +35,16 @@ const LINE_TEXT_MESSAGE_LIMIT = 5000;
 // LINE公式アカウントマネージャーでの手動チャット対応に委ねる
 const HUMAN_HANDOFF_MESSAGE = 'ご意見・リクエストを送ります';
 
-// ハンドオフ時に、何も返信されず不安にならないよう受付を伝える定型メッセージ（docs/survey-schema.md参照）
+// ご意見・ご質問フォームのURL（docs/survey-schema.md参照）
+const FEEDBACK_FORM_URL =
+  'https://docs.google.com/forms/d/e/1FAIpQLSe_AS7xrjQuaa90Ao_E9bwbMwJFvqrNbM2UtKzQvq9sCNg14w/viewform';
+
+// ハンドオフ時に、何も返信されず不安にならないようフォームへの案内を返す定型メッセージ（docs/survey-schema.md参照）
 const HUMAN_HANDOFF_REPLY_MESSAGE =
-  'ご意見・ご要望をお送りいただきありがとうございます🌱\n\n内容を確認し、担当より順次ご返信いたします。今しばらくお待ちください😊';
+  `いつもTANE:iをご利用いただきありがとうございます🌱\n\n` +
+  `ご意見・ご質問はこちらの専用フォームから送っていただけると、チームで一つひとつ確認しやすくなります😊\n\n` +
+  `▼ご意見・ご質問フォーム\n${FEEDBACK_FORM_URL}\n\n` +
+  `もちろん、このままメッセージを送っていただいても大丈夫です！`;
 
 // TANE:i本体(app/app/page.tsx)の「本日の無料相談 10回」と同じ回数・仕様に合わせる。
 // LINE bot側はサーバーで完結する必要があるため、ユーザーごと・日付ごとにサーバー側で実カウントする

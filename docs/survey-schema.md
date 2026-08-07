@@ -3,6 +3,8 @@
 TANE:iのユーザーからご意見・ご質問・不具合報告を効率よく収集するためのGoogleフォーム構成案。
 LINE版・WEB版の両方から案内する想定。
 
+**公開URL**: https://docs.google.com/forms/d/e/1FAIpQLSe_AS7xrjQuaa90Ao_E9bwbMwJFvqrNbM2UtKzQvq9sCNg14w/viewform
+
 ## 1. フォームのタイトル・説明文
 
 **タイトル**
@@ -61,7 +63,7 @@ TANE:iへの声を聞かせてください🌱
 チームで一つひとつ確認しやすくなります😊
 
 ▼ご意見・ご質問フォーム
-（フォームURLをここに挿入）
+https://docs.google.com/forms/d/e/1FAIpQLSe_AS7xrjQuaa90Ao_E9bwbMwJFvqrNbM2UtKzQvq9sCNg14w/viewform
 
 もちろん、このままメッセージを送っていただいても大丈夫です！
 ```
@@ -74,5 +76,5 @@ TANE:iへのご意見・ご質問はこちらから📮
 いただいた声はすべて開発チームで確認し、今後のアップデートに役立てています。
 
 ▼ご意見・ご質問フォーム
-（フォームURLをここに挿入）
+https://docs.google.com/forms/d/e/1FAIpQLSe_AS7xrjQuaa90Ao_E9bwbMwJFvqrNbM2UtKzQvq9sCNg14w/viewform
 ```

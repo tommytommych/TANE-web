@@ -471,11 +471,14 @@ export default function Home() {
     window.open('https://gemini.google.com/', '_blank');
   }, [messages, remainingImageCount, showToast]);
 
-  // RightPanel「ご意見、リクエストはこちらから」用。LINE公式アカウントへ遷移する前に、
-  // 何が起きるか一言添えることでLINE Bot側のハンドオフ受付メッセージと体験を揃える（docs/survey-schema.md参照）
+  // RightPanel「ご意見、リクエストはこちらから」用。ご意見・ご質問フォームへ遷移する前に、
+  // 一言添えることでLINE Bot側のハンドオフ案内メッセージと体験を揃える（docs/survey-schema.md参照）
   const handleOpenFeedbackLink = useCallback(() => {
-    showToast('LINE公式アカウントを開きます。ご意見・ご要望をお気軽にお送りください🌱');
-    window.open('https://line.me/R/ti/p/@mdo9046l', '_blank');
+    showToast('ご意見・ご質問フォームを開きます🌱 どんな内容でも歓迎です！');
+    window.open(
+      'https://docs.google.com/forms/d/e/1FAIpQLSe_AS7xrjQuaa90Ao_E9bwbMwJFvqrNbM2UtKzQvq9sCNg14w/viewform',
+      '_blank'
+    );
   }, [showToast]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
