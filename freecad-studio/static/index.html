@@ -17,8 +17,26 @@
   main { max-width: 960px; margin: 0 auto; }
   h1 { font-weight: 500; font-size: 24px; margin-bottom: 4px; }
   p.lead { color: #8A8A8A; margin-top: 0; font-size: 14px; }
-  .layout { display: grid; grid-template-columns: 320px 1fr; gap: 32px; margin-top: 32px; }
+  .layout { display: grid; grid-template-columns: 300px 260px 1fr; gap: 24px; margin-top: 32px; align-items: start; }
+  @media (max-width: 1080px) { .layout { grid-template-columns: 300px 1fr; } .options-panel { grid-column: 1 / -1; } }
   @media (max-width: 720px) { .layout { grid-template-columns: 1fr; } }
+  .options-panel {
+    display: flex; flex-direction: column; gap: 10px; background: #fff; padding: 16px;
+    border-radius: 8px; border: 1px solid #eee;
+  }
+  .opt-row { display: flex; flex-direction: column; gap: 6px; padding: 10px; background: #faf8f5; border: 1px solid #eee; border-radius: 6px; }
+  .opt-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+  .opt-toggle input[type="checkbox"] { width: 16px; height: 16px; }
+  .opt-param { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #5a5a5a; font-weight: 400; padding-left: 24px; }
+  .opt-param input[type="number"], .opt-param select { width: 64px; font-size: 13px; padding: 4px 6px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; }
+  #print-sheet { display: none; }
+  @media print {
+    body * { visibility: hidden; }
+    #print-sheet, #print-sheet * { visibility: visible; }
+    #print-sheet { display: block; position: absolute; top: 0; left: 0; width: 100%; padding: 24px; }
+    #print-sheet table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    #print-sheet th, #print-sheet td { border: 1px solid #333; padding: 6px 10px; font-size: 13px; text-align: left; }
+  }
   form { display: flex; flex-direction: column; gap: 14px; background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #eee; }
   label { font-size: 13px; font-weight: 500; display: flex; flex-direction: column; gap: 6px; }
   input, select {
@@ -146,6 +164,66 @@
       <div id="status" class="status"></div>
     </form>
 
+    <aside class="options-panel">
+      <p class="finish-group-title">追加パーツ（任意・複数選択可）</p>
+
+      <div class="opt-row">
+        <label class="opt-toggle"><input type="checkbox" name="opt-door-enabled" form="render-form" /> 扉</label>
+        <label class="opt-param">枚数<input type="number" name="opt-door-count" form="render-form" value="1" min="1" max="2" /></label>
+      </div>
+
+      <div class="opt-row">
+        <label class="opt-toggle"><input type="checkbox" name="opt-drawer_front-enabled" form="render-form" /> 引き出し前板</label>
+        <label class="opt-param">段数<input type="number" name="opt-drawer_front-count" form="render-form" value="1" min="1" max="4" /></label>
+      </div>
+
+      <div class="opt-row">
+        <label class="opt-toggle"><input type="checkbox" name="opt-legs-enabled" form="render-form" /> 脚</label>
+        <label class="opt-param">高さ(mm)<input type="number" name="opt-legs-heightMm" form="render-form" value="100" min="30" max="400" /></label>
+        <label class="opt-param">本数
+          <select name="opt-legs-count" form="render-form">
+            <option value="4" selected>4</option>
+            <option value="6">6</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="opt-row">
+        <label class="opt-toggle"><input type="checkbox" name="opt-apron-enabled" form="render-form" /> 幕板</label>
+        <label class="opt-param">見付け高さ(mm)<input type="number" name="opt-apron-heightMm" form="render-form" value="60" min="30" max="120" /></label>
+      </div>
+
+      <div class="opt-row">
+        <label class="opt-toggle"><input type="checkbox" name="opt-pillars-enabled" form="render-form" /> 支柱</label>
+        <label class="opt-param">本数<input type="number" name="opt-pillars-count" form="render-form" value="2" min="1" max="4" /></label>
+      </div>
+
+      <div class="opt-row">
+        <label class="opt-toggle"><input type="checkbox" name="opt-stack-enabled" form="render-form" /> 本体2段重ね</label>
+        <label class="opt-param">追加段数<input type="number" name="opt-stack-count" form="render-form" value="1" min="1" max="2" /></label>
+      </div>
+
+      <div class="opt-row">
+        <label class="opt-toggle"><input type="checkbox" name="opt-divider_v-enabled" form="render-form" /> 縦仕切り</label>
+        <label class="opt-param">枚数<input type="number" name="opt-divider_v-count" form="render-form" value="1" min="1" max="3" /></label>
+      </div>
+
+      <div class="opt-row">
+        <label class="opt-toggle"><input type="checkbox" name="opt-shelf_h-enabled" form="render-form" /> 横棚板</label>
+        <label class="opt-param">枚数<input type="number" name="opt-shelf_h-count" form="render-form" value="1" min="1" max="4" /></label>
+      </div>
+
+      <div class="opt-row">
+        <label class="opt-toggle"><input type="checkbox" name="opt-back_batten-enabled" form="render-form" /> 背面補強桟</label>
+        <label class="opt-param">本数<input type="number" name="opt-back_batten-count" form="render-form" value="2" min="1" max="4" /></label>
+      </div>
+
+      <div class="opt-row">
+        <label class="opt-toggle"><input type="checkbox" name="opt-caster_block-enabled" form="render-form" /> キャスター台座</label>
+        <label class="opt-param">一辺(mm)<input type="number" name="opt-caster_block-sizeMm" form="render-form" value="50" min="30" max="80" /></label>
+      </div>
+    </aside>
+
     <div class="result">
       <div class="tabs" id="result-tabs" style="display: none;">
         <button type="button" class="tab-btn active" data-tab="image">完成イメージ</button>
@@ -159,9 +237,12 @@
         <p class="viewer-hint">ドラッグで回転、スクロールでズーム、右ドラッグ（または2本指）で平行移動できます。</p>
       </div>
       <div id="cutlist-area"></div>
+      <button type="button" id="print-cutlist-btn" class="tab-btn" style="display: none; margin-top: 12px;">🖨 カット依頼用紙を印刷</button>
     </div>
   </div>
 </main>
+
+<div id="print-sheet"></div>
 
 <script type="importmap">
 {
@@ -183,6 +264,12 @@ const statusEl = document.getElementById('status');
 const imageArea = document.getElementById('image-area');
 const cutlistArea = document.getElementById('cutlist-area');
 const resultTabs = document.getElementById('result-tabs');
+const printBtn = document.getElementById('print-cutlist-btn');
+const printSheet = document.getElementById('print-sheet');
+
+printBtn.addEventListener('click', () => {
+  window.print();
+});
 
 // --- タブ切り替え ---
 document.querySelectorAll('.tab-btn').forEach((btn) => {
@@ -267,6 +354,30 @@ function buildViewerFromPanels(panels) {
   resizeRenderer();
 }
 
+// 追加パーツ（扉・脚・棚板など）の選択状態を、/api/renderのoptionsとして組み立てる。
+// 各inputはform="render-form"属性で紐付けているため、DOM上はform要素の外（<aside>内）に
+// あってもform.elements経由で取得できる
+function collectOptionsFromForm() {
+  const val = (name) => form.elements.namedItem(name)?.value;
+  const checked = (name) => !!form.elements.namedItem(name)?.checked;
+  return {
+    door: { enabled: checked('opt-door-enabled'), count: Number(val('opt-door-count')) },
+    drawer_front: { enabled: checked('opt-drawer_front-enabled'), count: Number(val('opt-drawer_front-count')) },
+    legs: {
+      enabled: checked('opt-legs-enabled'),
+      heightMm: Number(val('opt-legs-heightMm')),
+      count: Number(val('opt-legs-count')),
+    },
+    apron: { enabled: checked('opt-apron-enabled'), heightMm: Number(val('opt-apron-heightMm')) },
+    pillars: { enabled: checked('opt-pillars-enabled'), count: Number(val('opt-pillars-count')) },
+    stack: { enabled: checked('opt-stack-enabled'), count: Number(val('opt-stack-count')) },
+    divider_v: { enabled: checked('opt-divider_v-enabled'), count: Number(val('opt-divider_v-count')) },
+    shelf_h: { enabled: checked('opt-shelf_h-enabled'), count: Number(val('opt-shelf_h-count')) },
+    back_batten: { enabled: checked('opt-back_batten-enabled'), count: Number(val('opt-back_batten-count')) },
+    caster_block: { enabled: checked('opt-caster_block-enabled'), sizeMm: Number(val('opt-caster_block-sizeMm')) },
+  };
+}
+
 // フォームの現在の入力値から、/api/renderへ送るpayloadを組み立てる
 function collectPayloadFromForm() {
   const formData = new FormData(form);
@@ -283,6 +394,7 @@ function collectPayloadFromForm() {
       '側板': formData.get('finish-側板'),
       '背板': formData.get('finish-背板'),
     },
+    options: collectOptionsFromForm(),
   };
 }
 
@@ -315,6 +427,7 @@ async function renderPayload(payload) {
   statusEl.textContent = 'FreeCADでモデルを生成し、POV-Rayでレンダリング中です…（数十秒〜数分かかることがあります）';
   imageArea.innerHTML = '';
   cutlistArea.innerHTML = '';
+  printBtn.style.display = 'none';
 
   try {
     const res = await fetch('/api/render', {
@@ -349,6 +462,23 @@ async function renderPayload(payload) {
           <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
+
+      // 木取り表と全く同じデータ(data.cutlist)から、印刷用の「カット依頼用紙」も組み立てる。
+      // 追加パーツ（扉・脚・棚板など）で増えた部材も同じcutlistに含まれているため、
+      // ここでの特別な処理は不要（データソースを共有しているだけで自動的に連動する）
+      const printRows = data.cutlist
+        .map((row) => `<tr>${headers.map((h) => `<td>${row[h]}</td>`).join('')}<td>☐</td></tr>`)
+        .join('');
+      printSheet.innerHTML = `
+        <h2>カット依頼用紙</h2>
+        <p>品名: ${data.item}　作成日: ${new Date().toLocaleDateString('ja-JP')}</p>
+        <table>
+          <thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}<th>確認</th></tr></thead>
+          <tbody>${printRows}</tbody>
+        </table>`;
+      printBtn.style.display = 'inline-block';
+    } else {
+      printBtn.style.display = 'none';
     }
   } catch (err) {
     statusEl.className = 'status error';

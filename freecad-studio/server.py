@@ -34,6 +34,8 @@ sys.path.insert(0, BASE_DIR)
 from freecad_scripts.generate_model import (  # noqa: E402
     DEFAULT_BACK_THICKNESS_MM,
     FINISH_OPTIONS,
+    OPTION_PART_DEFS,
+    compute_option_panels,
     compute_panels,
     write_cutlist_csv,
 )
@@ -129,6 +131,33 @@ def parse_panel_finishes(data):
     }
 
 
+def parse_options(data):
+    """リクエストのoptions（扉・脚・棚板などの追加パーツ）を検証する。
+
+    OPTION_PART_DEFS（generate_model.py）に無いキー、enabledがfalsyなエントリ、
+    範囲外のパラメータは黙って除外・クランプする（generate_model.py側の
+    _resolve_option_paramsと同じ考え方だが、こちらはAPIの入力境界での防御用）。
+    """
+    raw = data.get("options")
+    if not isinstance(raw, dict):
+        return {}
+
+    result = {}
+    for key, opt_def in OPTION_PART_DEFS.items():
+        opt = raw.get(key)
+        if not isinstance(opt, dict) or not opt.get("enabled"):
+            continue
+        parsed = {"enabled": True}
+        for param_key, meta in opt_def["params"].items():
+            try:
+                value = float(opt.get(param_key, meta["default"]))
+            except (TypeError, ValueError):
+                value = meta["default"]
+            parsed[param_key] = max(meta["min"], min(meta["max"], value))
+        result[key] = parsed
+    return result
+
+
 def validate_input(data):
     """入力値を検証し、問題があればエラーメッセージの文字列を返す（問題なければNone）。"""
     if not isinstance(data, dict):
@@ -164,7 +193,7 @@ def render_files(job_id, filename):
     return send_from_directory(job_dir, filename)
 
 
-def run_freecad_pipeline(job_dir, item, width, depth, height, thickness, material, panel_finishes):
+def run_freecad_pipeline(job_dir, item, width, depth, height, thickness, material, panel_finishes, options):
     """本来のパイプライン: freecadcmdをサブプロセス実行し、FreeCAD+POV-Rayで生成する。
 
     freecadcmdは独自のCLIパーサー（boost::program_options）を持ち、一般的な
@@ -181,6 +210,7 @@ def run_freecad_pipeline(job_dir, item, width, depth, height, thickness, materia
         "thickness": thickness,
         "material": material,
         "panelFinishes": panel_finishes,
+        "options": options,
         "outputDir": job_dir,
     })
     cmd = [FREECAD_CMD_PATH, GENERATE_SCRIPT]
@@ -221,13 +251,16 @@ def run_freecad_pipeline(job_dir, item, width, depth, height, thickness, materia
     }, None, None
 
 
-def run_mock_pipeline(job_dir, item, width, depth, height, thickness, material, panel_finishes):
+def run_mock_pipeline(job_dir, item, width, depth, height, thickness, material, panel_finishes, options):
     """FreeCAD/POV-Ray未接続時のフォールバック: 実際の寸法計算＋等角プレビューSVGで代替する。
 
     開発環境（FreeCAD/POV-Ray未インストール）でも、UI・APIの一連の流れを実際に動かして
     確認できるようにするためのモード。本番のフォトリアルなレンダリングの代わりにはならない。
     """
     panels = compute_panels(width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material, panel_finishes)
+    panels += compute_option_panels(
+        width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material, panel_finishes, options
+    )
 
     cutlist_csv_path = os.path.join(job_dir, "cutlist.csv")
     write_cutlist_csv(panels, cutlist_csv_path)
@@ -264,6 +297,7 @@ def api_render():
     thickness = float(data.get("thickness") or DEFAULT_THICKNESS_MM)
     material = str(data["material"]).strip()
     panel_finishes = parse_panel_finishes(data)
+    options = parse_options(data)
 
     job_id = uuid.uuid4().hex[:12]
     job_dir = os.path.join(RENDERS_DIR, job_id)
@@ -271,17 +305,21 @@ def api_render():
 
     try:
         # インタラクティブ3Dビューア（Three.js）用のパネルジオメトリは、どちらのパイプラインでも
-        # 同じcompute_panels()から得られるため、ここで一度だけ計算して両方に使い回す
+        # 同じcompute_panels()+compute_option_panels()から得られるため、ここで一度だけ計算して
+        # 両方に使い回す（扉・脚・棚板などの追加パーツも同じ形のパネル辞書で返るため連結するだけでよい）
         panels = compute_panels(width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material, panel_finishes)
+        panels += compute_option_panels(
+            width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material, panel_finishes, options
+        )
         panels_for_viewer = serialize_panels_for_viewer(panels)
 
         if shutil.which(FREECAD_CMD_PATH):
             payload, error_payload, status = run_freecad_pipeline(
-                job_dir, item, width, depth, height, thickness, material, panel_finishes
+                job_dir, item, width, depth, height, thickness, material, panel_finishes, options
             )
         else:
             payload, error_payload, status = run_mock_pipeline(
-                job_dir, item, width, depth, height, thickness, material, panel_finishes
+                job_dir, item, width, depth, height, thickness, material, panel_finishes, options
             )
     except ValueError as exc:
         # compute_panels()の寸法バリデーション（高さが板厚に対して小さすぎる等）
@@ -302,6 +340,7 @@ def api_render():
             "thickness": thickness,
             "material": material,
             "panelFinishes": panel_finishes,
+            "options": options,
         },
         source="studio",
     )

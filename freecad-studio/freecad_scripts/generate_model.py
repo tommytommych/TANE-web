@@ -9,11 +9,14 @@ FreeCAD本体にバンドルされており、一般的なpip環境にはイン�
     ※freecadcmdは独自のCLIパーサーを持ち、一般的な `--` 以降パススルーの慣習を尊重しないため、
       パラメータはコマンドライン引数ではなく環境変数 TANEI_PARAMS_JSON で渡す（詳細はmain()参照）。
 
-    TANEI_PARAMS_JSON='{"item":"テレビ台","width":1200,"depth":400,"height":400,"thickness":18,"material":"パイン集成材","panelFinishes":{"天板":"walnut","側板":"white"},"outputDir":"./renders/job123"}' \\
+    TANEI_PARAMS_JSON='{"item":"テレビ台","width":1200,"depth":400,"height":400,"thickness":18,"material":"パイン集成材","panelFinishes":{"天板":"walnut","側板":"white"},"options":{"legs":{"enabled":true,"heightMm":100,"count":4},"shelf_h":{"enabled":true,"count":1}},"outputDir":"./renders/job123"}' \\
         freecadcmd generate_model.py
 
     panelFinishesは省略可能で、指定が無いパーツはデフォルトの"clear"（材質そのものの木目）になる。
     指定できる値: "clear"（クリア塗装）/ "walnut"（ウォルナット調）/ "white"（ホワイト）/ "black"（ブラック）
+
+    optionsも省略可能で、扉・脚・棚板などの追加パーツを個別に有効化できる
+    （キー・パラメータの一覧はOPTION_PART_DEFS参照）。
 
 処理の流れ:
   1. 入力パラメータ（幅・奥行・高さ・厚み・材質）から、天板・底板・側板・背板の
@@ -64,6 +67,15 @@ FINISH_APPROX_COLOR = {
 }
 
 
+def _finish_for(label, panel_finishes):
+    """指定した品名（パネルのlabel）に対応するfinishを、panel_finishesから安全に取り出す。
+    未指定・不正な値の場合はDEFAULT_FINISH（クリア塗装）にフォールバックする。
+    天板・底板・側板・背板の基本4種だけでなく、扉・脚などの追加パーツのlabelにも使える。
+    """
+    value = (panel_finishes or {}).get(label, DEFAULT_FINISH)
+    return value if value in FINISH_OPTIONS else DEFAULT_FINISH
+
+
 def compute_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_mm, material, panel_finishes=None):
     """家具の外形寸法から、天板・底板・側板×2・背板のパネル構成を計算する。
 
@@ -78,17 +90,11 @@ def compute_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_m
     if inner_height <= 0:
         raise ValueError(f"高さ({height_mm}mm)が板厚×2({thickness_mm * 2}mm)以下です。高さを見直してください。")
 
-    panel_finishes = panel_finishes or {}
-
-    def finish_for(label):
-        value = panel_finishes.get(label, DEFAULT_FINISH)
-        return value if value in FINISH_OPTIONS else DEFAULT_FINISH
-
     return [
         {
             "label": "天板",
             "material": material,
-            "finish": finish_for("天板"),
+            "finish": _finish_for("天板", panel_finishes),
             "size": (width_mm, depth_mm, thickness_mm),
             "pos": (0, 0, height_mm - thickness_mm),
             "cut_w": width_mm,
@@ -98,7 +104,7 @@ def compute_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_m
         {
             "label": "底板",
             "material": material,
-            "finish": finish_for("底板"),
+            "finish": _finish_for("底板", panel_finishes),
             "size": (width_mm, depth_mm, thickness_mm),
             "pos": (0, 0, 0),
             "cut_w": width_mm,
@@ -108,7 +114,7 @@ def compute_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_m
         {
             "label": "側板",
             "material": material,
-            "finish": finish_for("側板"),
+            "finish": _finish_for("側板", panel_finishes),
             "size": (thickness_mm, depth_mm, inner_height),
             "pos": (0, 0, thickness_mm),
             "cut_w": depth_mm,
@@ -118,7 +124,7 @@ def compute_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_m
         {
             "label": "側板",
             "material": material,
-            "finish": finish_for("側板"),
+            "finish": _finish_for("側板", panel_finishes),
             "size": (thickness_mm, depth_mm, inner_height),
             "pos": (width_mm - thickness_mm, 0, thickness_mm),
             "cut_w": depth_mm,
@@ -128,7 +134,7 @@ def compute_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_m
         {
             "label": "背板",
             "material": material,
-            "finish": finish_for("背板"),
+            "finish": _finish_for("背板", panel_finishes),
             "size": (width_mm, back_thickness_mm, inner_height),
             "pos": (0, depth_mm - back_thickness_mm, thickness_mm),
             "cut_w": width_mm,
@@ -136,6 +142,397 @@ def compute_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_m
             "cut_t": back_thickness_mm,
         },
     ]
+
+
+## --- 追加パーツ（オプションパーツ）---
+## 基本の箱（天板・底板・側板・背板）に加えて、扉・脚・棚板などの追加パーツを
+## 選択式で組み込めるようにする。各オプションパーツの生成関数は、compute_panels()と
+## 全く同じ形のパネル辞書（label/material/finish/size/pos/cut_w/cut_d/cut_t）を返す。
+## この形さえ守れば、FreeCADモデリング（build_freecad_document）・POV-Rayレンダリング
+## （generate_pov_scene）・木取りCSV（write_cutlist_csv）・3Dビューア・簡易プレビューの
+## いずれも、base_panels + option_panels のように単純に連結するだけで自動的に対応でき、
+## 追加パーツ専用のコードをこれらの関数側に書く必要が一切ない。
+
+# 角材・台座パーツの断面寸法・位置の目安（mm）。実測に基づく固定値ではなく、
+# 一般的な木工DIYでよく使われるサイズを初期値として採用している
+LEG_CROSS_SECTION_MM = 30
+PILLAR_CROSS_SECTION_MM = 30
+BATTEN_HEIGHT_MM = 30
+CORNER_INSET_MM = 15
+
+
+# 追加パーツの一覧・パラメータ定義。UI（static/index.html）側のラベル・初期値・
+# 範囲もこれと揃えてあるが、ここが実際のバリデーション・デフォルト値の正となる
+# （server.py側のparse_optionsもこの定義を参照してクランプする）
+OPTION_PART_DEFS = {
+    "door": {
+        "label": "扉",
+        "description": "本体前面を覆う開き戸",
+        "params": {"count": {"label": "枚数", "default": 1, "min": 1, "max": 2}},
+    },
+    "drawer_front": {
+        "label": "引き出し前板",
+        "description": "前面の引き出し用化粧板（段数分を縦に分割配置）",
+        "params": {"count": {"label": "段数", "default": 1, "min": 1, "max": 4}},
+    },
+    "legs": {
+        "label": "脚",
+        "description": "本体下面に取り付ける角材の脚（4本または6本）",
+        "params": {
+            "heightMm": {"label": "高さ(mm)", "default": 100, "min": 30, "max": 400},
+            "count": {"label": "本数", "default": 4, "min": 4, "max": 6},
+        },
+    },
+    "apron": {
+        "label": "幕板",
+        "description": "脚同士をつなぐ補強レール（本体前後面の下部）",
+        "params": {"heightMm": {"label": "見付け高さ(mm)", "default": 60, "min": 30, "max": 120}},
+    },
+    "pillars": {
+        "label": "支柱",
+        "description": "本体前面に追加する角材の支柱（間口が広い場合の中間支持など）",
+        "params": {"count": {"label": "本数", "default": 2, "min": 1, "max": 4}},
+    },
+    "stack": {
+        "label": "本体2段重ね",
+        "description": "同じ本体をもう1段（以上）上に積み重ねる",
+        "params": {"count": {"label": "追加段数", "default": 1, "min": 1, "max": 2}},
+    },
+    "divider_v": {
+        "label": "縦仕切り",
+        "description": "内部を左右に区切る縦板",
+        "params": {"count": {"label": "枚数", "default": 1, "min": 1, "max": 3}},
+    },
+    "shelf_h": {
+        "label": "横棚板",
+        "description": "内部の高さ方向を区切る棚板",
+        "params": {"count": {"label": "枚数", "default": 1, "min": 1, "max": 4}},
+    },
+    "back_batten": {
+        "label": "背面補強桟",
+        "description": "背板内側に取り付ける補強用の桟",
+        "params": {"count": {"label": "本数", "default": 2, "min": 1, "max": 4}},
+    },
+    "caster_block": {
+        "label": "キャスター台座",
+        "description": "本体下面四隅に取り付けるキャスター取付用の台座",
+        "params": {"sizeMm": {"label": "台座の一辺(mm)", "default": 50, "min": 30, "max": 80}},
+    },
+}
+
+
+def _resolve_option_params(key, opt):
+    """1つのオプションパーツについて、渡されたパラメータをOPTION_PART_DEFSの
+    min/maxでクランプし、未指定分はdefaultで補って返す。countパラメータは整数に丸める。
+    """
+    resolved = {}
+    for param_key, meta in OPTION_PART_DEFS[key]["params"].items():
+        raw = opt.get(param_key, meta["default"])
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            value = meta["default"]
+        value = max(meta["min"], min(meta["max"], value))
+        if param_key == "count":
+            value = int(round(value))
+        resolved[param_key] = value
+    return resolved
+
+
+def _option_context(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_mm):
+    """オプションパーツの座標計算でよく使う「内寸」をまとめて計算する。"""
+    return {
+        "width": width_mm,
+        "depth": depth_mm,
+        "height": height_mm,
+        "thickness": thickness_mm,
+        "back_thickness": back_thickness_mm,
+        "inner_w": width_mm - 2 * thickness_mm,
+        "inner_h": height_mm - 2 * thickness_mm,
+        "inner_d": depth_mm - back_thickness_mm,
+    }
+
+
+def _option_door(ctx, params, material, panel_finishes):
+    """本体前面（y=0の開口部）を覆う扉。count=2で観音開き（左右分割）にする。"""
+    label = OPTION_PART_DEFS["door"]["label"]
+    count = int(params["count"])
+    t = ctx["thickness"]
+    inner_w, inner_h = ctx["inner_w"], ctx["inner_h"]
+    leaf_w = inner_w / count
+    finish = _finish_for(label, panel_finishes)
+    return [
+        {
+            "label": label,
+            "material": material,
+            "finish": finish,
+            "size": (leaf_w, t, inner_h),
+            "pos": (t + i * leaf_w, -t, t),
+            "cut_w": leaf_w,
+            "cut_d": inner_h,
+            "cut_t": t,
+        }
+        for i in range(count)
+    ]
+
+
+def _option_drawer_front(ctx, params, material, panel_finishes):
+    """前面の引き出し前板。countで縦方向に段数分割する（扉が左右分割なのに対し、こちらは上下分割）。"""
+    label = OPTION_PART_DEFS["drawer_front"]["label"]
+    count = int(params["count"])
+    t = ctx["thickness"]
+    inner_w, inner_h = ctx["inner_w"], ctx["inner_h"]
+    front_h = inner_h / count
+    finish = _finish_for(label, panel_finishes)
+    return [
+        {
+            "label": label,
+            "material": material,
+            "finish": finish,
+            "size": (inner_w, t, front_h),
+            "pos": (t, -t, t + i * front_h),
+            "cut_w": inner_w,
+            "cut_d": front_h,
+            "cut_t": t,
+        }
+        for i in range(count)
+    ]
+
+
+def _option_legs(ctx, params, material, panel_finishes):
+    """本体下面（z=0）から下方向に伸びる角材の脚。4本は四隅、6本は四隅+左右中央にも追加する。"""
+    label = OPTION_PART_DEFS["legs"]["label"]
+    leg_h = params["heightMm"]
+    count = int(params["count"])
+    width, depth = ctx["width"], ctx["depth"]
+    finish = _finish_for(label, panel_finishes)
+    cs = LEG_CROSS_SECTION_MM
+    inset = CORNER_INSET_MM
+    x_positions = (
+        [inset, width - inset - cs] if count <= 4 else [inset, (width - cs) / 2, width - inset - cs]
+    )
+    y_positions = [inset, depth - inset - cs]
+    return [
+        {
+            "label": label,
+            "material": material,
+            "finish": finish,
+            "size": (cs, cs, leg_h),
+            "pos": (x, y, -leg_h),
+            # 角材は「長さ×断面×断面」として記録する（cut_w=長さ）。フラットパネルの
+            # cut_w/cut_d（面の縦横）とは意味が異なるが、木取り表の列自体は共通のため流用する
+            "cut_w": leg_h,
+            "cut_d": cs,
+            "cut_t": cs,
+        }
+        for x in x_positions
+        for y in y_positions
+    ]
+
+
+def _option_apron(ctx, params, material, panel_finishes):
+    """脚同士をつなぐ幕板（前面・背面の下部に取り付ける薄板のレール）。"""
+    label = OPTION_PART_DEFS["apron"]["label"]
+    h = params["heightMm"]
+    t = ctx["thickness"]
+    width, depth = ctx["width"], ctx["depth"]
+    finish = _finish_for(label, panel_finishes)
+    rail_w = width - 2 * CORNER_INSET_MM
+    return [
+        {
+            "label": label,
+            "material": material,
+            "finish": finish,
+            "size": (rail_w, t, h),
+            "pos": (CORNER_INSET_MM, y, -h),
+            "cut_w": rail_w,
+            "cut_d": h,
+            "cut_t": t,
+        }
+        for y in (0, depth - t)
+    ]
+
+
+def _option_pillars(ctx, params, material, panel_finishes):
+    """本体前面に追加する角材の支柱（間口が広い棚などの中間支持を想定）。"""
+    label = OPTION_PART_DEFS["pillars"]["label"]
+    count = int(params["count"])
+    t = ctx["thickness"]
+    inner_w, inner_h = ctx["inner_w"], ctx["inner_h"]
+    finish = _finish_for(label, panel_finishes)
+    cs = PILLAR_CROSS_SECTION_MM
+    panels = []
+    for i in range(count):
+        x = t + (i + 1) * inner_w / (count + 1) - cs / 2
+        panels.append(
+            {
+                "label": label,
+                "material": material,
+                "finish": finish,
+                "size": (cs, cs, inner_h),
+                "pos": (x, 0, t),
+                "cut_w": inner_h,
+                "cut_d": cs,
+                "cut_t": cs,
+            }
+        )
+    return panels
+
+
+def _option_stack(ctx, params, material, panel_finishes):
+    """同じ本体をもう1段(以上)、真上に積み重ねる。compute_panels()をそのまま再利用し、
+    高さ分だけz座標をずらす。ラベル（天板・底板等）は基本の5枚と同じにするため、
+    木取りCSVでは同一規格として枚数が自動的に加算される（例: 天板が2枚になる）。
+    """
+    count = int(params["count"])
+    width, depth, height = ctx["width"], ctx["depth"], ctx["height"]
+    t, bt = ctx["thickness"], ctx["back_thickness"]
+    panels = []
+    for level in range(1, count + 1):
+        level_panels = compute_panels(width, depth, height, t, bt, material, panel_finishes)
+        for p in level_panels:
+            x, y, z = p["pos"]
+            p["pos"] = (x, y, z + level * height)
+        panels.extend(level_panels)
+    return panels
+
+
+def _option_divider_v(ctx, params, material, panel_finishes):
+    """内部を左右に区切る縦仕切り板。countの数だけ内寸を等分する位置に配置する。"""
+    label = OPTION_PART_DEFS["divider_v"]["label"]
+    count = int(params["count"])
+    t = ctx["thickness"]
+    inner_w, inner_h, inner_d = ctx["inner_w"], ctx["inner_h"], ctx["inner_d"]
+    finish = _finish_for(label, panel_finishes)
+    panels = []
+    for i in range(count):
+        x = t + (i + 1) * inner_w / (count + 1) - t / 2
+        panels.append(
+            {
+                "label": label,
+                "material": material,
+                "finish": finish,
+                "size": (t, inner_d, inner_h),
+                "pos": (x, 0, t),
+                "cut_w": inner_d,
+                "cut_d": inner_h,
+                "cut_t": t,
+            }
+        )
+    return panels
+
+
+def _option_shelf_h(ctx, params, material, panel_finishes):
+    """内部の高さ方向を区切る横棚板。countの数だけ内寸の高さを等分する位置に配置する。"""
+    label = OPTION_PART_DEFS["shelf_h"]["label"]
+    count = int(params["count"])
+    t = ctx["thickness"]
+    inner_w, inner_h, inner_d = ctx["inner_w"], ctx["inner_h"], ctx["inner_d"]
+    finish = _finish_for(label, panel_finishes)
+    panels = []
+    for i in range(count):
+        z = t + (i + 1) * inner_h / (count + 1) - t / 2
+        panels.append(
+            {
+                "label": label,
+                "material": material,
+                "finish": finish,
+                "size": (inner_w, inner_d, t),
+                "pos": (t, 0, z),
+                "cut_w": inner_w,
+                "cut_d": inner_d,
+                "cut_t": t,
+            }
+        )
+    return panels
+
+
+def _option_back_batten(ctx, params, material, panel_finishes):
+    """背板の内側に取り付ける補強用の桟。countが1本なら中央、2本以上なら上下均等に配置する。"""
+    label = OPTION_PART_DEFS["back_batten"]["label"]
+    count = int(params["count"])
+    t = ctx["thickness"]
+    inner_w, inner_h = ctx["inner_w"], ctx["inner_h"]
+    depth, bt = ctx["depth"], ctx["back_thickness"]
+    finish = _finish_for(label, panel_finishes)
+    y = depth - bt - t
+    panels = []
+    for i in range(count):
+        if count == 1:
+            z = t + inner_h / 2 - BATTEN_HEIGHT_MM / 2
+        else:
+            z = t + i * (inner_h - BATTEN_HEIGHT_MM) / (count - 1)
+        panels.append(
+            {
+                "label": label,
+                "material": material,
+                "finish": finish,
+                "size": (inner_w, t, BATTEN_HEIGHT_MM),
+                "pos": (t, y, z),
+                "cut_w": inner_w,
+                "cut_d": BATTEN_HEIGHT_MM,
+                "cut_t": t,
+            }
+        )
+    return panels
+
+
+def _option_caster_block(ctx, params, material, panel_finishes):
+    """本体下面四隅に取り付けるキャスター取付用の台座（正方形の角材ブロック）。"""
+    label = OPTION_PART_DEFS["caster_block"]["label"]
+    size = params["sizeMm"]
+    height = LEG_CROSS_SECTION_MM
+    width, depth = ctx["width"], ctx["depth"]
+    finish = _finish_for(label, panel_finishes)
+    inset = CORNER_INSET_MM
+    return [
+        {
+            "label": label,
+            "material": material,
+            "finish": finish,
+            "size": (size, size, height),
+            "pos": (x, y, -height),
+            "cut_w": size,
+            "cut_d": size,
+            "cut_t": height,
+        }
+        for x in (inset, width - inset - size)
+        for y in (inset, depth - inset - size)
+    ]
+
+
+OPTION_GENERATORS = {
+    "door": _option_door,
+    "drawer_front": _option_drawer_front,
+    "legs": _option_legs,
+    "apron": _option_apron,
+    "pillars": _option_pillars,
+    "stack": _option_stack,
+    "divider_v": _option_divider_v,
+    "shelf_h": _option_shelf_h,
+    "back_batten": _option_back_batten,
+    "caster_block": _option_caster_block,
+}
+
+
+def compute_option_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_mm, material, panel_finishes, options):
+    """有効化された追加パーツ（扉・脚・棚板など）のパネル一覧を計算する。
+
+    optionsは { "legs": {"enabled": true, "heightMm": 100, "count": 4}, ... } の形（キーは
+    OPTION_PART_DEFSのキーと一致）。enabledがfalsyなキーはスキップする。戻り値は
+    compute_panels()と同じ形のパネル辞書のリストなので、呼び出し側は
+    `base_panels + compute_option_panels(...)` と連結するだけでよい。
+    """
+    options = options or {}
+    ctx = _option_context(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_mm)
+    panels = []
+    for key, generator in OPTION_GENERATORS.items():
+        opt = options.get(key)
+        if not opt or not opt.get("enabled"):
+            continue
+        params = _resolve_option_params(key, opt)
+        panels.extend(generator(ctx, params, material, panel_finishes))
+    return panels
 
 
 def _apply_panel_color(obj, panel, material_color_lookup):
@@ -276,13 +673,32 @@ def _panel_pov_texture(panel):
     )
 
 
+def _panels_bounding_box(panels):
+    """全パネルを包む外接直方体（min/max のx,y,z）を計算する。
+
+    脚（本体下面より下）・扉（本体前面より手前）・本体2段重ね（本体の上）のように、
+    追加パーツは基本の外形寸法（width/depth/height）の範囲をはみ出すことがあるため、
+    カメラ・地面の配置は生の外形寸法ではなく、実際のパネル構成から計算した外接直方体を
+    基準にする必要がある。
+    """
+    xs_min = min(p["pos"][0] for p in panels)
+    xs_max = max(p["pos"][0] + p["size"][0] for p in panels)
+    ys_min = min(p["pos"][1] for p in panels)
+    ys_max = max(p["pos"][1] + p["size"][1] for p in panels)
+    zs_min = min(p["pos"][2] for p in panels)
+    zs_max = max(p["pos"][2] + p["size"][2] for p in panels)
+    return xs_min, xs_max, ys_min, ys_max, zs_min, zs_max
+
+
 def generate_pov_scene(panels, width_mm, depth_mm, height_mm, material, output_path):
     """パネル構成から、POV-Ray用のシーンファイル(.pov)をテキストとして生成する。
 
-    メッシュ変換を経由せず、天板・底板・側板・背板をそのままbox{}プリミティブとして
-    書き出すことで、FreeCADモデルと完全に同じ寸法をレンダリングに反映させる。
-    パネルごとに個別のfinish（クリア塗装/ウォルナット調/ホワイト/ブラック）を
-    テクスチャとして割り当てるため、単一のWoodTextureではなくパネルごとに生成する。
+    メッシュ変換を経由せず、天板・底板・側板・背板（および追加パーツ）をそのまま
+    box{}プリミティブとして書き出すことで、FreeCADモデルと完全に同じ寸法を
+    レンダリングに反映させる。パネルごとに個別のfinish（クリア塗装/ウォルナット調/
+    ホワイト/ブラック）をテクスチャとして割り当てるため、単一のWoodTextureではなく
+    パネルごとに生成する。カメラ・地面は_panels_bounding_box()の外接直方体を基準に
+    配置するため、脚や扉などで基本の外形寸法をはみ出しても正しく画角に収まる。
     """
     box_entries = []
     for panel in panels:
@@ -291,9 +707,18 @@ def generate_pov_scene(panels, width_mm, depth_mm, height_mm, material, output_p
         texture_block = _panel_pov_texture(panel)
         box_entries.append(f"  box {{ <{x}, {y}, {z}>, <{x + dx}, {y + dy}, {z + dz}> {texture_block} }}")
 
-    cam_distance = max(width_mm, depth_mm, height_mm) * 2.4
+    min_x, max_x, min_y, max_y, min_z, max_z = _panels_bounding_box(panels)
+    bbox_w = max_x - min_x
+    bbox_d = max_y - min_y
+    bbox_h = max_z - min_z
+    center_x = (min_x + max_x) / 2
+    center_y = (min_y + max_y) / 2
+    center_z = (min_z + max_z) / 2
+    cam_distance = max(bbox_w, bbox_d, bbox_h) * 2.4
+
     scene = f"""// TANE:i FreeCAD Studio - auto-generated POV-Ray scene
 // 元になったパラメータ: width={width_mm}mm depth={depth_mm}mm height={height_mm}mm material={material}
+// カメラ・地面は追加パーツ込みの全パネル外接直方体（{bbox_w:.0f}x{bbox_d:.0f}x{bbox_h:.0f}mm）を基準に配置
 
 #include "colors.inc"
 #include "woods.inc"
@@ -301,19 +726,19 @@ def generate_pov_scene(panels, width_mm, depth_mm, height_mm, material, output_p
 global_settings {{ assumed_gamma 1.0 }}
 
 camera {{
-  location <{width_mm * 1.4}, -{cam_distance}, {height_mm * 1.6}>
+  location <{center_x + bbox_w * 0.7}, {min_y - cam_distance}, {center_z + bbox_h * 0.8}>
   sky <0, 0, 1>
-  look_at <{width_mm / 2}, {depth_mm / 2}, {height_mm / 2}>
+  look_at <{center_x}, {center_y}, {center_z}>
   angle 38
 }}
 
-light_source {{ <{width_mm * 2}, -{depth_mm * 3}, {height_mm * 3}> color rgb <1, 1, 0.97> }}
-light_source {{ <-{width_mm * 0.8}, -{depth_mm * 1.2}, {height_mm * 2}> color rgb <0.35, 0.35, 0.4> }}
+light_source {{ <{center_x + bbox_w * 1.5}, {min_y - bbox_d * 2}, {center_z + bbox_h * 2}> color rgb <1, 1, 0.97> }}
+light_source {{ <{center_x - bbox_w * 0.6}, {min_y - bbox_d * 1}, {center_z + bbox_h * 1.5}> color rgb <0.35, 0.35, 0.4> }}
 
 background {{ color rgb <0.98, 0.97, 0.94> }}
 
 plane {{
-  <0, 0, 1>, -1
+  <0, 0, 1>, {min_z - 1}
   pigment {{ color rgb <0.93, 0.92, 0.89> }}
   finish {{ diffuse 0.9 }}
 }}
@@ -383,11 +808,15 @@ def main():
     thickness = float(params.get("thickness", DEFAULT_THICKNESS_MM))
     material = params.get("material", "パイン集成材")
     panel_finishes = params.get("panelFinishes") or {}
+    options = params.get("options") or {}
     output_dir = params["outputDir"]
 
     os.makedirs(output_dir, exist_ok=True)
 
     panels = compute_panels(width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material, panel_finishes)
+    panels += compute_option_panels(
+        width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material, panel_finishes, options
+    )
 
     fcstd_path = os.path.join(output_dir, "model.FCStd")
     csv_path = os.path.join(output_dir, "cutlist.csv")
