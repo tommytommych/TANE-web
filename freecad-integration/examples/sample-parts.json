@@ -1,0 +1,7 @@
+[
+  { "name": "天板", "widthMm": 800, "depthMm": 300, "thicknessMm": 18, "material": "シナベニヤ", "qty": 1 },
+  { "name": "底板", "widthMm": 800, "depthMm": 300, "thicknessMm": 18, "material": "シナベニヤ", "qty": 1 },
+  { "name": "側板", "widthMm": 300, "depthMm": 900, "thicknessMm": 18, "material": "シナベニヤ", "qty": 2 },
+  { "name": "棚板", "widthMm": 780, "depthMm": 280, "thicknessMm": 18, "material": "シナベニヤ", "qty": 4 },
+  { "name": "背板", "widthMm": 800, "depthMm": 900, "thicknessMm": 12, "material": "シナベニヤ", "qty": 1 }
+]

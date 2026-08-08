@@ -1,0 +1,16 @@
+{
+  "name": "@tane/freecad-integration",
+  "version": "0.1.0",
+  "private": true,
+  "description": "FreeCAD連携機能の独立プロトタイプ（Phase1: 部品リスト解析・木取り最適化エンジン）",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "analyze": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
