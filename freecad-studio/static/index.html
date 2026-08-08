@@ -18,8 +18,8 @@
   h1 { font-weight: 500; font-size: 24px; margin-bottom: 4px; }
   p.lead { color: #8A8A8A; margin-top: 0; font-size: 14px; }
   .layout { display: flex; flex-direction: column; gap: 28px; margin-top: 32px; }
-  .settings-row { display: grid; grid-template-columns: 300px 280px; gap: 24px; justify-content: center; }
-  @media (max-width: 720px) { .settings-row { grid-template-columns: 1fr; } }
+  .settings-row { display: grid; grid-template-columns: 300px minmax(320px, 1fr) 280px; gap: 24px; align-items: start; }
+  @media (max-width: 1024px) { .settings-row { grid-template-columns: 1fr; } }
   .options-panel {
     display: flex; flex-direction: column; gap: 10px; background: #fff; padding: 16px;
     border-radius: 8px; border: 1px solid #eee;
@@ -40,8 +40,8 @@
     background: #1F3028; color: #FAF8F4; font-size: 14px; font-weight: 500; cursor: pointer;
   }
   button:disabled { opacity: 0.5; cursor: default; }
-  .result { display: flex; flex-direction: column; align-items: center; min-height: 200px; }
-  .result-inner { width: 100%; max-width: 960px; }
+  .result { min-height: 200px; }
+  .result-inner { width: 100%; }
   .result .tabs { justify-content: center; }
   .result img { display: block; width: 100%; max-width: 100%; margin: 0 auto; border-radius: 8px; border: 1px solid #eee; background: #fff; }
   table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; background: #fff; }
@@ -159,6 +159,23 @@
       <div id="status" class="status"></div>
     </form>
 
+    <div class="result">
+      <div class="result-inner">
+        <div class="tabs" id="result-tabs" style="display: none;">
+          <button type="button" class="tab-btn active" data-tab="image">完成イメージ</button>
+          <button type="button" class="tab-btn" data-tab="viewer3d">3Dビューで動かす</button>
+        </div>
+        <div id="tab-image" class="tab-panel active">
+          <div id="image-area"></div>
+        </div>
+        <div id="tab-viewer3d" class="tab-panel">
+          <canvas id="viewer-3d-canvas"></canvas>
+          <p class="viewer-hint">ドラッグで回転、スクロールでズーム、右ドラッグ（または2本指）で平行移動できます。</p>
+        </div>
+        <div id="cutlist-area"></div>
+      </div>
+    </div>
+
     <aside class="options-panel">
       <p class="finish-group-title">追加パーツ（任意・複数選択可）</p>
 
@@ -219,23 +236,6 @@
       </div>
     </aside>
    </div>
-
-    <div class="result">
-      <div class="result-inner">
-        <div class="tabs" id="result-tabs" style="display: none;">
-          <button type="button" class="tab-btn active" data-tab="image">完成イメージ</button>
-          <button type="button" class="tab-btn" data-tab="viewer3d">3Dビューで動かす</button>
-        </div>
-        <div id="tab-image" class="tab-panel active">
-          <div id="image-area"></div>
-        </div>
-        <div id="tab-viewer3d" class="tab-panel">
-          <canvas id="viewer-3d-canvas"></canvas>
-          <p class="viewer-hint">ドラッグで回転、スクロールでズーム、右ドラッグ（または2本指）で平行移動できます。</p>
-        </div>
-        <div id="cutlist-area"></div>
-      </div>
-    </div>
   </div>
 </main>
 
@@ -330,13 +330,15 @@ function buildViewerFromPanels(panels) {
 
   scene.add(panelGroup);
 
-  // 全体が収まるようにカメラを配置し直す
+  // 全体が収まるように、まず正面（FreeCAD側のy=0、扉・引き出しがある開口部側）から
+  // 見た状態でカメラをスタートさせる。Three.js側はy/zを入れ替えているため、
+  // FreeCADのY軸（奥行き）はThree.jsのZ軸に対応し、正面はZが最小側になる
   const box = new THREE.Box3().setFromObject(panelGroup);
   const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z);
 
-  camera.position.set(center.x + maxDim * 1.3, center.y + maxDim * 0.9, center.z + maxDim * 1.6);
+  camera.position.set(center.x, center.y, box.min.z - maxDim * 1.4);
   controls.target.copy(center);
   controls.update();
 
