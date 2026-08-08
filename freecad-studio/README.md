@@ -215,9 +215,9 @@ TANE:iチャット（`app/app/page.tsx`、Vercel等にデプロイされるメ�
 - `serialize_panels_for_viewer()` / Three.jsの3Dビューア — 追加パーツも同じ色ロジックで着色される
 - `mock_preview.py`の等角プレビューSVG（FreeCAD/POV-Ray未接続時のフォールバック）
 
-「印刷用のカット依頼用紙」（結果パネルの「🖨 カット依頼用紙を印刷」ボタン、`static/index.html`の
-`#print-sheet`、`@media print`スタイル）も、画面上の木取り表と全く同じ`data.cutlist`から
-組み立てているため、追加パーツを有効にするだけで自動的にカット依頼用紙にも反映される。
+印刷用の「カット依頼用紙」出力はStudio側には持たせていない（TANE:iチャット側のPDF出力
+機能で対応する想定のため、あえて重複実装しない）。Studio側は画面上の木取り表（`data.cutlist`）
+までで、追加パーツもここに自動的に反映される。
 
 ### 追加した際に発生した副作用の修正
 

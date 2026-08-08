@@ -14,12 +14,12 @@
     margin: 0;
     padding: 40px 20px;
   }
-  main { max-width: 960px; margin: 0 auto; }
+  main { max-width: 1200px; margin: 0 auto; }
   h1 { font-weight: 500; font-size: 24px; margin-bottom: 4px; }
   p.lead { color: #8A8A8A; margin-top: 0; font-size: 14px; }
-  .layout { display: grid; grid-template-columns: 300px 260px 1fr; gap: 24px; margin-top: 32px; align-items: start; }
-  @media (max-width: 1080px) { .layout { grid-template-columns: 300px 1fr; } .options-panel { grid-column: 1 / -1; } }
-  @media (max-width: 720px) { .layout { grid-template-columns: 1fr; } }
+  .layout { display: flex; flex-direction: column; gap: 28px; margin-top: 32px; }
+  .settings-row { display: grid; grid-template-columns: 300px 280px; gap: 24px; justify-content: center; }
+  @media (max-width: 720px) { .settings-row { grid-template-columns: 1fr; } }
   .options-panel {
     display: flex; flex-direction: column; gap: 10px; background: #fff; padding: 16px;
     border-radius: 8px; border: 1px solid #eee;
@@ -29,14 +29,6 @@
   .opt-toggle input[type="checkbox"] { width: 16px; height: 16px; }
   .opt-param { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #5a5a5a; font-weight: 400; padding-left: 24px; }
   .opt-param input[type="number"], .opt-param select { width: 64px; font-size: 13px; padding: 4px 6px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; }
-  #print-sheet { display: none; }
-  @media print {
-    body * { visibility: hidden; }
-    #print-sheet, #print-sheet * { visibility: visible; }
-    #print-sheet { display: block; position: absolute; top: 0; left: 0; width: 100%; padding: 24px; }
-    #print-sheet table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-    #print-sheet th, #print-sheet td { border: 1px solid #333; padding: 6px 10px; font-size: 13px; text-align: left; }
-  }
   form { display: flex; flex-direction: column; gap: 14px; background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #eee; }
   label { font-size: 13px; font-weight: 500; display: flex; flex-direction: column; gap: 6px; }
   input, select {
@@ -48,8 +40,10 @@
     background: #1F3028; color: #FAF8F4; font-size: 14px; font-weight: 500; cursor: pointer;
   }
   button:disabled { opacity: 0.5; cursor: default; }
-  .result { min-height: 200px; }
-  .result img { max-width: 100%; border-radius: 8px; border: 1px solid #eee; background: #fff; }
+  .result { display: flex; flex-direction: column; align-items: center; min-height: 200px; }
+  .result-inner { width: 100%; max-width: 960px; }
+  .result .tabs { justify-content: center; }
+  .result img { display: block; width: 100%; max-width: 100%; margin: 0 auto; border-radius: 8px; border: 1px solid #eee; background: #fff; }
   table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; background: #fff; }
   th, td { border: 1px solid #eee; padding: 6px 10px; text-align: left; }
   th { background: #f5f3ef; }
@@ -88,6 +82,7 @@
   <p class="lead" id="sync-status" style="font-size: 12px;">チャットとの連携: 接続確認中…</p>
 
   <div class="layout">
+   <div class="settings-row">
     <form id="render-form">
       <label>
         品名
@@ -223,26 +218,26 @@
         <label class="opt-param">一辺(mm)<input type="number" name="opt-caster_block-sizeMm" form="render-form" value="50" min="30" max="80" /></label>
       </div>
     </aside>
+   </div>
 
     <div class="result">
-      <div class="tabs" id="result-tabs" style="display: none;">
-        <button type="button" class="tab-btn active" data-tab="image">完成イメージ</button>
-        <button type="button" class="tab-btn" data-tab="viewer3d">3Dビューで動かす</button>
+      <div class="result-inner">
+        <div class="tabs" id="result-tabs" style="display: none;">
+          <button type="button" class="tab-btn active" data-tab="image">完成イメージ</button>
+          <button type="button" class="tab-btn" data-tab="viewer3d">3Dビューで動かす</button>
+        </div>
+        <div id="tab-image" class="tab-panel active">
+          <div id="image-area"></div>
+        </div>
+        <div id="tab-viewer3d" class="tab-panel">
+          <canvas id="viewer-3d-canvas"></canvas>
+          <p class="viewer-hint">ドラッグで回転、スクロールでズーム、右ドラッグ（または2本指）で平行移動できます。</p>
+        </div>
+        <div id="cutlist-area"></div>
       </div>
-      <div id="tab-image" class="tab-panel active">
-        <div id="image-area"></div>
-      </div>
-      <div id="tab-viewer3d" class="tab-panel">
-        <canvas id="viewer-3d-canvas"></canvas>
-        <p class="viewer-hint">ドラッグで回転、スクロールでズーム、右ドラッグ（または2本指）で平行移動できます。</p>
-      </div>
-      <div id="cutlist-area"></div>
-      <button type="button" id="print-cutlist-btn" class="tab-btn" style="display: none; margin-top: 12px;">🖨 カット依頼用紙を印刷</button>
     </div>
   </div>
 </main>
-
-<div id="print-sheet"></div>
 
 <script type="importmap">
 {
@@ -264,12 +259,6 @@ const statusEl = document.getElementById('status');
 const imageArea = document.getElementById('image-area');
 const cutlistArea = document.getElementById('cutlist-area');
 const resultTabs = document.getElementById('result-tabs');
-const printBtn = document.getElementById('print-cutlist-btn');
-const printSheet = document.getElementById('print-sheet');
-
-printBtn.addEventListener('click', () => {
-  window.print();
-});
 
 // --- タブ切り替え ---
 document.querySelectorAll('.tab-btn').forEach((btn) => {
@@ -427,7 +416,6 @@ async function renderPayload(payload) {
   statusEl.textContent = 'FreeCADでモデルを生成し、POV-Rayでレンダリング中です…（数十秒〜数分かかることがあります）';
   imageArea.innerHTML = '';
   cutlistArea.innerHTML = '';
-  printBtn.style.display = 'none';
 
   try {
     const res = await fetch('/api/render', {
@@ -462,23 +450,6 @@ async function renderPayload(payload) {
           <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
-
-      // 木取り表と全く同じデータ(data.cutlist)から、印刷用の「カット依頼用紙」も組み立てる。
-      // 追加パーツ（扉・脚・棚板など）で増えた部材も同じcutlistに含まれているため、
-      // ここでの特別な処理は不要（データソースを共有しているだけで自動的に連動する）
-      const printRows = data.cutlist
-        .map((row) => `<tr>${headers.map((h) => `<td>${row[h]}</td>`).join('')}<td>☐</td></tr>`)
-        .join('');
-      printSheet.innerHTML = `
-        <h2>カット依頼用紙</h2>
-        <p>品名: ${data.item}　作成日: ${new Date().toLocaleDateString('ja-JP')}</p>
-        <table>
-          <thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}<th>確認</th></tr></thead>
-          <tbody>${printRows}</tbody>
-        </table>`;
-      printBtn.style.display = 'inline-block';
-    } else {
-      printBtn.style.display = 'none';
     }
   } catch (err) {
     statusEl.className = 'status error';
