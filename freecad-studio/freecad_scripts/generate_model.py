@@ -6,9 +6,11 @@ FreeCADのPython環境（freecadcmd）で実行する、家具モデル生成ス
 FreeCAD本体にバンドルされており、一般的なpip環境にはインストールできない。
 
 実行例:
-    freecadcmd generate_model.py -- \\
-        --item "テレビ台" --width 1200 --depth 400 --height 400 \\
-        --thickness 18 --material "パイン集成材" --output-dir ./renders/job123
+    ※freecadcmdは独自のCLIパーサーを持ち、一般的な `--` 以降パススルーの慣習を尊重しないため、
+      パラメータはコマンドライン引数ではなく環境変数 TANEI_PARAMS_JSON で渡す（詳細はmain()参照）。
+
+    TANEI_PARAMS_JSON='{"item":"テレビ台","width":1200,"depth":400,"height":400,"thickness":18,"material":"パイン集成材","outputDir":"./renders/job123"}' \\
+        freecadcmd generate_model.py
 
 処理の流れ:
   1. 入力パラメータ（幅・奥行・高さ・厚み・材質）から、天板・底板・側板・背板の
@@ -27,7 +29,6 @@ FreeCAD本体にバンドルされており、一般的なpip環境にはイン�
      呼び出し元（server.py）はこの行をパースして結果を受け取る。
 """
 
-import argparse
 import csv
 import json
 import os
@@ -223,8 +224,10 @@ def render_with_povray(pov_path, output_png_path, width_px=1000, height_px=750):
         "+A0.3",  # アンチエイリアス
         "+Q9",  # 品質
         "-D",  # ディスプレイプレビューを無効化（サーバー環境向け）
-        "/EXIT",  # レンダリング後に自動終了（Windows版povray向け、Linux/Macでは無視される）
     ]
+    # 【重要・実機検証で判明】"/EXIT"はWindows版povray向けのオプションで、Mac/Linux版では
+    # 無視されず "Failed to parse command-line option" として実行自体が失敗する。
+    # Mac/Linuxのpovrayは元々レンダリング後にプロセスが自動終了するため、このオプション自体が不要。
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
@@ -244,50 +247,71 @@ def render_with_povray(pov_path, output_png_path, width_px=1000, height_px=750):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="TANE:i FreeCAD Studio - furniture model generator")
-    parser.add_argument("--item", default="家具", help="品名（例: テレビ台）")
-    parser.add_argument("--width", type=float, required=True, help="幅(mm)")
-    parser.add_argument("--depth", type=float, required=True, help="奥行(mm)")
-    parser.add_argument("--height", type=float, required=True, help="高さ(mm)")
-    parser.add_argument("--thickness", type=float, default=DEFAULT_THICKNESS_MM, help="板厚(mm)")
-    parser.add_argument("--material", default="パイン集成材", help="材質名")
-    parser.add_argument("--output-dir", required=True, help="生成物の出力先ディレクトリ")
+    # 【重要】FreeCADのfreecadcmdは、boost::program_optionsベースの独自CLIパーサーを持ち、
+    # 一般的な `script.py -- --foo bar` のような「--以降はスクリプトへそのまま渡す」慣習を
+    # 尊重しない（`--pass`という専用オプションはあるが、値を1つしか受け付けず、複数の
+    # --key value ペアを引き継ぐには向かない）。この問題を確実に避けるため、パラメータは
+    # コマンドライン引数ではなく環境変数 TANEI_PARAMS_JSON（JSON文字列）で受け渡す。
+    params_json = os.environ.get("TANEI_PARAMS_JSON")
+    if not params_json:
+        raise RuntimeError(
+            "環境変数 TANEI_PARAMS_JSON が設定されていません。"
+            "server.py経由ではなく直接実行する場合は、JSON文字列をこの環境変数に設定してください。"
+        )
+    params = json.loads(params_json)
 
-    # freecadcmdは `freecadcmd script.py -- --foo bar` のように渡された引数を
-    # そのままsys.argvへ引き継ぐが、環境によって先頭にスクリプトパス自体が
-    # 含まれることがあるため、parse_known_argsで余計な引数を無視する
-    args, _unknown = parser.parse_known_args()
+    item = params.get("item", "家具")
+    width = float(params["width"])
+    depth = float(params["depth"])
+    height = float(params["height"])
+    thickness = float(params.get("thickness", DEFAULT_THICKNESS_MM))
+    material = params.get("material", "パイン集成材")
+    output_dir = params["outputDir"]
 
-    os.makedirs(args.output_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
 
-    panels = compute_panels(
-        args.width, args.depth, args.height, args.thickness, DEFAULT_BACK_THICKNESS_MM, args.material
-    )
+    panels = compute_panels(width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material)
 
-    fcstd_path = os.path.join(args.output_dir, "model.FCStd")
-    csv_path = os.path.join(args.output_dir, "cutlist.csv")
-    pov_path = os.path.join(args.output_dir, "scene.pov")
-    png_path = os.path.join(args.output_dir, "render.png")
+    fcstd_path = os.path.join(output_dir, "model.FCStd")
+    csv_path = os.path.join(output_dir, "cutlist.csv")
+    pov_path = os.path.join(output_dir, "scene.pov")
+    png_path = os.path.join(output_dir, "render.png")
 
     build_freecad_document(panels, fcstd_path)
     write_cutlist_csv(panels, csv_path)
-    generate_pov_scene(panels, args.width, args.depth, args.height, args.material, pov_path)
+    generate_pov_scene(panels, width, depth, height, material, pov_path)
     render_with_povray(pov_path, png_path)
 
-    result = {
-        "item": args.item,
+    return {
+        "item": item,
         "model": fcstd_path,
         "cutlistCsv": csv_path,
         "renderPng": png_path,
         "panelCount": len(panels),
     }
-    # server.py側はこの行だけを標準出力から探してパースする
-    print("RESULT_JSON:" + json.dumps(result, ensure_ascii=False))
 
 
-if __name__ == "__main__":
+# 【重要】freecadcmdはスクリプトを「モジュールとしてimport」する形で実行し、__name__は
+# "__main__"にならない（実際に検証して確認: ファイル名から拡張子を除いた文字列になる）。
+# そのため `if __name__ == "__main__":` では絶対に実行されず、main()が呼ばれないまま
+# 静かに終了してしまう。TANEI_PARAMS_JSON環境変数の有無を「実際に生成を実行すべきか」の
+# 判定に使うことで、freecadcmdからの直接実行と、server.py等からのヘルパー関数の
+# import利用（compute_panels等だけを使いたい場合）の両方を正しく区別する。
+#
+# 【重要】結果・エラーは標準出力ではなく output_dir/result.json ファイルに書き出す。
+# freecadcmd経由の実行では、print()の出力がサブプロセスのキャプチャに正しく反映されない
+# （バッファリングの都合か、sys.exit()前にflushされない）ケースを実際に確認したため、
+# ファイル書き込みという、より確実な方法で呼び出し元（server.py）に結果を伝える。
+if os.environ.get("TANEI_PARAMS_JSON"):
+    _params = json.loads(os.environ["TANEI_PARAMS_JSON"])
+    _output_dir = _params.get("outputDir", ".")
+    os.makedirs(_output_dir, exist_ok=True)
+    _result_path = os.path.join(_output_dir, "result.json")
     try:
-        main()
+        _result = main()
+        with open(_result_path, "w", encoding="utf-8") as _f:
+            json.dump({"ok": True, **_result}, _f, ensure_ascii=False)
     except Exception as exc:  # noqa: BLE001  (freecadcmd呼び出し元に必ずエラー内容を返すため意図的に広く捕捉)
-        print("ERROR_JSON:" + json.dumps({"error": str(exc)}, ensure_ascii=False))
+        with open(_result_path, "w", encoding="utf-8") as _f:
+            json.dump({"ok": False, "error": str(exc)}, _f, ensure_ascii=False)
         sys.exit(1)

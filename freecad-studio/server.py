@@ -84,43 +84,45 @@ def render_files(job_id, filename):
 
 
 def run_freecad_pipeline(job_dir, item, width, depth, height, thickness, material):
-    """本来のパイプライン: freecadcmdをサブプロセス実行し、FreeCAD+POV-Rayで生成する。"""
-    cmd = [
-        FREECAD_CMD_PATH,
-        GENERATE_SCRIPT,
-        "--",
-        "--item", item,
-        "--width", str(width),
-        "--depth", str(depth),
-        "--height", str(height),
-        "--thickness", str(thickness),
-        "--material", material,
-        "--output-dir", job_dir,
-    ]
+    """本来のパイプライン: freecadcmdをサブプロセス実行し、FreeCAD+POV-Rayで生成する。
+
+    freecadcmdは独自のCLIパーサー（boost::program_options）を持ち、一般的な
+    `script.py -- --foo bar` のような「--以降はスクリプトへそのまま渡す」慣習を尊重しない
+    （実際に検証したところ、出力先ディレクトリのパスをFreeCADが開くべきドキュメントと
+    誤認識し「File format not supported」エラーになった）。そのため、パラメータは
+    コマンドライン引数ではなく環境変数 TANEI_PARAMS_JSON で渡す。
+    """
+    params_json = json.dumps({
+        "item": item,
+        "width": width,
+        "depth": depth,
+        "height": height,
+        "thickness": thickness,
+        "material": material,
+        "outputDir": job_dir,
+    })
+    cmd = [FREECAD_CMD_PATH, GENERATE_SCRIPT]
+    env = {**os.environ, "TANEI_PARAMS_JSON": params_json}
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180, env=env)
     except subprocess.TimeoutExpired:
         return None, {"error": "FreeCADでの生成処理がタイムアウトしました（180秒）。"}, 504
 
-    result_line = next(
-        (line for line in result.stdout.splitlines() if line.startswith("RESULT_JSON:")), None
-    )
-    error_line = next(
-        (line for line in result.stdout.splitlines() if line.startswith("ERROR_JSON:")), None
-    )
-
-    if error_line:
-        error_payload = json.loads(error_line[len("ERROR_JSON:"):])
-        return None, {"error": error_payload.get("error", "不明なエラーが発生しました。")}, 500
-
-    if result.returncode != 0 or not result_line:
+    # 結果はstdoutではなく result.json ファイルから読む（generate_model.py側のコメント参照:
+    # freecadcmd経由ではprint()の出力がサブプロセスキャプチャに確実に反映されないケースがある）
+    result_json_path = os.path.join(job_dir, "result.json")
+    if not os.path.exists(result_json_path):
         return None, {
-            "error": "FreeCADでのモデル生成に失敗しました。",
+            "error": "FreeCADでのモデル生成に失敗しました（result.jsonが生成されませんでした）。",
             "details": (result.stderr or result.stdout)[-2000:],
         }, 500
 
-    payload = json.loads(result_line[len("RESULT_JSON:"):])
+    with open(result_json_path, encoding="utf-8") as f:
+        payload = json.load(f)
+
+    if not payload.get("ok"):
+        return None, {"error": payload.get("error", "不明なエラーが発生しました。")}, 500
 
     cutlist = []
     cutlist_csv_path = payload.get("cutlistCsv")
