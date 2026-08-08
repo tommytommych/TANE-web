@@ -55,6 +55,12 @@
   }
   #viewer-3d-canvas:active { cursor: grabbing; }
   .viewer-hint { font-size: 12px; color: #8A8A8A; margin-top: 6px; }
+  .finish-group {
+    display: flex; flex-direction: column; gap: 10px; padding: 12px;
+    background: #faf8f5; border: 1px solid #eee; border-radius: 8px;
+  }
+  .finish-group-title { font-size: 12px; font-weight: 600; color: #8A8A8A; margin: 0; }
+  .finish-group label { font-weight: 400; }
 </style>
 </head>
 <body>
@@ -94,6 +100,47 @@
           <option>OSB合板</option>
         </select>
       </label>
+
+      <div class="finish-group">
+        <p class="finish-group-title">パーツごとの塗装（任意）</p>
+        <label>
+          天板
+          <select name="finish-天板" class="finish-select">
+            <option value="clear" selected>クリア塗装（材質の木目）</option>
+            <option value="walnut">ウォルナット調</option>
+            <option value="white">ホワイト</option>
+            <option value="black">ブラック</option>
+          </select>
+        </label>
+        <label>
+          底板
+          <select name="finish-底板" class="finish-select">
+            <option value="clear" selected>クリア塗装（材質の木目）</option>
+            <option value="walnut">ウォルナット調</option>
+            <option value="white">ホワイト</option>
+            <option value="black">ブラック</option>
+          </select>
+        </label>
+        <label>
+          側板
+          <select name="finish-側板" class="finish-select">
+            <option value="clear" selected>クリア塗装（材質の木目）</option>
+            <option value="walnut">ウォルナット調</option>
+            <option value="white">ホワイト</option>
+            <option value="black">ブラック</option>
+          </select>
+        </label>
+        <label>
+          背板
+          <select name="finish-背板" class="finish-select">
+            <option value="clear" selected>クリア塗装（材質の木目）</option>
+            <option value="walnut">ウォルナット調</option>
+            <option value="white">ホワイト</option>
+            <option value="black">ブラック</option>
+          </select>
+        </label>
+      </div>
+
       <button type="submit" id="submit-btn">FreeCADでレンダリング</button>
       <div id="status" class="status"></div>
     </form>
@@ -229,6 +276,12 @@ form.addEventListener('submit', async (e) => {
     height: Number(formData.get('height')),
     thickness: Number(formData.get('thickness')),
     material: formData.get('material'),
+    panelFinishes: {
+      '天板': formData.get('finish-天板'),
+      '底板': formData.get('finish-底板'),
+      '側板': formData.get('finish-側板'),
+      '背板': formData.get('finish-背板'),
+    },
   };
 
   submitBtn.disabled = true;

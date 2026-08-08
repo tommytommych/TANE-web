@@ -23,6 +23,21 @@ MATERIAL_HEX = {
 }
 DEFAULT_MATERIAL_HEX = "#cca675"
 
+# finishが材質そのもの（clear）以外の場合の色（generate_model.pyのFINISH_APPROX_COLORと対応）
+FINISH_HEX = {
+    "walnut": "#3d2617",
+    "white": "#ede9e0",
+    "black": "#121212",
+}
+
+
+def _panel_hex_color(panel):
+    """パネルのfinishに応じた色（clearの場合は材質の色）を返す。"""
+    finish = panel.get("finish", "clear")
+    if finish in FINISH_HEX:
+        return FINISH_HEX[finish]
+    return MATERIAL_HEX.get(panel.get("material"), DEFAULT_MATERIAL_HEX)
+
 
 def _iso(x, y, z):
     """3D座標(mm)を、等角投影の2Dスクリーン座標へ変換する。"""
@@ -48,15 +63,18 @@ def _box_faces(x0, y0, z0, x1, y1, z1):
 
 
 def render_iso_preview_svg(panels, item_label, material):
-    """panels（generate_model.compute_panelsの出力）から、等角投影のSVG文字列を生成する。"""
-    base_color = MATERIAL_HEX.get(material, DEFAULT_MATERIAL_HEX)
+    """panels（generate_model.compute_panelsの出力）から、等角投影のSVG文字列を生成する。
 
+    パネルごとのfinish（クリア塗装/ウォルナット調/ホワイト/ブラック）を反映するため、
+    色はパネル単位で決める（単一のbase_colorを全パネルに使い回さない）。
+    """
     all_points = []
     polygons = []
 
     for panel in panels:
         x, y, z = panel["pos"]
         dx, dy, dz = panel["size"]
+        base_color = _panel_hex_color(panel)
         for face_name, corners, shade_factor in _box_faces(x, y, z, x + dx, y + dy, z + dz):
             projected = [_iso(*c) for c in corners]
             all_points.extend(projected)

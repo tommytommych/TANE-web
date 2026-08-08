@@ -32,10 +32,11 @@ GENERATE_SCRIPT = os.path.join(BASE_DIR, "freecad_scripts", "generate_model.py")
 sys.path.insert(0, BASE_DIR)
 from freecad_scripts.generate_model import (  # noqa: E402
     DEFAULT_BACK_THICKNESS_MM,
+    FINISH_OPTIONS,
     compute_panels,
     write_cutlist_csv,
 )
-from mock_preview import render_iso_preview_svg, MATERIAL_HEX, DEFAULT_MATERIAL_HEX  # noqa: E402
+from mock_preview import render_iso_preview_svg, MATERIAL_HEX, DEFAULT_MATERIAL_HEX, FINISH_HEX  # noqa: E402
 
 FREECAD_CMD_PATH = os.environ.get("FREECAD_CMD_PATH", "freecadcmd")
 
@@ -48,18 +49,37 @@ app = Flask(__name__, static_folder=None)
 os.makedirs(RENDERS_DIR, exist_ok=True)
 
 
-def serialize_panels_for_viewer(panels, material):
-    """ブラウザ側のThree.jsインタラクティブ3Dビューア用に、panelsをJSON化しやすい形にする。"""
-    color = MATERIAL_HEX.get(material, DEFAULT_MATERIAL_HEX)
+def serialize_panels_for_viewer(panels):
+    """ブラウザ側のThree.jsインタラクティブ3Dビューア用に、panelsをJSON化しやすい形にする。
+    パネルごとのfinish（クリア塗装/ウォルナット調/ホワイト/ブラック）を色に反映する。
+    """
+    def color_for(panel):
+        finish = panel.get("finish", "clear")
+        if finish in FINISH_HEX:
+            return FINISH_HEX[finish]
+        return MATERIAL_HEX.get(panel["material"], DEFAULT_MATERIAL_HEX)
+
     return [
         {
             "label": p["label"],
             "x": p["pos"][0], "y": p["pos"][1], "z": p["pos"][2],
             "dx": p["size"][0], "dy": p["size"][1], "dz": p["size"][2],
-            "color": color,
+            "color": color_for(p),
         }
         for p in panels
     ]
+
+
+def parse_panel_finishes(data):
+    """リクエストのpanelFinishesを検証し、未知のキー・不正な値を除いた辞書にする。"""
+    raw = data.get("panelFinishes")
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        str(label): str(finish)
+        for label, finish in raw.items()
+        if str(label) in ("天板", "底板", "側板", "背板") and str(finish) in FINISH_OPTIONS
+    }
 
 
 def validate_input(data):
@@ -97,7 +117,7 @@ def render_files(job_id, filename):
     return send_from_directory(job_dir, filename)
 
 
-def run_freecad_pipeline(job_dir, item, width, depth, height, thickness, material):
+def run_freecad_pipeline(job_dir, item, width, depth, height, thickness, material, panel_finishes):
     """本来のパイプライン: freecadcmdをサブプロセス実行し、FreeCAD+POV-Rayで生成する。
 
     freecadcmdは独自のCLIパーサー（boost::program_options）を持ち、一般的な
@@ -113,6 +133,7 @@ def run_freecad_pipeline(job_dir, item, width, depth, height, thickness, materia
         "height": height,
         "thickness": thickness,
         "material": material,
+        "panelFinishes": panel_finishes,
         "outputDir": job_dir,
     })
     cmd = [FREECAD_CMD_PATH, GENERATE_SCRIPT]
@@ -153,13 +174,13 @@ def run_freecad_pipeline(job_dir, item, width, depth, height, thickness, materia
     }, None, None
 
 
-def run_mock_pipeline(job_dir, item, width, depth, height, thickness, material):
+def run_mock_pipeline(job_dir, item, width, depth, height, thickness, material, panel_finishes):
     """FreeCAD/POV-Ray未接続時のフォールバック: 実際の寸法計算＋等角プレビューSVGで代替する。
 
     開発環境（FreeCAD/POV-Ray未インストール）でも、UI・APIの一連の流れを実際に動かして
     確認できるようにするためのモード。本番のフォトリアルなレンダリングの代わりにはならない。
     """
-    panels = compute_panels(width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material)
+    panels = compute_panels(width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material, panel_finishes)
 
     cutlist_csv_path = os.path.join(job_dir, "cutlist.csv")
     write_cutlist_csv(panels, cutlist_csv_path)
@@ -195,6 +216,7 @@ def api_render():
     height = float(data["height"])
     thickness = float(data.get("thickness") or DEFAULT_THICKNESS_MM)
     material = str(data["material"]).strip()
+    panel_finishes = parse_panel_finishes(data)
 
     job_id = uuid.uuid4().hex[:12]
     job_dir = os.path.join(RENDERS_DIR, job_id)
@@ -203,16 +225,16 @@ def api_render():
     try:
         # インタラクティブ3Dビューア（Three.js）用のパネルジオメトリは、どちらのパイプラインでも
         # 同じcompute_panels()から得られるため、ここで一度だけ計算して両方に使い回す
-        panels = compute_panels(width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material)
-        panels_for_viewer = serialize_panels_for_viewer(panels, material)
+        panels = compute_panels(width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material, panel_finishes)
+        panels_for_viewer = serialize_panels_for_viewer(panels)
 
         if shutil.which(FREECAD_CMD_PATH):
             payload, error_payload, status = run_freecad_pipeline(
-                job_dir, item, width, depth, height, thickness, material
+                job_dir, item, width, depth, height, thickness, material, panel_finishes
             )
         else:
             payload, error_payload, status = run_mock_pipeline(
-                job_dir, item, width, depth, height, thickness, material
+                job_dir, item, width, depth, height, thickness, material, panel_finishes
             )
     except ValueError as exc:
         # compute_panels()の寸法バリデーション（高さが板厚に対して小さすぎる等）

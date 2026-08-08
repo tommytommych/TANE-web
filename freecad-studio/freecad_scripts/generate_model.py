@@ -9,8 +9,11 @@ FreeCAD本体にバンドルされており、一般的なpip環境にはイン�
     ※freecadcmdは独自のCLIパーサーを持ち、一般的な `--` 以降パススルーの慣習を尊重しないため、
       パラメータはコマンドライン引数ではなく環境変数 TANEI_PARAMS_JSON で渡す（詳細はmain()参照）。
 
-    TANEI_PARAMS_JSON='{"item":"テレビ台","width":1200,"depth":400,"height":400,"thickness":18,"material":"パイン集成材","outputDir":"./renders/job123"}' \\
+    TANEI_PARAMS_JSON='{"item":"テレビ台","width":1200,"depth":400,"height":400,"thickness":18,"material":"パイン集成材","panelFinishes":{"天板":"walnut","側板":"white"},"outputDir":"./renders/job123"}' \\
         freecadcmd generate_model.py
+
+    panelFinishesは省略可能で、指定が無いパーツはデフォルトの"clear"（材質そのものの木目）になる。
+    指定できる値: "clear"（クリア塗装）/ "walnut"（ウォルナット調）/ "white"（ホワイト）/ "black"（ブラック）
 
 処理の流れ:
   1. 入力パラメータ（幅・奥行・高さ・厚み・材質）から、天板・底板・側板・背板の
@@ -39,22 +42,53 @@ DEFAULT_THICKNESS_MM = 18
 DEFAULT_BACK_THICKNESS_MM = 5.5
 
 
-def compute_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_mm, material):
+# パーツごとに指定できる塗装・仕上げの選択肢。"clear"（クリア塗装）は選択した材質そのものの
+# 木目を活かす仕上げ、それ以外は木目の上に色を乗せる／隠す仕上げを表す
+FINISH_OPTIONS = ("clear", "walnut", "white", "black")
+DEFAULT_FINISH = "clear"
+
+FINISH_LABELS = {
+    "clear": "クリア塗装",
+    "walnut": "ウォルナット調",
+    "white": "ホワイト",
+    "black": "ブラック",
+}
+
+# FreeCAD側のShapeMaterial（App::Material、GUI無しでも設定可能）や、Web UIの3Dビューアに
+# 渡すおおよその色。POV-Ray側の実際の質感はgenerate_pov_sceneの木目テクスチャ・finishで決まるため、
+# これはあくまで「ざっくりした色の目安」
+FINISH_APPROX_COLOR = {
+    "walnut": "0.24, 0.15, 0.09",
+    "white": "0.93, 0.92, 0.88",
+    "black": "0.07, 0.07, 0.07",
+}
+
+
+def compute_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_mm, material, panel_finishes=None):
     """家具の外形寸法から、天板・底板・側板×2・背板のパネル構成を計算する。
 
     各パネルは以下を持つ:
       - size: FreeCAD上でのbox寸法 (dx, dy, dz)
       - pos:  FreeCAD上での配置位置 (x, y, z)（Z軸を高さ方向とする）
       - cut_w / cut_d / cut_t: 木取り（カットリスト）用の平面寸法・厚み
+      - finish: このパネル個別の塗装・仕上げ（"clear"/"walnut"/"white"/"black"）。
+                panel_finishesで品名（天板・底板・側板・背板）ごとに指定できる
     """
     inner_height = height_mm - 2 * thickness_mm
     if inner_height <= 0:
         raise ValueError(f"高さ({height_mm}mm)が板厚×2({thickness_mm * 2}mm)以下です。高さを見直してください。")
 
+    panel_finishes = panel_finishes or {}
+
+    def finish_for(label):
+        value = panel_finishes.get(label, DEFAULT_FINISH)
+        return value if value in FINISH_OPTIONS else DEFAULT_FINISH
+
     return [
         {
             "label": "天板",
             "material": material,
+            "finish": finish_for("天板"),
             "size": (width_mm, depth_mm, thickness_mm),
             "pos": (0, 0, height_mm - thickness_mm),
             "cut_w": width_mm,
@@ -64,6 +98,7 @@ def compute_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_m
         {
             "label": "底板",
             "material": material,
+            "finish": finish_for("底板"),
             "size": (width_mm, depth_mm, thickness_mm),
             "pos": (0, 0, 0),
             "cut_w": width_mm,
@@ -73,6 +108,7 @@ def compute_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_m
         {
             "label": "側板",
             "material": material,
+            "finish": finish_for("側板"),
             "size": (thickness_mm, depth_mm, inner_height),
             "pos": (0, 0, thickness_mm),
             "cut_w": depth_mm,
@@ -82,6 +118,7 @@ def compute_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_m
         {
             "label": "側板",
             "material": material,
+            "finish": finish_for("側板"),
             "size": (thickness_mm, depth_mm, inner_height),
             "pos": (width_mm - thickness_mm, 0, thickness_mm),
             "cut_w": depth_mm,
@@ -91,6 +128,7 @@ def compute_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_m
         {
             "label": "背板",
             "material": material,
+            "finish": finish_for("背板"),
             "size": (width_mm, back_thickness_mm, inner_height),
             "pos": (0, depth_mm - back_thickness_mm, thickness_mm),
             "cut_w": width_mm,
@@ -100,8 +138,33 @@ def compute_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_m
     ]
 
 
-def build_freecad_document(panels, output_path):
-    """FreeCADドキュメントにパネルを組み立て、.FCStdとして保存する。"""
+def _apply_panel_color(obj, panel, material_color_lookup):
+    """パネルのfinishに応じたRGBを、GUI無し（freecadcmd）でも設定できる
+    ShapeMaterial（App::Material、DiffuseColor）へ反映する。
+
+    【実機検証で確認】freecadcmd（GUI無し）では従来のobj.ViewObject.ShapeColorは
+    ViewObjectがNoneのため使えないが、FreeCAD 1.1系のMaterialsフレームワークによる
+    obj.ShapeMaterial.setAppearanceValue("DiffuseColor", ...)は非GUI環境でも動作する。
+    あくまでFreeCAD文書を後でGUIで開いた際の見た目用（実際のレンダリングはPOV-Ray側で行う）。
+    """
+    finish = panel.get("finish", DEFAULT_FINISH)
+    if finish == "clear":
+        rgb_csv = material_color_lookup(panel["material"])
+    else:
+        rgb_csv = FINISH_APPROX_COLOR.get(finish, material_color_lookup(panel["material"]))
+    r, g, b = (float(v) for v in rgb_csv.split(","))
+
+    try:
+        sm = obj.ShapeMaterial
+        sm.setAppearanceValue("DiffuseColor", f"({r}, {g}, {b}, 1.0)")
+        obj.ShapeMaterial = sm
+    except Exception:  # noqa: BLE001  (FreeCADのバージョンによりMaterialsフレームワークが
+        # 無い/挙動が異なる可能性があるため、失敗しても致命的にはしない（POV-Ray側の見た目には影響しない）
+        pass
+
+
+def build_freecad_document(panels, output_path, material_color_lookup=None):
+    """FreeCADドキュメントにパネルを組み立て、パネルごとに色を設定して.FCStdとして保存する。"""
     try:
         import FreeCAD as App  # noqa: N814  (FreeCAD公式の慣例に合わせたimport名)
         import Part
@@ -111,6 +174,8 @@ def build_freecad_document(panels, output_path):
             "FreeCAD付属のfreecadcmd（またはFreeCADCmd）から実行してください。"
         ) from exc
 
+    material_color_lookup = material_color_lookup or (lambda _material: DEFAULT_MATERIAL_COLOR)
+
     doc = App.newDocument("TaneiFurniture")
     for i, panel in enumerate(panels):
         dx, dy, dz = panel["size"]
@@ -119,6 +184,7 @@ def build_freecad_document(panels, output_path):
         obj = doc.addObject("Part::Feature", f"Panel_{i}_{panel['label']}")
         obj.Shape = box_shape
         obj.Label = panel["label"]
+        _apply_panel_color(obj, panel, material_color_lookup)
 
     doc.recompute()
     doc.saveAs(output_path)
@@ -144,7 +210,7 @@ def write_cutlist_csv(panels, output_path):
     return output_path
 
 
-# 材質名から、POV-Rayでのおおよその色味を決める簡易テーブル（プロトタイプ用の最小実装）
+# 材質名から、POV-Rayでのおおよその色味（clear仕上げの目安）を決める簡易テーブル
 MATERIAL_COLORS = {
     "パイン集成材": "0.85, 0.70, 0.48",
     "シナベニヤ": "0.90, 0.80, 0.62",
@@ -154,28 +220,83 @@ MATERIAL_COLORS = {
 }
 DEFAULT_MATERIAL_COLOR = "0.80, 0.65, 0.45"
 
+# 材質ごとに、POV-Ray付属woods.incの木目テクスチャ（層状のpigment+turbulenceで構成された
+# 本物らしい木目パターン）から見た目が近いものを割り当てる。単色pigmentよりも
+# 木目・節・色ムラが表現され、質感が大きく向上する
+MATERIAL_WOOD_TEXTURE = {
+    "パイン集成材": "T_Wood10",  # Soft pine（明るい黄色みの、なめらかな木目）
+    "シナベニヤ": "T_Wood13",    # 直線的でまっすぐな木目、白っぽい
+    "ラワン合板": "T_Wood15",    # 中間色の茶色
+    "SPF材": "T_Wood11",         # Spruce（黄色みの強い、まっすぐで細かい木目）
+    "OSB合板": "T_Wood9",        # 不規則なうねり（OSB特有のチップ感に近い）
+}
+DEFAULT_WOOD_TEXTURE = "T_Wood10"
+
+# 「ウォルナット調」は材質に関わらず、ウォルナット色に着色した仕上げとして固定のテクスチャを使う
+WALNUT_WOOD_TEXTURE = "T_Wood12"  # Very dark brown. Walnut-stained pine
+
+# 木目パターンのスケール（mm単位）。値が大きいほど年輪の間隔が広くなる。
+# 実際にレンダリングして目視で調整した値
+WOOD_TEXTURE_SCALE_MM = 300
+
+
+def _panel_pov_texture(panel):
+    """パネル1枚分のPOV-Rayテクスチャブロックを、finishに応じて生成する。
+
+    - clear: 材質に応じた木目（woods.inc）をそのまま活かす
+    - walnut: ウォルナット色に着色された木目（woods.inc）
+    - white / black: 木目を隠す均一な塗装（pigment）。白はやや艶あり、黒はより艶のある
+      仕上げにして「塗装らしさ」を出す
+    木目パターンの原点をパネルの中心付近にずらすことで、パネルが家具のどこにあっても
+    年輪が偏らず視認できるようにしている
+    """
+    finish = panel.get("finish", DEFAULT_FINISH)
+    x, y, z = panel["pos"]
+    dx, dy, dz = panel["size"]
+    cx, cy, cz = x + dx / 2, y + dy / 2, z + dz / 2
+
+    if finish == "white":
+        return (
+            "texture { pigment { color rgb <0.93, 0.92, 0.88> } "
+            "finish { diffuse 0.75 specular 0.45 roughness 0.02 } }"
+        )
+    if finish == "black":
+        return (
+            "texture { pigment { color rgb <0.07, 0.07, 0.07> } "
+            "finish { diffuse 0.55 specular 0.6 roughness 0.015 reflection 0.12 } }"
+        )
+
+    wood_macro = WALNUT_WOOD_TEXTURE if finish == "walnut" else MATERIAL_WOOD_TEXTURE.get(
+        panel["material"], DEFAULT_WOOD_TEXTURE
+    )
+    return (
+        f"texture {{ {wood_macro} "
+        f"scale {WOOD_TEXTURE_SCALE_MM} rotate y*90 translate <{cx}, {cy}, {cz}> "
+        f"finish {{ specular 0.3 roughness 0.05 }} }}"
+    )
+
 
 def generate_pov_scene(panels, width_mm, depth_mm, height_mm, material, output_path):
     """パネル構成から、POV-Ray用のシーンファイル(.pov)をテキストとして生成する。
 
     メッシュ変換を経由せず、天板・底板・側板・背板をそのままbox{}プリミティブとして
     書き出すことで、FreeCADモデルと完全に同じ寸法をレンダリングに反映させる。
+    パネルごとに個別のfinish（クリア塗装/ウォルナット調/ホワイト/ブラック）を
+    テクスチャとして割り当てるため、単一のWoodTextureではなくパネルごとに生成する。
     """
-    color = MATERIAL_COLORS.get(material, DEFAULT_MATERIAL_COLOR)
-
     box_entries = []
     for panel in panels:
         x, y, z = panel["pos"]
         dx, dy, dz = panel["size"]
-        box_entries.append(
-            f"  box {{ <{x}, {y}, {z}>, <{x + dx}, {y + dy}, {z + dz}> texture {{ WoodTexture }} }}"
-        )
+        texture_block = _panel_pov_texture(panel)
+        box_entries.append(f"  box {{ <{x}, {y}, {z}>, <{x + dx}, {y + dy}, {z + dz}> {texture_block} }}")
 
     cam_distance = max(width_mm, depth_mm, height_mm) * 2.4
     scene = f"""// TANE:i FreeCAD Studio - auto-generated POV-Ray scene
 // 元になったパラメータ: width={width_mm}mm depth={depth_mm}mm height={height_mm}mm material={material}
 
 #include "colors.inc"
+#include "woods.inc"
 
 global_settings {{ assumed_gamma 1.0 }}
 
@@ -195,11 +316,6 @@ plane {{
   <0, 0, 1>, -1
   pigment {{ color rgb <0.93, 0.92, 0.89> }}
   finish {{ diffuse 0.9 }}
-}}
-
-#declare WoodTexture = texture {{
-  pigment {{ color rgb <{color}> }}
-  finish {{ diffuse 0.75 specular 0.25 roughness 0.06 }}
 }}
 
 {chr(10).join(box_entries)}
@@ -266,18 +382,21 @@ def main():
     height = float(params["height"])
     thickness = float(params.get("thickness", DEFAULT_THICKNESS_MM))
     material = params.get("material", "パイン集成材")
+    panel_finishes = params.get("panelFinishes") or {}
     output_dir = params["outputDir"]
 
     os.makedirs(output_dir, exist_ok=True)
 
-    panels = compute_panels(width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material)
+    panels = compute_panels(width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material, panel_finishes)
 
     fcstd_path = os.path.join(output_dir, "model.FCStd")
     csv_path = os.path.join(output_dir, "cutlist.csv")
     pov_path = os.path.join(output_dir, "scene.pov")
     png_path = os.path.join(output_dir, "render.png")
 
-    build_freecad_document(panels, fcstd_path)
+    build_freecad_document(
+        panels, fcstd_path, material_color_lookup=lambda m: MATERIAL_COLORS.get(m, DEFAULT_MATERIAL_COLOR)
+    )
     write_cutlist_csv(panels, csv_path)
     generate_pov_scene(panels, width, depth, height, material, pov_path)
     render_with_povray(pov_path, png_path)
