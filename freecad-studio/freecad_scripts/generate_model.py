@@ -40,11 +40,14 @@ FreeCAD本体にバンドルされており、一般的なpip環境にはイン�
 
 import csv
 import json
+import math
 import os
 import subprocess
 import sys
 
 DEFAULT_THICKNESS_MM = 18
+RENDER_WIDTH_PX = 1000
+RENDER_HEIGHT_PX = 750
 DEFAULT_BACK_THICKNESS_MM = 5.5
 
 
@@ -252,13 +255,33 @@ def _option_context(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_
     }
 
 
+# 隣接する扉・引き出し前板の間に設ける見切り用の隙間（mm）。実物の建具でも扉と扉の間には
+# 数mm程度の目地（クリアランス）があるため、その再現を兼ねる。この隙間が無いと、同じ
+# テクスチャの箱同士が完全に接して継ぎ目が無くなり、POV-Rayの完成イメージでは複数枚では
+# なく1枚の板に見えてしまう（3Dビュー・Three.jsはパネルごとに黒いエッジ線を描画するため、
+# 隙間が無くてもパネルの境目が視認できてしまい、両者の見た目が食い違う原因になっていた）。
+PANEL_GAP_MM = 3
+
+
+def _split_with_gap(total, count, gap=PANEL_GAP_MM):
+    """total(mm)をcount個に、隙間gapを挟んで均等に分割し、[(開始位置, 幅), ...] を返す。
+    count<=1の場合は隙間なしでtotal全体を1個として返す。
+    """
+    if count <= 1:
+        return [(0, total)]
+    seg = (total - gap * (count - 1)) / count
+    return [(i * (seg + gap), seg) for i in range(count)]
+
+
 def _option_door(ctx, params, material, panel_finishes):
-    """本体前面（y=0の開口部）を覆う扉。count=2で観音開き（左右分割）にする。"""
+    """本体前面（y=0の開口部）を覆う扉。count=2で観音開き（左右分割）にする。
+    複数枚の場合はPANEL_GAP_MM分の隙間を挟んで配置し、レンダリング上も
+    はっきり別々の扉として見えるようにする。
+    """
     label = TIER_PART_DEFS["door"]["label"]
     count = int(params["count"])
     t = ctx["thickness"]
     inner_w, inner_h = ctx["inner_w"], ctx["inner_h"]
-    leaf_w = inner_w / count
     finish = _finish_for(label, panel_finishes)
     return [
         {
@@ -266,12 +289,12 @@ def _option_door(ctx, params, material, panel_finishes):
             "material": material,
             "finish": finish,
             "size": (leaf_w, t, inner_h),
-            "pos": (t + i * leaf_w, -t, t),
+            "pos": (t + offset, -t, t),
             "cut_w": leaf_w,
             "cut_d": inner_h,
             "cut_t": t,
         }
-        for i in range(count)
+        for offset, leaf_w in _split_with_gap(inner_w, count)
     ]
 
 
@@ -296,6 +319,8 @@ def _column_bounds(inner_w, t, divider_count):
 
 def _option_drawer_front(ctx, params, material, panel_finishes):
     """前面の引き出し前板。countで縦方向に段数分割する（扉が左右分割なのに対し、こちらは上下分割）。
+    同じ列内で複数段になる場合はPANEL_GAP_MM分の隙間を挟み、レンダリング上もはっきり
+    別々の引き出しとして見えるようにする。
 
     同じ段に縦仕切り（divider_v）がある場合は、params["divider_count"]（compute_option_panels
     が同じ段のdivider_v個数を調べて渡す）に応じて、区切られた列ごとにcountを均等に振り分け、
@@ -317,15 +342,14 @@ def _option_drawer_front(ctx, params, material, panel_finishes):
         col_count = base_count + (1 if col_index < extra else 0)
         if col_count == 0:
             continue
-        front_h = inner_h / col_count
-        for i in range(col_count):
+        for offset, front_h in _split_with_gap(inner_h, col_count):
             panels.append(
                 {
                     "label": label,
                     "material": material,
                     "finish": finish,
                     "size": (col_w, t, front_h),
-                    "pos": (x_left, -t, t + i * front_h),
+                    "pos": (x_left, -t, t + offset),
                     "cut_w": col_w,
                     "cut_d": front_h,
                     "cut_t": t,
@@ -807,6 +831,95 @@ def _panels_bounding_box(panels):
     return xs_min, xs_max, ys_min, ys_max, zs_min, zs_max
 
 
+def _vec_sub(a, b):
+    return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+
+
+def _vec_cross(a, b):
+    return (
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    )
+
+
+def _vec_dot(a, b):
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
+def _vec_normalize(a):
+    length = math.sqrt(_vec_dot(a, a))
+    return (a[0] / length, a[1] / length, a[2] / length)
+
+
+# カメラの視線方向（固定の方位角・仰角）と画角、被写体まわりの余白の比率。
+# 家具の縦横比によらず常に画面中央にバランス良く収まるよう、_compute_camera()で
+# この視線方向に対して外接直方体がちょうど収まる距離を毎回計算し直す
+CAMERA_AZIMUTH_DEG = 35
+CAMERA_ELEVATION_DEG = 22
+CAMERA_H_FOV_DEG = 38
+CAMERA_MARGIN = 1.2
+
+
+def _compute_camera(panels, image_width_px, image_height_px):
+    """全パネルの外接直方体が、指定のアスペクト比の画角にちょうど中央へ収まるような
+    カメラの位置・注視点を計算する。
+
+    【背景】以前は「カメラのオフセット = 外接直方体の各辺の生の長さ × 適当な係数」
+    というヒューリスティックで計算しており、家具の縦横比（幅に対して極端に低い/高い等）
+    によっては画面内の余白バランスが崩れ、完成イメージが3Dビューと比べて被写体が
+    中央からずれて見える不具合があった。ここでは固定の視線方向（方位角・仰角）を
+    決め打ちしたうえで、外接直方体の8頂点をカメラのright/up軸へ投影して必要な
+    半画角を求め、水平・垂直それぞれの画角にちょうど収まる距離を計算することで、
+    縦横比によらず被写体が常に画面中央に一定の余白で収まるようにしている
+    （look_atに指定した点は常に画像の中心に投影されるため、この点を外接直方体の
+    幾何学的な中心にすることで、水平・垂直それぞれの必要半画角が一致する＝
+    上下左右の余白が揃う設計にしている）。
+    """
+    min_x, max_x, min_y, max_y, min_z, max_z = _panels_bounding_box(panels)
+    center = ((min_x + max_x) / 2, (min_y + max_y) / 2, (min_z + max_z) / 2)
+
+    azimuth = math.radians(CAMERA_AZIMUTH_DEG)
+    elevation = math.radians(CAMERA_ELEVATION_DEG)
+    # 正面（開口部側、y=0が最小）から見つつ、方位角・仰角の分だけ傾けた視線方向。
+    # view_dirは「カメラから注視点へ向かう向き」で、カメラは注視点よりYが小さい
+    # （手前＝開口部の外側）・Zが高い（見下ろす）位置に置きたいので、
+    # Y成分は正（カメラ→注視点でYが増える向き）、Z成分は負（カメラ→注視点でZが下がる向き）にする
+    view_dir = _vec_normalize((
+        math.sin(azimuth) * math.cos(elevation),
+        math.cos(azimuth) * math.cos(elevation),
+        -math.sin(elevation),
+    ))
+    world_up = (0.0, 0.0, 1.0)
+    right = _vec_normalize(_vec_cross(view_dir, world_up))
+    up = _vec_cross(right, view_dir)
+
+    corners = [
+        (x, y, z)
+        for x in (min_x, max_x)
+        for y in (min_y, max_y)
+        for z in (min_z, max_z)
+    ]
+    half_width = max(abs(_vec_dot(_vec_sub(c, center), right)) for c in corners)
+    half_height = max(abs(_vec_dot(_vec_sub(c, center), up)) for c in corners)
+
+    h_fov = math.radians(CAMERA_H_FOV_DEG)
+    aspect = image_width_px / image_height_px
+    v_fov = 2 * math.atan(math.tan(h_fov / 2) / aspect)
+
+    distance = max(
+        half_width / math.tan(h_fov / 2),
+        half_height / math.tan(v_fov / 2),
+    ) * CAMERA_MARGIN
+
+    location = (
+        center[0] - view_dir[0] * distance,
+        center[1] - view_dir[1] * distance,
+        center[2] - view_dir[2] * distance,
+    )
+    return location, center
+
+
 def generate_pov_scene(panels, width_mm, depth_mm, height_mm, material, output_path):
     """パネル構成から、POV-Ray用のシーンファイル(.pov)をテキストとして生成する。
 
@@ -836,14 +949,18 @@ def generate_pov_scene(panels, width_mm, depth_mm, height_mm, material, output_p
     bbox_w = max_x - min_x
     bbox_d = max_y - min_y
     bbox_h = max_z - min_z
-    center_x = (min_x + max_x) / 2
-    center_y = (min_y + max_y) / 2
-    center_z = (min_z + max_z) / 2
-    cam_distance = max(bbox_w, bbox_d, bbox_h) * 2.4
+    (cam_x, cam_y, cam_z), (look_x, look_y, look_z) = _compute_camera(
+        panels, RENDER_WIDTH_PX, RENDER_HEIGHT_PX
+    )
+    # ライトはカメラとほぼ同じ側（正面〜やや斜め）から当てるが、位置そのものは
+    # カメラよりだいぶ近く・高くして、影の付き方が不自然にならないようにする
+    key_light = (cam_x + bbox_w * 0.4, cam_y * 0.5 + look_y * 0.5, cam_z + bbox_h * 0.6)
+    fill_light = (look_x - bbox_w * 0.6, cam_y * 0.7 + look_y * 0.3, look_z + bbox_h * 1.2)
 
     scene = f"""// TANE:i FreeCAD Studio - auto-generated POV-Ray scene
 // 元になったパラメータ: width={width_mm}mm depth={depth_mm}mm height={height_mm}mm material={material}
-// カメラ・地面は追加パーツ込みの全パネル外接直方体（{bbox_w:.0f}x{bbox_d:.0f}x{bbox_h:.0f}mm）を基準に配置
+// カメラは追加パーツ込みの全パネル外接直方体（{bbox_w:.0f}x{bbox_d:.0f}x{bbox_h:.0f}mm）が
+// 画角にちょうど中央へ収まるよう_compute_camera()で毎回計算し直している
 
 #include "colors.inc"
 #include "woods.inc"
@@ -851,14 +968,14 @@ def generate_pov_scene(panels, width_mm, depth_mm, height_mm, material, output_p
 global_settings {{ assumed_gamma 1.0 }}
 
 camera {{
-  location <{center_x + bbox_w * 0.7}, {min_y - cam_distance}, {center_z + bbox_h * 0.8}>
+  location <{cam_x}, {cam_y}, {cam_z}>
   sky <0, 0, 1>
-  look_at <{center_x}, {center_y}, {center_z}>
-  angle 38
+  look_at <{look_x}, {look_y}, {look_z}>
+  angle {CAMERA_H_FOV_DEG}
 }}
 
-light_source {{ <{center_x + bbox_w * 1.5}, {min_y - bbox_d * 2}, {center_z + bbox_h * 2}> color rgb <1, 1, 0.97> }}
-light_source {{ <{center_x - bbox_w * 0.6}, {min_y - bbox_d * 1}, {center_z + bbox_h * 1.5}> color rgb <0.35, 0.35, 0.4> }}
+light_source {{ <{key_light[0]}, {key_light[1]}, {key_light[2]}> color rgb <1, 1, 0.97> }}
+light_source {{ <{fill_light[0]}, {fill_light[1]}, {fill_light[2]}> color rgb <0.35, 0.35, 0.4> }}
 
 background {{ color rgb <0.98, 0.97, 0.94> }}
 
@@ -877,7 +994,7 @@ plane {{
     return output_path
 
 
-def render_with_povray(pov_path, output_png_path, width_px=1000, height_px=750):
+def render_with_povray(pov_path, output_png_path, width_px=RENDER_WIDTH_PX, height_px=RENDER_HEIGHT_PX):
     """povrayコマンドをサブプロセスとして呼び出し、.povからPNGをレンダリングする。"""
     povray_bin = os.environ.get("POVRAY_PATH", "povray")
 
