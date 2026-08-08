@@ -29,6 +29,8 @@
   .opt-toggle input[type="checkbox"] { width: 16px; height: 16px; }
   .opt-param { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #5a5a5a; font-weight: 400; padding-left: 24px; }
   .opt-param input[type="number"], .opt-param select { width: 64px; font-size: 13px; padding: 4px 6px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; }
+  .opt-param.opt-param-color { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .opt-param.opt-param-color select { width: 100%; }
   form { display: flex; flex-direction: column; gap: 14px; background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #eee; }
   label { font-size: 13px; font-weight: 500; display: flex; flex-direction: column; gap: 6px; }
   input, select {
@@ -223,7 +225,7 @@
             <option value="6">6</option>
           </select>
         </label>
-        <label class="opt-param">色
+        <label class="opt-param opt-param-color">色
           <select name="finish-脚" class="finish-select" form="render-form">
             <option value="clear" selected>クリア塗装（材質の木目）</option>
             <option value="walnut">ウォルナット調</option>
@@ -236,7 +238,7 @@
       <div class="opt-row">
         <label class="opt-toggle"><input type="checkbox" name="opt-apron-enabled" form="render-form" /> 幕板</label>
         <label class="opt-param">見付け高さ(mm)<input type="number" name="opt-apron-heightMm" form="render-form" value="60" min="30" max="120" /></label>
-        <label class="opt-param">色
+        <label class="opt-param opt-param-color">色
           <select name="finish-幕板" class="finish-select" form="render-form">
             <option value="clear" selected>クリア塗装（材質の木目）</option>
             <option value="walnut">ウォルナット調</option>
@@ -249,7 +251,7 @@
       <div class="opt-row">
         <label class="opt-toggle"><input type="checkbox" name="opt-caster_block-enabled" form="render-form" /> キャスター</label>
         <label class="opt-param">直径(mm)<input type="number" name="opt-caster_block-diameterMm" form="render-form" value="40" min="20" max="60" /></label>
-        <label class="opt-param">色
+        <label class="opt-param opt-param-color">色
           <select name="finish-キャスター" class="finish-select" form="render-form">
             <option value="clear" selected>ゴム（濃いグレー）</option>
             <option value="white">プラスチック風（明るいグレー）</option>
@@ -439,13 +441,17 @@ function buildViewerFromPanels(panels) {
   panelGroup = new THREE.Group();
 
   // FreeCAD/POV-Ray側はZ軸を高さ方向として扱っているため、Three.js（Y軸が上）に
-  // 合わせて y と z を入れ替える。キャスター（shape: 'wheel'）は円柱で表現する
-  // （CylinderGeometryは既定でY軸方向に高さを持つため、FreeCADのZ軸=高さと自然に対応し
-  // 回転補正が不要）
+  // 合わせて y と z を入れ替える。キャスター（shape: 'wheel'）はタイヤのように軸を
+  // 水平（奥行き方向）に向けた円柱で表現する。CylinderGeometryは既定でY軸方向に
+  // 高さを持つため、rotateX(90°)でZ軸方向（＝FreeCADの奥行きY軸）に向け直す
   panels.forEach((p) => {
-    const geometry = p.shape === 'wheel'
-      ? new THREE.CylinderGeometry(p.dx / 2, p.dx / 2, p.dz, 24)
-      : new THREE.BoxGeometry(p.dx, p.dz, p.dy);
+    let geometry;
+    if (p.shape === 'wheel') {
+      geometry = new THREE.CylinderGeometry(p.dx / 2, p.dx / 2, p.dy, 24);
+      geometry.rotateX(Math.PI / 2);
+    } else {
+      geometry = new THREE.BoxGeometry(p.dx, p.dz, p.dy);
+    }
     const material = new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.8 });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(p.x + p.dx / 2, p.z + p.dz / 2, p.y + p.dy / 2);

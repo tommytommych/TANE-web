@@ -165,7 +165,7 @@ LEG_CROSS_SECTION_MM = 30
 PILLAR_CROSS_SECTION_MM = 30
 BATTEN_HEIGHT_MM = 30
 CORNER_INSET_MM = 15
-CASTER_WHEEL_HEIGHT_MM = 20
+CASTER_WHEEL_WIDTH_MM = 15  # タイヤの車軸方向(奥行き=Y軸)の厚み
 
 
 # 土台パーツ（脚・幕板・キャスター台座）: 本体最下部（1段目の下）にのみ取り付く。
@@ -509,13 +509,19 @@ def _option_back_batten(ctx, params, material, panel_finishes):
 
 
 def _option_caster_block(ctx, params, material, panel_finishes):
-    """本体下面四隅に取り付ける小さいキャスター。タイヤらしく見えるよう円柱（"shape": "wheel"）
-    として表現する。sizeはボックス系パーツと形を揃えるため(直径, 直径, 高さ)のタプルで持ち、
-    位置(pos)も左下手前を基準にしたバウンディングボックスのコーナー座標（他パーツと同じ規約）。
+    """本体下面四隅に取り付ける小さいキャスター。実物のタイヤのように、円柱の軸を
+    水平（奥行き＝Y軸）方向に向けて「縦向き」に配置する（円形の側面が正面から見える）。
+    軸を高さ方向にした「パック」のような向きだと、レンダリングでは影に紛れてほぼ見えず、
+    3Dビューとの見た目の食い違いが生じていたため、この向きに修正した。
+
+    sizeはボックス系パーツと形を揃えるため(直径, タイヤ幅, 直径)のタプルで持つ
+    （dx/dzが円の直径、dyが車軸方向の厚み）。位置(pos)は他パーツと同じくバウンディング
+    ボックスの左下手前コーナー座標で、z=-diameterから0（本体最下部）まで、
+    ちょうど直径分だけ下に伸びて床に接地する。
     """
     label = FOUNDATION_PART_DEFS["caster_block"]["label"]
     diameter = params["diameterMm"]
-    height = CASTER_WHEEL_HEIGHT_MM
+    wheel_width = CASTER_WHEEL_WIDTH_MM
     width, depth = ctx["width"], ctx["depth"]
     finish = _finish_for(label, panel_finishes)
     inset = CORNER_INSET_MM
@@ -525,14 +531,14 @@ def _option_caster_block(ctx, params, material, panel_finishes):
             "material": material,
             "finish": finish,
             "shape": "wheel",
-            "size": (diameter, diameter, height),
-            "pos": (x, y, -height),
+            "size": (diameter, wheel_width, diameter),
+            "pos": (x, y, -diameter),
             "cut_w": diameter,
             "cut_d": diameter,
-            "cut_t": height,
+            "cut_t": wheel_width,
         }
         for x in (inset, width - inset - diameter)
-        for y in (inset, depth - inset - diameter)
+        for y in (inset, depth - inset - wheel_width)
     ]
 
 
@@ -676,9 +682,10 @@ def build_freecad_document(panels, output_path, material_color_lookup=None):
         dx, dy, dz = panel["size"]
         x, y, z = panel["pos"]
         if panel.get("shape") == "wheel":
-            # キャスターは円柱（タイヤ状）として表現する。dx/dyは直径として等しい前提
+            # キャスターはタイヤのように軸を水平（奥行き=Y軸）方向に向けた円柱として表現する
+            # （dx/dzが直径として等しい前提、dyが車軸方向＝円柱の長さ）
             radius = dx / 2
-            shape = Part.makeCylinder(radius, dz, App.Vector(x + radius, y + radius, z), App.Vector(0, 0, 1))
+            shape = Part.makeCylinder(radius, dy, App.Vector(x + radius, y, z + radius), App.Vector(0, 1, 0))
         else:
             shape = Part.makeBox(dx, dy, dz, App.Vector(x, y, z))
         obj = doc.addObject("Part::Feature", f"Panel_{i}_{panel['label']}")
@@ -816,10 +823,11 @@ def generate_pov_scene(panels, width_mm, depth_mm, height_mm, material, output_p
         dx, dy, dz = panel["size"]
         texture_block = _panel_pov_texture(panel)
         if panel.get("shape") == "wheel":
+            # タイヤのように軸を水平（奥行き=Y軸）方向に向けた円柱にする
             radius = dx / 2
-            cx, cy = x + radius, y + radius
+            cx, cz = x + radius, z + radius
             box_entries.append(
-                f"  cylinder {{ <{cx}, {cy}, {z}>, <{cx}, {cy}, {z + dz}>, {radius} {texture_block} }}"
+                f"  cylinder {{ <{cx}, {y}, {cz}>, <{cx}, {y + dy}, {cz}>, {radius} {texture_block} }}"
             )
         else:
             box_entries.append(f"  box {{ <{x}, {y}, {z}>, <{x + dx}, {y + dy}, {z + dz}> {texture_block} }}")
