@@ -17,7 +17,9 @@ freecadcmd経由でサブプロセス実行し、FreeCADベースの完成イメ
 
 import json
 import os
+import shutil
 import subprocess
+import sys
 import uuid
 
 from flask import Flask, jsonify, request, send_from_directory
@@ -26,6 +28,14 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RENDERS_DIR = os.path.join(BASE_DIR, "renders")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 GENERATE_SCRIPT = os.path.join(BASE_DIR, "freecad_scripts", "generate_model.py")
+
+sys.path.insert(0, BASE_DIR)
+from freecad_scripts.generate_model import (  # noqa: E402
+    DEFAULT_BACK_THICKNESS_MM,
+    compute_panels,
+    write_cutlist_csv,
+)
+from mock_preview import render_iso_preview_svg  # noqa: E402
 
 FREECAD_CMD_PATH = os.environ.get("FREECAD_CMD_PATH", "freecadcmd")
 
@@ -73,6 +83,88 @@ def render_files(job_id, filename):
     return send_from_directory(job_dir, filename)
 
 
+def run_freecad_pipeline(job_dir, item, width, depth, height, thickness, material):
+    """本来のパイプライン: freecadcmdをサブプロセス実行し、FreeCAD+POV-Rayで生成する。"""
+    cmd = [
+        FREECAD_CMD_PATH,
+        GENERATE_SCRIPT,
+        "--",
+        "--item", item,
+        "--width", str(width),
+        "--depth", str(depth),
+        "--height", str(height),
+        "--thickness", str(thickness),
+        "--material", material,
+        "--output-dir", job_dir,
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    except subprocess.TimeoutExpired:
+        return None, {"error": "FreeCADでの生成処理がタイムアウトしました（180秒）。"}, 504
+
+    result_line = next(
+        (line for line in result.stdout.splitlines() if line.startswith("RESULT_JSON:")), None
+    )
+    error_line = next(
+        (line for line in result.stdout.splitlines() if line.startswith("ERROR_JSON:")), None
+    )
+
+    if error_line:
+        error_payload = json.loads(error_line[len("ERROR_JSON:"):])
+        return None, {"error": error_payload.get("error", "不明なエラーが発生しました。")}, 500
+
+    if result.returncode != 0 or not result_line:
+        return None, {
+            "error": "FreeCADでのモデル生成に失敗しました。",
+            "details": (result.stderr or result.stdout)[-2000:],
+        }, 500
+
+    payload = json.loads(result_line[len("RESULT_JSON:"):])
+
+    cutlist = []
+    cutlist_csv_path = payload.get("cutlistCsv")
+    if cutlist_csv_path and os.path.exists(cutlist_csv_path):
+        import csv
+        with open(cutlist_csv_path, newline="", encoding="utf-8") as f:
+            cutlist = list(csv.DictReader(f))
+
+    return {
+        "item": payload.get("item", item),
+        "imageFilename": "render.png",
+        "cutlist": cutlist,
+        "mockMode": False,
+    }, None, None
+
+
+def run_mock_pipeline(job_dir, item, width, depth, height, thickness, material):
+    """FreeCAD/POV-Ray未接続時のフォールバック: 実際の寸法計算＋等角プレビューSVGで代替する。
+
+    開発環境（FreeCAD/POV-Ray未インストール）でも、UI・APIの一連の流れを実際に動かして
+    確認できるようにするためのモード。本番のフォトリアルなレンダリングの代わりにはならない。
+    """
+    panels = compute_panels(width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material)
+
+    cutlist_csv_path = os.path.join(job_dir, "cutlist.csv")
+    write_cutlist_csv(panels, cutlist_csv_path)
+
+    svg = render_iso_preview_svg(panels, item, material)
+    svg_path = os.path.join(job_dir, "preview.svg")
+    with open(svg_path, "w", encoding="utf-8") as f:
+        f.write(svg)
+
+    import csv
+    with open(cutlist_csv_path, newline="", encoding="utf-8") as f:
+        cutlist = list(csv.DictReader(f))
+
+    return {
+        "item": item,
+        "imageFilename": "preview.svg",
+        "cutlist": cutlist,
+        "mockMode": True,
+    }, None, None
+
+
 @app.route("/api/render", methods=["POST"])
 def api_render():
     data = request.get_json(silent=True) or {}
@@ -92,63 +184,28 @@ def api_render():
     job_dir = os.path.join(RENDERS_DIR, job_id)
     os.makedirs(job_dir, exist_ok=True)
 
-    cmd = [
-        FREECAD_CMD_PATH,
-        GENERATE_SCRIPT,
-        "--",
-        "--item", item,
-        "--width", str(width),
-        "--depth", str(depth),
-        "--height", str(height),
-        "--thickness", str(thickness),
-        "--material", material,
-        "--output-dir", job_dir,
-    ]
-
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
-    except FileNotFoundError:
-        return jsonify({
-            "error": (
-                f"FreeCADコマンド（'{FREECAD_CMD_PATH}'）が見つかりません。"
-                "FreeCADがインストールされているか、FREECAD_CMD_PATH環境変数で"
-                "freecadcmdの実行ファイルパスを指定してください。"
+        if shutil.which(FREECAD_CMD_PATH):
+            payload, error_payload, status = run_freecad_pipeline(
+                job_dir, item, width, depth, height, thickness, material
             )
-        }), 500
-    except subprocess.TimeoutExpired:
-        return jsonify({"error": "FreeCADでの生成処理がタイムアウトしました（180秒）。"}), 504
+        else:
+            payload, error_payload, status = run_mock_pipeline(
+                job_dir, item, width, depth, height, thickness, material
+            )
+    except ValueError as exc:
+        # compute_panels()の寸法バリデーション（高さが板厚に対して小さすぎる等）
+        return jsonify({"error": str(exc)}), 400
 
-    result_line = next(
-        (line for line in result.stdout.splitlines() if line.startswith("RESULT_JSON:")), None
-    )
-    error_line = next(
-        (line for line in result.stdout.splitlines() if line.startswith("ERROR_JSON:")), None
-    )
-
-    if error_line:
-        error_payload = json.loads(error_line[len("ERROR_JSON:"):])
-        return jsonify({"error": error_payload.get("error", "不明なエラーが発生しました。")}), 500
-
-    if result.returncode != 0 or not result_line:
-        return jsonify({
-            "error": "FreeCADでのモデル生成に失敗しました。",
-            "details": (result.stderr or result.stdout)[-2000:],
-        }), 500
-
-    payload = json.loads(result_line[len("RESULT_JSON:"):])
-
-    cutlist = []
-    cutlist_csv_path = payload.get("cutlistCsv")
-    if cutlist_csv_path and os.path.exists(cutlist_csv_path):
-        import csv
-        with open(cutlist_csv_path, newline="", encoding="utf-8") as f:
-            cutlist = list(csv.DictReader(f))
+    if error_payload:
+        return jsonify(error_payload), status
 
     return jsonify({
         "jobId": job_id,
-        "item": payload.get("item", item),
-        "imageUrl": f"/renders/{job_id}/render.png",
-        "cutlist": cutlist,
+        "item": payload["item"],
+        "imageUrl": f"/renders/{job_id}/{payload['imageFilename']}",
+        "cutlist": payload["cutlist"],
+        "mockMode": payload["mockMode"],
     })
 
 

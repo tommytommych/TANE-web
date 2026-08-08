@@ -37,6 +37,10 @@
   th { background: #f5f3ef; }
   .status { font-size: 13px; color: #8A8A8A; margin-top: 10px; white-space: pre-wrap; }
   .status.error { color: #b3432b; }
+  .mock-badge {
+    background: #fff3cd; color: #7a5c00; border: 1px solid #f0d989;
+    border-radius: 6px; padding: 8px 12px; font-size: 12px; margin-bottom: 10px;
+  }
 </style>
 </head>
 <body>
@@ -127,7 +131,10 @@ form.addEventListener('submit', async (e) => {
     }
 
     statusEl.textContent = '完了しました。';
-    imageArea.innerHTML = `<img src="${data.imageUrl}?t=${Date.now()}" alt="${data.item}の完成イメージ" />`;
+    const mockBadge = data.mockMode
+      ? '<div class="mock-badge">⚠ 簡易プレビュー表示中：FreeCAD/POV-Rayが見つからないため、実寸から計算した等角図で代用しています（本番のレンダリングではありません）</div>'
+      : '';
+    imageArea.innerHTML = `${mockBadge}<img src="${data.imageUrl}?t=${Date.now()}" alt="${data.item}の完成イメージ" />`;
 
     if (data.cutlist && data.cutlist.length > 0) {
       const headers = Object.keys(data.cutlist[0]);
