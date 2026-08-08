@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TANE:i FreeCAD Studio（プロトタイプ）</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    background: #FAF8F4;
+    color: #1F3028;
+    margin: 0;
+    padding: 40px 20px;
+  }
+  main { max-width: 960px; margin: 0 auto; }
+  h1 { font-weight: 500; font-size: 24px; margin-bottom: 4px; }
+  p.lead { color: #8A8A8A; margin-top: 0; font-size: 14px; }
+  .layout { display: grid; grid-template-columns: 320px 1fr; gap: 32px; margin-top: 32px; }
+  @media (max-width: 720px) { .layout { grid-template-columns: 1fr; } }
+  form { display: flex; flex-direction: column; gap: 14px; background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #eee; }
+  label { font-size: 13px; font-weight: 500; display: flex; flex-direction: column; gap: 6px; }
+  input, select {
+    font-size: 14px; padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px;
+    font-family: inherit;
+  }
+  button {
+    margin-top: 8px; padding: 10px 16px; border: none; border-radius: 999px;
+    background: #1F3028; color: #FAF8F4; font-size: 14px; font-weight: 500; cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .result { min-height: 200px; }
+  .result img { max-width: 100%; border-radius: 8px; border: 1px solid #eee; background: #fff; }
+  table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; background: #fff; }
+  th, td { border: 1px solid #eee; padding: 6px 10px; text-align: left; }
+  th { background: #f5f3ef; }
+  .status { font-size: 13px; color: #8A8A8A; margin-top: 10px; white-space: pre-wrap; }
+  .status.error { color: #b3432b; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🌱 TANE:i FreeCAD Studio（プロトタイプ）</h1>
+  <p class="lead">FreeCAD + POV-Rayによる、寸法・構造が正確な完成イメージと木取りリストの生成。既存のTANE:i／Gemini画像生成とは独立した検証用アプリです。</p>
+
+  <div class="layout">
+    <form id="render-form">
+      <label>
+        品名
+        <input type="text" name="item" value="テレビ台" required />
+      </label>
+      <label>
+        幅 W (mm)
+        <input type="number" name="width" value="1200" min="100" max="3000" required />
+      </label>
+      <label>
+        奥行 D (mm)
+        <input type="number" name="depth" value="400" min="100" max="3000" required />
+      </label>
+      <label>
+        高さ H (mm)
+        <input type="number" name="height" value="400" min="100" max="3000" required />
+      </label>
+      <label>
+        板厚 (mm)
+        <input type="number" name="thickness" value="18" min="6" max="40" />
+      </label>
+      <label>
+        材質
+        <select name="material">
+          <option>パイン集成材</option>
+          <option>シナベニヤ</option>
+          <option>ラワン合板</option>
+          <option>SPF材</option>
+          <option>OSB合板</option>
+        </select>
+      </label>
+      <button type="submit" id="submit-btn">FreeCADでレンダリング</button>
+      <div id="status" class="status"></div>
+    </form>
+
+    <div class="result">
+      <div id="image-area"></div>
+      <div id="cutlist-area"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const form = document.getElementById('render-form');
+const submitBtn = document.getElementById('submit-btn');
+const statusEl = document.getElementById('status');
+const imageArea = document.getElementById('image-area');
+const cutlistArea = document.getElementById('cutlist-area');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const formData = new FormData(form);
+  const payload = {
+    item: formData.get('item'),
+    width: Number(formData.get('width')),
+    depth: Number(formData.get('depth')),
+    height: Number(formData.get('height')),
+    thickness: Number(formData.get('thickness')),
+    material: formData.get('material'),
+  };
+
+  submitBtn.disabled = true;
+  statusEl.className = 'status';
+  statusEl.textContent = 'FreeCADでモデルを生成し、POV-Rayでレンダリング中です…（数十秒〜数分かかることがあります）';
+  imageArea.innerHTML = '';
+  cutlistArea.innerHTML = '';
+
+  try {
+    const res = await fetch('/api/render', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      statusEl.className = 'status error';
+      statusEl.textContent = (data.error || '不明なエラーが発生しました。') + (data.details ? '\n\n' + data.details : '');
+      return;
+    }
+
+    statusEl.textContent = '完了しました。';
+    imageArea.innerHTML = `<img src="${data.imageUrl}?t=${Date.now()}" alt="${data.item}の完成イメージ" />`;
+
+    if (data.cutlist && data.cutlist.length > 0) {
+      const headers = Object.keys(data.cutlist[0]);
+      const rows = data.cutlist.map(row => `<tr>${headers.map(h => `<td>${row[h]}</td>`).join('')}</tr>`).join('');
+      cutlistArea.innerHTML = `
+        <table>
+          <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+  } catch (err) {
+    statusEl.className = 'status error';
+    statusEl.textContent = '通信エラーが発生しました: ' + err.message;
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
