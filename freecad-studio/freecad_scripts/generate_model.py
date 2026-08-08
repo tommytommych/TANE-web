@@ -70,6 +70,9 @@ FINISH_APPROX_COLOR = {
 }
 
 
+BASE_PANEL_LABELS = ("天板", "底板", "側板", "背板")
+
+
 def _finish_for(label, panel_finishes):
     """指定した品名（パネルのlabel）に対応するfinishを、panel_finishesから安全に取り出す。
     未指定・不正な値の場合はDEFAULT_FINISH（クリア塗装）にフォールバックする。
@@ -162,6 +165,7 @@ LEG_CROSS_SECTION_MM = 30
 PILLAR_CROSS_SECTION_MM = 30
 BATTEN_HEIGHT_MM = 30
 CORNER_INSET_MM = 15
+CASTER_WHEEL_HEIGHT_MM = 20
 
 
 # 土台パーツ（脚・幕板・キャスター台座）: 本体最下部（1段目の下）にのみ取り付く。
@@ -182,9 +186,9 @@ FOUNDATION_PART_DEFS = {
         "params": {"heightMm": {"label": "見付け高さ(mm)", "default": 60, "min": 30, "max": 120}},
     },
     "caster_block": {
-        "label": "キャスター台座",
-        "description": "本体下面四隅に取り付けるキャスター取付用の台座",
-        "params": {"sizeMm": {"label": "台座の一辺(mm)", "default": 50, "min": 30, "max": 80}},
+        "label": "キャスター",
+        "description": "本体下面四隅に取り付ける小さいキャスター（タイヤ状の円柱）",
+        "params": {"diameterMm": {"label": "直径(mm)", "default": 40, "min": 20, "max": 60}},
     },
 }
 
@@ -204,6 +208,15 @@ TIER_PART_DEFS = {
     "shelf_h": {"label": "横棚板", "max_per_tier": 4},
     "back_batten": {"label": "背面補強桟", "max_per_tier": 4},
 }
+
+# 塗装・仕上げ（panelFinishes）を個別指定できる品名の一覧。基本4種＋土台パーツ＋
+# 段のパーツすべてに対応する（_finish_for()はlabelさえ一致すればどのパーツにも使えるため、
+# 新しいパーツを追加した際はここに登録するだけでUI・APIの両方から色指定できるようになる）
+ALL_FINISHABLE_LABELS = (
+    BASE_PANEL_LABELS
+    + tuple(d["label"] for d in FOUNDATION_PART_DEFS.values())
+    + tuple(d["label"] for d in TIER_PART_DEFS.values())
+)
 
 
 def _resolve_foundation_params(key, opt):
@@ -262,27 +275,63 @@ def _option_door(ctx, params, material, panel_finishes):
     ]
 
 
+def _column_bounds(inner_w, t, divider_count):
+    """縦仕切りの本数から、区切られた列ごとの(x開始位置, 列幅)のリストを返す。
+
+    _option_divider_v()と全く同じ位置計算（中心座標）を使うことで、引き出し前板が
+    区切り板にぴったり収まる列幅になる。divider_count=0なら1列（全幅）を返す。
+    """
+    if divider_count <= 0:
+        return [(t, inner_w)]
+    centers = [t + (i + 1) * inner_w / (divider_count + 1) for i in range(divider_count)]
+    bounds = []
+    prev_right = t
+    for cx in centers:
+        left_edge = cx - t / 2
+        bounds.append((prev_right, left_edge - prev_right))
+        prev_right = cx + t / 2
+    bounds.append((prev_right, t + inner_w - prev_right))
+    return bounds
+
+
 def _option_drawer_front(ctx, params, material, panel_finishes):
-    """前面の引き出し前板。countで縦方向に段数分割する（扉が左右分割なのに対し、こちらは上下分割）。"""
+    """前面の引き出し前板。countで縦方向に段数分割する（扉が左右分割なのに対し、こちらは上下分割）。
+
+    同じ段に縦仕切り（divider_v）がある場合は、params["divider_count"]（compute_option_panels
+    が同じ段のdivider_v個数を調べて渡す）に応じて、区切られた列ごとにcountを均等に振り分け、
+    列の幅に収まるように配置する（例: 仕切り1本→2列に分けて左右に引き出しを並べられる）。
+    """
     label = TIER_PART_DEFS["drawer_front"]["label"]
     count = int(params["count"])
+    divider_count = int(params.get("divider_count", 0))
     t = ctx["thickness"]
     inner_w, inner_h = ctx["inner_w"], ctx["inner_h"]
-    front_h = inner_h / count
     finish = _finish_for(label, panel_finishes)
-    return [
-        {
-            "label": label,
-            "material": material,
-            "finish": finish,
-            "size": (inner_w, t, front_h),
-            "pos": (t, -t, t + i * front_h),
-            "cut_w": inner_w,
-            "cut_d": front_h,
-            "cut_t": t,
-        }
-        for i in range(count)
-    ]
+
+    columns = _column_bounds(inner_w, t, divider_count)
+    n_cols = len(columns)
+    base_count, extra = divmod(count, n_cols)
+
+    panels = []
+    for col_index, (x_left, col_w) in enumerate(columns):
+        col_count = base_count + (1 if col_index < extra else 0)
+        if col_count == 0:
+            continue
+        front_h = inner_h / col_count
+        for i in range(col_count):
+            panels.append(
+                {
+                    "label": label,
+                    "material": material,
+                    "finish": finish,
+                    "size": (col_w, t, front_h),
+                    "pos": (x_left, -t, t + i * front_h),
+                    "cut_w": col_w,
+                    "cut_d": front_h,
+                    "cut_t": t,
+                }
+            )
+    return panels
 
 
 def _option_legs(ctx, params, material, panel_finishes):
@@ -460,10 +509,13 @@ def _option_back_batten(ctx, params, material, panel_finishes):
 
 
 def _option_caster_block(ctx, params, material, panel_finishes):
-    """本体下面四隅に取り付けるキャスター取付用の台座（正方形の角材ブロック）。"""
+    """本体下面四隅に取り付ける小さいキャスター。タイヤらしく見えるよう円柱（"shape": "wheel"）
+    として表現する。sizeはボックス系パーツと形を揃えるため(直径, 直径, 高さ)のタプルで持ち、
+    位置(pos)も左下手前を基準にしたバウンディングボックスのコーナー座標（他パーツと同じ規約）。
+    """
     label = FOUNDATION_PART_DEFS["caster_block"]["label"]
-    size = params["sizeMm"]
-    height = LEG_CROSS_SECTION_MM
+    diameter = params["diameterMm"]
+    height = CASTER_WHEEL_HEIGHT_MM
     width, depth = ctx["width"], ctx["depth"]
     finish = _finish_for(label, panel_finishes)
     inset = CORNER_INSET_MM
@@ -472,14 +524,15 @@ def _option_caster_block(ctx, params, material, panel_finishes):
             "label": label,
             "material": material,
             "finish": finish,
-            "size": (size, size, height),
+            "shape": "wheel",
+            "size": (diameter, diameter, height),
             "pos": (x, y, -height),
-            "cut_w": size,
-            "cut_d": size,
+            "cut_w": diameter,
+            "cut_d": diameter,
             "cut_t": height,
         }
-        for x in (inset, width - inset - size)
-        for y in (inset, depth - inset - size)
+        for x in (inset, width - inset - diameter)
+        for y in (inset, depth - inset - diameter)
     ]
 
 
@@ -545,7 +598,18 @@ def compute_option_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thic
             count = max(0, min(max_per_tier, count))
             if count == 0:
                 continue
-            tier_panels = generator(ctx, {"count": count}, material, panel_finishes)
+            part_params = {"count": count}
+            if key == "drawer_front":
+                # 同じ段にある縦仕切りの本数を調べ、列分割の基準にする（無ければ0=全幅1列のまま）
+                divider_opt = options.get("divider_v") or {}
+                try:
+                    divider_count = int(divider_opt.get(f"tier{tier_index}", 0))
+                except (TypeError, ValueError):
+                    divider_count = 0
+                part_params["divider_count"] = max(
+                    0, min(TIER_PART_DEFS["divider_v"]["max_per_tier"], divider_count)
+                )
+            tier_panels = generator(ctx, part_params, material, panel_finishes)
             z_offset = (tier_index - 1) * height_mm
             for p in tier_panels:
                 x, y, z = p["pos"]
@@ -553,6 +617,18 @@ def compute_option_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thic
             panels.extend(tier_panels)
 
     return panels
+
+
+# キャスター（"shape": "wheel"）は木材ではなくゴム/樹脂のタイヤなので、他パーツと違い
+# "clear"（材質そのものの木目）を選んでも木目にはせず、既定でダークグレーのゴム色にする。
+# black/whiteを明示指定した場合はそれぞれより濃い黒・明るいプラスチック風グレーにする
+# （walnutは見た目上の意味を持たないため、既定のゴム色にフォールバックする）
+WHEEL_FINISH_COLOR = {
+    "clear": "0.12, 0.12, 0.12",
+    "walnut": "0.12, 0.12, 0.12",
+    "white": "0.75, 0.75, 0.75",
+    "black": "0.02, 0.02, 0.02",
+}
 
 
 def _apply_panel_color(obj, panel, material_color_lookup):
@@ -565,7 +641,9 @@ def _apply_panel_color(obj, panel, material_color_lookup):
     あくまでFreeCAD文書を後でGUIで開いた際の見た目用（実際のレンダリングはPOV-Ray側で行う）。
     """
     finish = panel.get("finish", DEFAULT_FINISH)
-    if finish == "clear":
+    if panel.get("shape") == "wheel":
+        rgb_csv = WHEEL_FINISH_COLOR.get(finish, WHEEL_FINISH_COLOR["clear"])
+    elif finish == "clear":
         rgb_csv = material_color_lookup(panel["material"])
     else:
         rgb_csv = FINISH_APPROX_COLOR.get(finish, material_color_lookup(panel["material"]))
@@ -597,9 +675,14 @@ def build_freecad_document(panels, output_path, material_color_lookup=None):
     for i, panel in enumerate(panels):
         dx, dy, dz = panel["size"]
         x, y, z = panel["pos"]
-        box_shape = Part.makeBox(dx, dy, dz, App.Vector(x, y, z))
+        if panel.get("shape") == "wheel":
+            # キャスターは円柱（タイヤ状）として表現する。dx/dyは直径として等しい前提
+            radius = dx / 2
+            shape = Part.makeCylinder(radius, dz, App.Vector(x + radius, y + radius, z), App.Vector(0, 0, 1))
+        else:
+            shape = Part.makeBox(dx, dy, dz, App.Vector(x, y, z))
         obj = doc.addObject("Part::Feature", f"Panel_{i}_{panel['label']}")
-        obj.Shape = box_shape
+        obj.Shape = shape
         obj.Label = panel["label"]
         _apply_panel_color(obj, panel, material_color_lookup)
 
@@ -672,6 +755,13 @@ def _panel_pov_texture(panel):
     dx, dy, dz = panel["size"]
     cx, cy, cz = x + dx / 2, y + dy / 2, z + dz / 2
 
+    if panel.get("shape") == "wheel":
+        r, g, b = (float(v) for v in WHEEL_FINISH_COLOR.get(finish, WHEEL_FINISH_COLOR["clear"]).split(","))
+        return (
+            f"texture {{ pigment {{ color rgb <{r}, {g}, {b}> }} "
+            "finish { diffuse 0.5 specular 0.5 roughness 0.08 } }"
+        )
+
     if finish == "white":
         return (
             "texture { pigment { color rgb <0.93, 0.92, 0.88> } "
@@ -725,7 +815,14 @@ def generate_pov_scene(panels, width_mm, depth_mm, height_mm, material, output_p
         x, y, z = panel["pos"]
         dx, dy, dz = panel["size"]
         texture_block = _panel_pov_texture(panel)
-        box_entries.append(f"  box {{ <{x}, {y}, {z}>, <{x + dx}, {y + dy}, {z + dz}> {texture_block} }}")
+        if panel.get("shape") == "wheel":
+            radius = dx / 2
+            cx, cy = x + radius, y + radius
+            box_entries.append(
+                f"  cylinder {{ <{cx}, {cy}, {z}>, <{cx}, {cy}, {z + dz}>, {radius} {texture_block} }}"
+            )
+        else:
+            box_entries.append(f"  box {{ <{x}, {y}, {z}>, <{x + dx}, {y + dy}, {z + dz}> {texture_block} }}")
 
     min_x, max_x, min_y, max_y, min_z, max_z = _panels_bounding_box(panels)
     bbox_w = max_x - min_x

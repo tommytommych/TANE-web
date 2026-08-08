@@ -104,6 +104,10 @@
     cursor: pointer; font-size: 12px; line-height: 1; padding: 0;
   }
   .drag-ghost { position: fixed; pointer-events: none; z-index: 1000; opacity: 0.85; transform: translate(-50%, -50%); }
+  .tier-color-picker { margin-top: 18px; padding-top: 14px; border-top: 1px solid #eee; }
+  .tier-color-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px 16px; margin-top: 10px; }
+  .tier-color-row { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 500; }
+  .tier-color-row select { font-size: 13px; }
 </style>
 </head>
 <body>
@@ -219,16 +223,39 @@
             <option value="6">6</option>
           </select>
         </label>
+        <label class="opt-param">色
+          <select name="finish-脚" class="finish-select" form="render-form">
+            <option value="clear" selected>クリア塗装（材質の木目）</option>
+            <option value="walnut">ウォルナット調</option>
+            <option value="white">ホワイト</option>
+            <option value="black">ブラック</option>
+          </select>
+        </label>
       </div>
 
       <div class="opt-row">
         <label class="opt-toggle"><input type="checkbox" name="opt-apron-enabled" form="render-form" /> 幕板</label>
         <label class="opt-param">見付け高さ(mm)<input type="number" name="opt-apron-heightMm" form="render-form" value="60" min="30" max="120" /></label>
+        <label class="opt-param">色
+          <select name="finish-幕板" class="finish-select" form="render-form">
+            <option value="clear" selected>クリア塗装（材質の木目）</option>
+            <option value="walnut">ウォルナット調</option>
+            <option value="white">ホワイト</option>
+            <option value="black">ブラック</option>
+          </select>
+        </label>
       </div>
 
       <div class="opt-row">
-        <label class="opt-toggle"><input type="checkbox" name="opt-caster_block-enabled" form="render-form" /> キャスター台座</label>
-        <label class="opt-param">一辺(mm)<input type="number" name="opt-caster_block-sizeMm" form="render-form" value="50" min="30" max="80" /></label>
+        <label class="opt-toggle"><input type="checkbox" name="opt-caster_block-enabled" form="render-form" /> キャスター</label>
+        <label class="opt-param">直径(mm)<input type="number" name="opt-caster_block-diameterMm" form="render-form" value="40" min="20" max="60" /></label>
+        <label class="opt-param">色
+          <select name="finish-キャスター" class="finish-select" form="render-form">
+            <option value="clear" selected>ゴム（濃いグレー）</option>
+            <option value="white">プラスチック風（明るいグレー）</option>
+            <option value="black">より濃い黒</option>
+          </select>
+        </label>
       </div>
 
       <div class="opt-row">
@@ -277,6 +304,60 @@
            <p class="tier-zone-title">1段目（土台の上）</p>
            <div class="tier-zone-drop" data-tier="1"></div>
          </div>
+       </div>
+     </div>
+
+     <div class="tier-color-picker">
+       <p class="finish-group-title">パーツの色（任意・パーツ全体に反映）</p>
+       <div class="tier-color-grid">
+         <label class="tier-color-row">扉
+           <select name="finish-扉" class="finish-select" form="render-form">
+             <option value="clear" selected>クリア塗装（材質の木目）</option>
+             <option value="walnut">ウォルナット調</option>
+             <option value="white">ホワイト</option>
+             <option value="black">ブラック</option>
+           </select>
+         </label>
+         <label class="tier-color-row">引き出し前板
+           <select name="finish-引き出し前板" class="finish-select" form="render-form">
+             <option value="clear" selected>クリア塗装（材質の木目）</option>
+             <option value="walnut">ウォルナット調</option>
+             <option value="white">ホワイト</option>
+             <option value="black">ブラック</option>
+           </select>
+         </label>
+         <label class="tier-color-row">支柱
+           <select name="finish-支柱" class="finish-select" form="render-form">
+             <option value="clear" selected>クリア塗装（材質の木目）</option>
+             <option value="walnut">ウォルナット調</option>
+             <option value="white">ホワイト</option>
+             <option value="black">ブラック</option>
+           </select>
+         </label>
+         <label class="tier-color-row">縦仕切り
+           <select name="finish-縦仕切り" class="finish-select" form="render-form">
+             <option value="clear" selected>クリア塗装（材質の木目）</option>
+             <option value="walnut">ウォルナット調</option>
+             <option value="white">ホワイト</option>
+             <option value="black">ブラック</option>
+           </select>
+         </label>
+         <label class="tier-color-row">横棚板
+           <select name="finish-横棚板" class="finish-select" form="render-form">
+             <option value="clear" selected>クリア塗装（材質の木目）</option>
+             <option value="walnut">ウォルナット調</option>
+             <option value="white">ホワイト</option>
+             <option value="black">ブラック</option>
+           </select>
+         </label>
+         <label class="tier-color-row">背面補強桟
+           <select name="finish-背面補強桟" class="finish-select" form="render-form">
+             <option value="clear" selected>クリア塗装（材質の木目）</option>
+             <option value="walnut">ウォルナット調</option>
+             <option value="white">ホワイト</option>
+             <option value="black">ブラック</option>
+           </select>
+         </label>
        </div>
      </div>
    </div>
@@ -358,9 +439,13 @@ function buildViewerFromPanels(panels) {
   panelGroup = new THREE.Group();
 
   // FreeCAD/POV-Ray側はZ軸を高さ方向として扱っているため、Three.js（Y軸が上）に
-  // 合わせて y と z を入れ替える
+  // 合わせて y と z を入れ替える。キャスター（shape: 'wheel'）は円柱で表現する
+  // （CylinderGeometryは既定でY軸方向に高さを持つため、FreeCADのZ軸=高さと自然に対応し
+  // 回転補正が不要）
   panels.forEach((p) => {
-    const geometry = new THREE.BoxGeometry(p.dx, p.dz, p.dy);
+    const geometry = p.shape === 'wheel'
+      ? new THREE.CylinderGeometry(p.dx / 2, p.dx / 2, p.dz, 24)
+      : new THREE.BoxGeometry(p.dx, p.dz, p.dy);
     const material = new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.8 });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(p.x + p.dx / 2, p.z + p.dz / 2, p.y + p.dy / 2);
@@ -531,13 +616,25 @@ function collectOptionsFromForm() {
       count: Number(val('opt-legs-count')),
     },
     apron: { enabled: checked('opt-apron-enabled'), heightMm: Number(val('opt-apron-heightMm')) },
-    caster_block: { enabled: checked('opt-caster_block-enabled'), sizeMm: Number(val('opt-caster_block-sizeMm')) },
+    caster_block: { enabled: checked('opt-caster_block-enabled'), diameterMm: Number(val('opt-caster_block-diameterMm')) },
     stack: { enabled: checked('opt-stack-enabled') },
   };
   for (const part of Object.keys(tierPartState)) {
     options[part] = { tier1: tierPartState[part].tier1, tier2: tierPartState[part].tier2 };
   }
   return options;
+}
+
+// ページ内の.finish-select（天板/底板/側板/背板に加え、脚・扉・キャスターなど追加パーツの
+// 色選択も含む）を全て走査してpanelFinishesを組み立てる。select要素はDOM上どこにあっても
+// （<aside>やtier-editor内でも）querySelectorAllで拾えるため、パーツを追加した際も
+// name="finish-<品名>"の命名規則さえ守ればここを変更する必要はない
+function collectPanelFinishes() {
+  const finishes = {};
+  document.querySelectorAll('.finish-select').forEach((select) => {
+    finishes[select.name.replace(/^finish-/, '')] = select.value;
+  });
+  return finishes;
 }
 
 // フォームの現在の入力値から、/api/renderへ送るpayloadを組み立てる
@@ -550,12 +647,7 @@ function collectPayloadFromForm() {
     height: Number(formData.get('height')),
     thickness: Number(formData.get('thickness')),
     material: formData.get('material'),
-    panelFinishes: {
-      '天板': formData.get('finish-天板'),
-      '底板': formData.get('finish-底板'),
-      '側板': formData.get('finish-側板'),
-      '背板': formData.get('finish-背板'),
-    },
+    panelFinishes: collectPanelFinishes(),
     options: collectOptionsFromForm(),
   };
 }

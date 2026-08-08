@@ -30,10 +30,21 @@ FINISH_HEX = {
     "black": "#121212",
 }
 
+# キャスター（"shape": "wheel"）は木材ではなくゴム/樹脂のタイヤなので、他パーツと違い
+# clearでも木目色にはせずダークグレーのゴム色にする（generate_model.pyのWHEEL_FINISH_COLORと対応）
+WHEEL_FINISH_HEX = {
+    "clear": "#1e1e1e",
+    "walnut": "#1e1e1e",
+    "white": "#bfbfbf",
+    "black": "#050505",
+}
+
 
 def _panel_hex_color(panel):
     """パネルのfinishに応じた色（clearの場合は材質の色）を返す。"""
     finish = panel.get("finish", "clear")
+    if panel.get("shape") == "wheel":
+        return WHEEL_FINISH_HEX.get(finish, WHEEL_FINISH_HEX["clear"])
     if finish in FINISH_HEX:
         return FINISH_HEX[finish]
     return MATERIAL_HEX.get(panel.get("material"), DEFAULT_MATERIAL_HEX)
@@ -75,6 +86,21 @@ def render_iso_preview_svg(panels, item_label, material):
         x, y, z = panel["pos"]
         dx, dy, dz = panel["size"]
         base_color = _panel_hex_color(panel)
+
+        if panel.get("shape") == "wheel":
+            # 円柱(タイヤ)は簡易プレビューでは中心位置の小さな楕円として表現する
+            cx3d, cy3d, cz3d = x + dx / 2, y + dy / 2, z + dz / 2
+            cx2d, cy2d = _iso(cx3d, cy3d, cz3d)
+            radius_2d = dx / 2 * COS30
+            all_points.extend(
+                [(cx2d - radius_2d, cy2d - radius_2d), (cx2d + radius_2d, cy2d + radius_2d)]
+            )
+            polygons.append(
+                f'<ellipse cx="{cx2d:.1f}" cy="{cy2d:.1f}" rx="{radius_2d:.1f}" ry="{radius_2d * 0.6:.1f}" '
+                f'fill="{base_color}" stroke="#111" stroke-width="1" />'
+            )
+            continue
+
         for face_name, corners, shade_factor in _box_faces(x, y, z, x + dx, y + dy, z + dz):
             projected = [_iso(*c) for c in corners]
             all_points.extend(projected)

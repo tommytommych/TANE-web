@@ -32,6 +32,7 @@ GENERATE_SCRIPT = os.path.join(BASE_DIR, "freecad_scripts", "generate_model.py")
 
 sys.path.insert(0, BASE_DIR)
 from freecad_scripts.generate_model import (  # noqa: E402
+    ALL_FINISHABLE_LABELS,
     DEFAULT_BACK_THICKNESS_MM,
     FINISH_OPTIONS,
     FOUNDATION_PART_DEFS,
@@ -40,7 +41,13 @@ from freecad_scripts.generate_model import (  # noqa: E402
     compute_panels,
     write_cutlist_csv,
 )
-from mock_preview import render_iso_preview_svg, MATERIAL_HEX, DEFAULT_MATERIAL_HEX, FINISH_HEX  # noqa: E402
+from mock_preview import (  # noqa: E402
+    render_iso_preview_svg,
+    MATERIAL_HEX,
+    DEFAULT_MATERIAL_HEX,
+    FINISH_HEX,
+    WHEEL_FINISH_HEX,
+)
 
 FREECAD_CMD_PATH = os.environ.get("FREECAD_CMD_PATH", "freecadcmd")
 
@@ -102,9 +109,12 @@ def ws_sync(ws):
 def serialize_panels_for_viewer(panels):
     """ブラウザ側のThree.jsインタラクティブ3Dビューア用に、panelsをJSON化しやすい形にする。
     パネルごとのfinish（クリア塗装/ウォルナット調/ホワイト/ブラック）を色に反映する。
+    キャスター（"shape": "wheel"）は木目ではなくゴム/樹脂の色になり、形状情報も渡す。
     """
     def color_for(panel):
         finish = panel.get("finish", "clear")
+        if panel.get("shape") == "wheel":
+            return WHEEL_FINISH_HEX.get(finish, WHEEL_FINISH_HEX["clear"])
         if finish in FINISH_HEX:
             return FINISH_HEX[finish]
         return MATERIAL_HEX.get(panel["material"], DEFAULT_MATERIAL_HEX)
@@ -115,20 +125,25 @@ def serialize_panels_for_viewer(panels):
             "x": p["pos"][0], "y": p["pos"][1], "z": p["pos"][2],
             "dx": p["size"][0], "dy": p["size"][1], "dz": p["size"][2],
             "color": color_for(p),
+            "shape": p.get("shape", "box"),
         }
         for p in panels
     ]
 
 
 def parse_panel_finishes(data):
-    """リクエストのpanelFinishesを検証し、未知のキー・不正な値を除いた辞書にする。"""
+    """リクエストのpanelFinishesを検証し、未知のキー・不正な値を除いた辞書にする。
+
+    天板・底板・側板・背板の基本4種だけでなく、脚・扉・キャスターなど追加パーツの
+    品名も含めたALL_FINISHABLE_LABELS（generate_model.py）を対象にする。
+    """
     raw = data.get("panelFinishes")
     if not isinstance(raw, dict):
         return {}
     return {
         str(label): str(finish)
         for label, finish in raw.items()
-        if str(label) in ("天板", "底板", "側板", "背板") and str(finish) in FINISH_OPTIONS
+        if str(label) in ALL_FINISHABLE_LABELS and str(finish) in FINISH_OPTIONS
     }
 
 
