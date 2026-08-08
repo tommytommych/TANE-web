@@ -23,6 +23,7 @@ import sys
 import uuid
 
 from flask import Flask, jsonify, request, send_from_directory
+from flask_sock import Sock
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RENDERS_DIR = os.path.join(BASE_DIR, "renders")
@@ -45,8 +46,54 @@ MAX_DIMENSION_MM = 3000
 DEFAULT_THICKNESS_MM = 18
 
 app = Flask(__name__, static_folder=None)
+sock = Sock(app)
 
 os.makedirs(RENDERS_DIR, exist_ok=True)
+
+# --- チャット(Next.js)⇔Studio 双方向同期用の WebSocket ハブ ---
+# Studioはfreecadcmd/povrayというローカルバイナリに依存するため、Vercel等にデプロイした
+# チャットのサーバー側から直接叩くことはできない。そのため同期はオペレーターのブラウザが
+# 「チャットのタブ」「Studioのタブ」の両方からこの/ws/syncに直結する形で成立させる
+# （ブラウザ⇔ブラウザではなく、両方がこのFlaskサーバーの同一エンドポイントに接続することで
+# 中継する）。sync_clientsは接続中の全クライアント（チャット側・Studio側の両方を含む）、
+# latest_specは直近の確定仕様で、新規接続時に最新状態を送るためだけに使う簡易プロトタイプ実装
+# （プロセス再起動で消える。複数案件の同時進行にはsessionId単位への拡張が必要）。
+sync_clients = set()
+latest_spec = {}
+
+
+def broadcast_spec_update(payload, source, exclude=None):
+    """接続中の全クライアント（excludeを除く）へ、最新仕様をブロードキャストする。"""
+    latest_spec.update(payload)
+    message = json.dumps({"type": "spec-update", "source": source, "payload": payload})
+    for client in list(sync_clients):
+        if client is exclude:
+            continue
+        try:
+            client.send(message)
+        except Exception:
+            sync_clients.discard(client)
+
+
+@sock.route("/ws/sync")
+def ws_sync(ws):
+    sync_clients.add(ws)
+    try:
+        if latest_spec:
+            ws.send(json.dumps({"type": "spec-update", "source": "studio", "payload": latest_spec}))
+        while True:
+            raw = ws.receive()
+            if raw is None:
+                break
+            try:
+                msg = json.loads(raw)
+            except ValueError:
+                continue
+            if msg.get("type") == "spec-update" and isinstance(msg.get("payload"), dict):
+                # チャット側から送られてきた確定仕様を、Studio側（他の全クライアント）へ中継する
+                broadcast_spec_update(msg["payload"], msg.get("source", "chat"), exclude=ws)
+    finally:
+        sync_clients.discard(ws)
 
 
 def serialize_panels_for_viewer(panels):
@@ -242,6 +289,22 @@ def api_render():
 
     if error_payload:
         return jsonify(error_payload), status
+
+    # Studio側でレンダリングが確定した(=フォーム送信された)タイミングで、
+    # チャット側に接続中のWebSocketクライアントへ最新仕様をブロードキャストする
+    # (双方向同期の「Studio→チャット」方向。要件の「保存時に必ず反映」に対応)
+    broadcast_spec_update(
+        {
+            "item": item,
+            "width": width,
+            "depth": depth,
+            "height": height,
+            "thickness": thickness,
+            "material": material,
+            "panelFinishes": panel_finishes,
+        },
+        source="studio",
+    )
 
     return jsonify({
         "jobId": job_id,

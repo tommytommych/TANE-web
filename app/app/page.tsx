@@ -25,6 +25,7 @@ import {
 } from '../lib/savedItemsStore';
 import { downloadPdfBytes } from '../lib/download';
 import { getLocalRemainingCount, consumeLocalUsage, setLocalRemainingCount } from '../lib/localUsage';
+import { connectStudioSync } from '../lib/studioSync';
 
 import TopBar from '../components/layout/TopBar';
 import LeftSidebar from '../components/layout/LeftSidebar';
@@ -141,6 +142,17 @@ export default function Home() {
       setToastMessage(null);
     }, 4000);
   }, []);
+
+  useEffect(() => {
+    // TANE:i Studio(freecad-studio/、ローカルのFreeCAD+POV-Rayスタジオ)側でオペレーターが
+    // 寸法・パーツごとの塗装を微調整して保存すると、ここに最新仕様が届く（双方向同期の
+    // 「Studio→チャット」方向）。Studioを起動していない環境では単に接続されないだけで、
+    // エラーにはならない
+    const disconnect = connectStudioSync((spec) => {
+      showToast(`TANE:i Studioで仕様が更新されました🔧（${spec.item} / 幅${spec.width}×奥行${spec.depth}×高さ${spec.height}mm）`);
+    });
+    return disconnect;
+  }, [showToast]);
 
   const handleNewConversation = useCallback(() => {
     if (messages.length > 1 && !window.confirm('現在の会話をリセットして、新しい相談を始めますか？\n（これまでの相談内容は「相談履歴」に保存されています）')) {

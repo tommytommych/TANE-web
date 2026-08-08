@@ -8,9 +8,11 @@ import {
   extractCutListFromContent,
   extractSheetLayoutFromContent,
   extractContextFromContent,
+  extractStudioSpecFromContent,
   stripInternalBlocks,
 } from '../../lib/cutlist';
 import type { SavedItemType } from '../../lib/types';
+import { pushSpecToStudio } from '../../lib/studioSync';
 
 interface CompletionCardsProps {
   msg: Message;
@@ -37,6 +39,7 @@ function CompletionCards({
   const materialGroups = useMemo(() => extractCutListFromContent(msg.content), [msg.content]);
   const sheetLayouts = useMemo(() => extractSheetLayoutFromContent(msg.content), [msg.content]);
   const context = useMemo(() => extractContextFromContent(msg.content), [msg.content]);
+  const studioSpec = useMemo(() => extractStudioSpecFromContent(msg.content), [msg.content]);
 
   const handleLineShare = () => {
     const text = stripInternalBlocks(msg.content).slice(0, 300);
@@ -75,6 +78,12 @@ function CompletionCards({
     showToast('設計・アイデアとして保存しました！');
   };
 
+  const handleOpenInStudio = () => {
+    if (!studioSpec) return;
+    pushSpecToStudio(studioSpec);
+    showToast('TANE:i Studioに仕様を送りました🌱（起動していない場合は新しいタブで開きます）');
+  };
+
   const cards: { icon: string; label: string; onClick: () => void; accent?: boolean; disabled?: boolean }[] = [
     // シルエットカメオの相談には木取り図PDFが関係ないため、この相談ではPDFボタンを出さない
     ...(isCameoContent
@@ -88,6 +97,8 @@ function CompletionCards({
             disabled: isGeneratingPdf,
           },
         ]),
+    // 天板・底板・側板・背板からなる箱型の家具のみ、AIがtanei-studio-specブロックを出力する
+    ...(studioSpec ? [{ icon: '🪚', label: 'Studioで確認', onClick: handleOpenInStudio }] : []),
     { icon: '💚', label: 'LINE送信', onClick: handleLineShare },
     { icon: '💾', label: '保存', onClick: handleSaveDesign },
     { icon: '🔗', label: '共有', onClick: handleShare },

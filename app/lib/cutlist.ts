@@ -4,6 +4,8 @@ import { type AssemblyManual, isValidAssemblyManual } from './assemblyManual';
 export type { AssemblyManual } from './assemblyManual';
 import { type CameoDesignCandidate, isValidCameoDesignCandidate } from './cameoDesigns';
 export type { CameoDesignCandidate } from './cameoDesigns';
+import { type StudioSpec, isValidStudioSpec } from './studioSpec';
+export type { StudioSpec } from './studioSpec';
 
 export interface Message {
   role: string;
@@ -186,6 +188,23 @@ export const extractContextFromContent = (content: string): DesignContext | null
   }
 };
 
+// AIの回答末尾に付加される ```tanei-studio-spec ... ``` ブロックを検出する正規表現
+// （TANE:i Studio(freecad-studio/)への自動反映用の確定仕様）
+export const STUDIO_SPEC_BLOCK_REGEX = /```tanei-studio-spec\s*([\s\S]*?)```/;
+
+// チャットの回答テキストから、AIが付加したStudio連携用の確定仕様（tanei-studio-specブロック）を取り出す
+export const extractStudioSpecFromContent = (content: string): StudioSpec | null => {
+  const match = content.match(STUDIO_SPEC_BLOCK_REGEX);
+  if (!match) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(match[1].trim());
+    return isValidStudioSpec(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
 // 表示用のMarkdown・APIへ送る会話履歴からは、内部データ用のtanei-*ブロックをすべて取り除く
 export const stripInternalBlocks = (content: string): string =>
   content
@@ -195,4 +214,5 @@ export const stripInternalBlocks = (content: string): string =>
     .replace(CAMEO_DESIGNS_BLOCK_REGEX, '')
     .replace(OPTIONS_BLOCK_REGEX, '')
     .replace(CONTEXT_BLOCK_REGEX, '')
+    .replace(STUDIO_SPEC_BLOCK_REGEX, '')
     .trim();

@@ -67,6 +67,7 @@
 <main>
   <h1>🌱 TANE:i FreeCAD Studio（プロトタイプ）</h1>
   <p class="lead">FreeCAD + POV-Rayによる、寸法・構造が正確な完成イメージと木取りリストの生成。既存のTANE:i／Gemini画像生成とは独立した検証用アプリです。</p>
+  <p class="lead" id="sync-status" style="font-size: 12px;">チャットとの連携: 接続確認中…</p>
 
   <div class="layout">
     <form id="render-form">
@@ -266,10 +267,10 @@ function buildViewerFromPanels(panels) {
   resizeRenderer();
 }
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault();
+// フォームの現在の入力値から、/api/renderへ送るpayloadを組み立てる
+function collectPayloadFromForm() {
   const formData = new FormData(form);
-  const payload = {
+  return {
     item: formData.get('item'),
     width: Number(formData.get('width')),
     depth: Number(formData.get('depth')),
@@ -283,7 +284,32 @@ form.addEventListener('submit', async (e) => {
       '背板': formData.get('finish-背板'),
     },
   };
+}
 
+// チャット側から届いた仕様(spec)をフォームの各入力欄に反映する。
+// 未指定の項目（thickness/panelFinishes等、チャット側が省略した場合）は既存の値を保持する
+function applySpecToForm(spec) {
+  if (spec.item != null) form.item.value = spec.item;
+  if (spec.width != null) form.width.value = spec.width;
+  if (spec.depth != null) form.depth.value = spec.depth;
+  if (spec.height != null) form.height.value = spec.height;
+  if (spec.thickness != null) form.thickness.value = spec.thickness;
+  if (spec.material) {
+    const materialOption = Array.from(form.material.options).find((o) => o.value === spec.material);
+    if (materialOption) form.material.value = spec.material;
+  }
+  if (spec.panelFinishes && typeof spec.panelFinishes === 'object') {
+    for (const [label, finish] of Object.entries(spec.panelFinishes)) {
+      const select = form.querySelector(`select[name="finish-${label}"]`);
+      if (select && Array.from(select.options).some((o) => o.value === finish)) {
+        select.value = finish;
+      }
+    }
+  }
+}
+
+// /api/renderを呼び出し、結果を画面に反映する（フォーム送信・チャットからの自動反映の両方から使う共通処理）
+async function renderPayload(payload) {
   submitBtn.disabled = true;
   statusEl.className = 'status';
   statusEl.textContent = 'FreeCADでモデルを生成し、POV-Rayでレンダリング中です…（数十秒〜数分かかることがあります）';
@@ -329,6 +355,43 @@ form.addEventListener('submit', async (e) => {
     statusEl.textContent = '通信エラーが発生しました: ' + err.message;
   } finally {
     submitBtn.disabled = false;
+  }
+}
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  renderPayload(collectPayloadFromForm());
+});
+
+// --- チャット(TANE:i)との双方向同期 ---
+// チャット側でも同じ/ws/syncに接続しており、このFlaskサーバーが中継役になる。
+// チャットで仕様が確定した際にここへ送られてくるspec-updateを受けてフォームへ反映・自動レンダリングし、
+// 逆にこちらでレンダリング（保存）した内容は、サーバー側(server.pyの/api/render)から
+// 自動的にチャット側へブロードキャストされる
+const syncStatusEl = document.getElementById('sync-status');
+const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
+const syncSocket = new WebSocket(`${wsProtocol}://${location.host}/ws/sync`);
+
+syncSocket.addEventListener('open', () => {
+  syncStatusEl.textContent = '🔗 チャットとの連携: 待機中（チャット側で仕様が確定すると自動反映されます）';
+});
+syncSocket.addEventListener('close', () => {
+  syncStatusEl.textContent = '⚠ チャットとの連携: 切断されました（ページを再読み込みしてください）';
+});
+syncSocket.addEventListener('error', () => {
+  syncStatusEl.textContent = '⚠ チャットとの連携でエラーが発生しました';
+});
+syncSocket.addEventListener('message', (event) => {
+  let msg;
+  try {
+    msg = JSON.parse(event.data);
+  } catch {
+    return;
+  }
+  if (msg.type === 'spec-update' && msg.source === 'chat') {
+    applySpecToForm(msg.payload);
+    syncStatusEl.textContent = '🔗 チャットから仕様を受信しました。自動でレンダリングします…';
+    renderPayload(collectPayloadFromForm());
   }
 });
 </script>

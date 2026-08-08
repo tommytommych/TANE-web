@@ -154,6 +154,44 @@ TANEI_PARAMS_JSON='{"item":"テレビ台","width":1200,"depth":400,"height":400,
 直方体を組み立てて表示する（ドラッグ回転・スクロールズーム・右ドラッグ平行移動に対応）。
 Three.js本体はCDN（unpkg）から読み込むため、インターネット接続が必要。
 
+### 6. TANE:iチャットとの双方向同期
+
+TANE:iチャット（`app/app/page.tsx`、Vercel等にデプロイされるメインシステム）とStudioの間で、
+確定仕様を自動反映しあう機能を用意している。
+
+```
+[チャットタブ]                          [Studioタブ]
+   pushSpecToStudio(spec) --送信-->  /ws/sync（Flask, flask-sock）  <--送信-- フォーム送信(保存)
+   connectStudioSync(cb)  <--受信--                                --broadcast-->
+```
+
+- **チャット→Studio**: チャットでAIが設計提案を出すと、回答末尾に非表示の
+  `tanei-studio-spec`ブロック（品名・幅・奥行き・高さ・板厚・材質・パーツごとの塗装）が
+  付加される（`app/lib/systemPrompt.ts`）。ユーザーが「🪚 Studioで確認」ボタン
+  （`CompletionCards.tsx`）を押すと、`app/lib/studioSync.ts`の`pushSpecToStudio()`が
+  `/ws/sync`へWebSocketで送信し、Studio側（`static/index.html`）がフォームへ自動反映＋
+  自動レンダリングする。
+- **Studio→チャット**: Studio側でオペレーターが寸法・塗装を微調整して「FreeCADで
+  レンダリング」を押す（＝保存が確定する）たびに、`/api/render`成功時に
+  サーバー側（`server.py`の`broadcast_spec_update()`）が最新仕様を`/ws/sync`の
+  全クライアントへブロードキャストする。チャット側は`connectStudioSync()`でこれを
+  受け取り、トースト通知で最新仕様をユーザーに知らせる。
+- **なぜWebSocketか**: Studioは`freecadcmd`/`povray`というローカルバイナリに依存するため、
+  Vercel等にデプロイされたチャットのサーバー側から直接アクセスすることはできない。
+  そのため同期はオペレーターのブラウザ内JavaScriptが、同じPC上で起動している
+  `localhost:5001`のStudioへ直結する形で行う（サーバー間連携ではなく、ブラウザが
+  両者の橋渡し役になる）。`postMessage`はウィンドウ参照が生きている間しか使えず、
+  `localStorage`/`BroadcastChannel`はオリジンをまたげない（チャットのドメインと
+  `localhost:5001`は別オリジン）ため、オリジンをまたいで安定して使えるWebSocketを選んだ。
+- Studio未起動時に「Studioで確認」を押した場合は、WebSocket接続がタイムアウトし、
+  クエリパラメータ（`item`/`width`/`depth`/`height`/`thickness`/`material`/`panelFinishes`/
+  `autoRender=1`）付きで`http://localhost:5001/`を新規タブで開くフォールバックになる。
+- 既知の制約: `latest_spec`はFlaskプロセス内メモリのみで、複数案件の同時進行には
+  `sessionId`単位への拡張が必要（現状は単一セッション運用前提）。また`server.py`は
+  `host="0.0.0.0"`でLAN全体に公開されているため、同期チャネル追加後は同一Wi-Fi上の
+  他端末からも任意の仕様を送り込める状態になる。社内利用に限定するなら`127.0.0.1`に
+  絞るか、`/ws/sync`接続時の認証を追加することを推奨する。
+
 ## 既知の制約・今後の検討事項
 
 - 現状の家具モデルは「天板・底板・側板×2・背板」の単純な箱型構成のみに対応
