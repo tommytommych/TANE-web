@@ -73,6 +73,37 @@
   }
   .finish-group-title { font-size: 12px; font-weight: 600; color: #8A8A8A; margin: 0; }
   .finish-group label { font-weight: 400; }
+
+  /* --- 段ごとの追加パーツ: ドラッグ&ドロップ配置エディタ --- */
+  .tier-editor { background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 16px; }
+  .tier-editor-hint { font-size: 12px; color: #8A8A8A; margin: 4px 0 12px 0; }
+  .tier-editor-body { display: flex; gap: 24px; flex-wrap: wrap; }
+  @media (max-width: 720px) { .tier-editor-body { flex-direction: column; } }
+  .part-palette { display: flex; flex-direction: row; flex-wrap: wrap; gap: 10px; width: 190px; align-content: flex-start; }
+  @media (max-width: 720px) { .part-palette { width: 100%; justify-content: center; } }
+  .part-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; width: 82px; padding: 10px 4px;
+    background: #faf8f5; border: 1px solid #ddd; border-radius: 8px; cursor: grab; user-select: none;
+    touch-action: none; font-size: 11px; font-weight: 600; color: #1F3028;
+  }
+  .part-chip:active, .part-chip.dragging { cursor: grabbing; opacity: 0.5; }
+  .part-chip svg { width: 26px; height: 26px; color: #5F8D69; }
+  .tier-zones { flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: 12px; }
+  .tier-zone { border: 2px dashed #cfcac2; border-radius: 8px; padding: 10px 12px; background: #faf8f5; transition: opacity 0.15s; }
+  .tier-zone.tier-disabled { opacity: 0.45; }
+  .tier-zone-title { font-size: 12px; font-weight: 600; color: #8A8A8A; margin: 0 0 8px 0; }
+  .tier-zone-hint { font-size: 11px; color: #b3432b; margin: 6px 0 0 0; }
+  .tier-zone-drop { min-height: 56px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; border-radius: 6px; transition: background 0.15s; }
+  .tier-zone-drop.drag-over { background: #e4efe7; }
+  .part-badge {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 4px 4px 10px; background: #fff;
+    border: 1px solid #ddd; border-radius: 999px; font-size: 12px; white-space: nowrap;
+  }
+  .badge-remove {
+    border: none; background: #eee; color: #1F3028; width: 18px; height: 18px; border-radius: 50%;
+    cursor: pointer; font-size: 12px; line-height: 1; padding: 0;
+  }
+  .drag-ghost { position: fixed; pointer-events: none; z-index: 1000; opacity: 0.85; transform: translate(-50%, -50%); }
 </style>
 </head>
 <body>
@@ -177,17 +208,7 @@
     </div>
 
     <aside class="options-panel">
-      <p class="finish-group-title">追加パーツ（任意・複数選択可）</p>
-
-      <div class="opt-row">
-        <label class="opt-toggle"><input type="checkbox" name="opt-door-enabled" form="render-form" /> 扉</label>
-        <label class="opt-param">枚数<input type="number" name="opt-door-count" form="render-form" value="1" min="1" max="2" /></label>
-      </div>
-
-      <div class="opt-row">
-        <label class="opt-toggle"><input type="checkbox" name="opt-drawer_front-enabled" form="render-form" /> 引き出し前板</label>
-        <label class="opt-param">段数<input type="number" name="opt-drawer_front-count" form="render-form" value="1" min="1" max="4" /></label>
-      </div>
+      <p class="finish-group-title">土台パーツ（任意）</p>
 
       <div class="opt-row">
         <label class="opt-toggle"><input type="checkbox" name="opt-legs-enabled" form="render-form" /> 脚</label>
@@ -206,35 +227,58 @@
       </div>
 
       <div class="opt-row">
-        <label class="opt-toggle"><input type="checkbox" name="opt-pillars-enabled" form="render-form" /> 支柱</label>
-        <label class="opt-param">本数<input type="number" name="opt-pillars-count" form="render-form" value="2" min="1" max="4" /></label>
-      </div>
-
-      <div class="opt-row">
-        <label class="opt-toggle"><input type="checkbox" name="opt-stack-enabled" form="render-form" /> 本体2段重ね</label>
-        <label class="opt-param">追加段数<input type="number" name="opt-stack-count" form="render-form" value="1" min="1" max="2" /></label>
-      </div>
-
-      <div class="opt-row">
-        <label class="opt-toggle"><input type="checkbox" name="opt-divider_v-enabled" form="render-form" /> 縦仕切り</label>
-        <label class="opt-param">枚数<input type="number" name="opt-divider_v-count" form="render-form" value="1" min="1" max="3" /></label>
-      </div>
-
-      <div class="opt-row">
-        <label class="opt-toggle"><input type="checkbox" name="opt-shelf_h-enabled" form="render-form" /> 横棚板</label>
-        <label class="opt-param">枚数<input type="number" name="opt-shelf_h-count" form="render-form" value="1" min="1" max="4" /></label>
-      </div>
-
-      <div class="opt-row">
-        <label class="opt-toggle"><input type="checkbox" name="opt-back_batten-enabled" form="render-form" /> 背面補強桟</label>
-        <label class="opt-param">本数<input type="number" name="opt-back_batten-count" form="render-form" value="2" min="1" max="4" /></label>
-      </div>
-
-      <div class="opt-row">
         <label class="opt-toggle"><input type="checkbox" name="opt-caster_block-enabled" form="render-form" /> キャスター台座</label>
         <label class="opt-param">一辺(mm)<input type="number" name="opt-caster_block-sizeMm" form="render-form" value="50" min="30" max="80" /></label>
       </div>
+
+      <div class="opt-row">
+        <label class="opt-toggle"><input type="checkbox" name="opt-stack-enabled" id="opt-stack-enabled" form="render-form" /> 本体2段重ね</label>
+      </div>
     </aside>
+   </div>
+
+   <div class="tier-editor">
+     <p class="finish-group-title">段ごとの追加パーツ（アイコンをドラッグして1段目・2段目に取り付け）</p>
+     <p class="tier-editor-hint">脚・幕板・キャスター台座は常に本体最下部に固定のため、ここではドラッグできません（天板側への誤設置を防ぐため）。</p>
+     <div class="tier-editor-body">
+       <div class="part-palette" id="part-palette">
+         <div class="part-chip" data-part="door">
+           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="3" width="14" height="18" rx="1"/><circle cx="15" cy="12" r="1.1" fill="currentColor"/></svg>
+           <span>扉</span>
+         </div>
+         <div class="part-chip" data-part="drawer_front">
+           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="5" rx="1"/><rect x="3" y="14" width="18" height="5" rx="1"/><line x1="9" y1="7.5" x2="15" y2="7.5"/><line x1="9" y1="16.5" x2="15" y2="16.5"/></svg>
+           <span>引き出し前板</span>
+         </div>
+         <div class="part-chip" data-part="pillars">
+           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="9" y="2" width="6" height="20"/></svg>
+           <span>支柱</span>
+         </div>
+         <div class="part-chip" data-part="divider_v">
+           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="20" height="16"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+           <span>縦仕切り</span>
+         </div>
+         <div class="part-chip" data-part="shelf_h">
+           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="20" height="16"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+           <span>横棚板</span>
+         </div>
+         <div class="part-chip" data-part="back_batten">
+           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="20" height="16" opacity="0.35"/><line x1="4" y1="7" x2="20" y2="17" stroke-width="2"/></svg>
+           <span>背面補強桟</span>
+         </div>
+       </div>
+       <div class="tier-zones" id="tier-zones">
+         <div class="tier-zone" data-tier="2" id="tier-zone-2">
+           <p class="tier-zone-title">2段目</p>
+           <div class="tier-zone-drop" data-tier="2"></div>
+           <p class="tier-zone-hint" id="tier2-hint">「本体2段重ね」を有効にすると、ここに取り付けられます。</p>
+         </div>
+         <div class="tier-zone" data-tier="1" id="tier-zone-1">
+           <p class="tier-zone-title">1段目（土台の上）</p>
+           <div class="tier-zone-drop" data-tier="1"></div>
+         </div>
+       </div>
+     </div>
    </div>
   </div>
 </main>
@@ -345,28 +389,155 @@ function buildViewerFromPanels(panels) {
   resizeRenderer();
 }
 
-// 追加パーツ（扉・脚・棚板など）の選択状態を、/api/renderのoptionsとして組み立てる。
-// 各inputはform="render-form"属性で紐付けているため、DOM上はform要素の外（<aside>内）に
-// あってもform.elements経由で取得できる
+// --- 段ごとの追加パーツ: ドラッグ&ドロップ配置エディタ ---
+// 脚・幕板・キャスター台座は常に本体最下部にのみ取り付くため、ここには含めない
+// （UIの制約として、天板側に脚を取り付けるといった誤操作自体ができないようにしている）。
+const TIER_PART_LABELS = {
+  door: '扉',
+  drawer_front: '引き出し前板',
+  pillars: '支柱',
+  divider_v: '縦仕切り',
+  shelf_h: '横棚板',
+  back_batten: '背面補強桟',
+};
+// server.py / generate_model.pyのTIER_PART_DEFSと揃えた1段あたりの上限
+const TIER_PART_MAX = { door: 2, drawer_front: 15, pillars: 4, divider_v: 3, shelf_h: 4, back_batten: 4 };
+const tierPartState = Object.fromEntries(Object.keys(TIER_PART_LABELS).map((k) => [k, { tier1: 0, tier2: 0 }]));
+
+const stackCheckbox = document.getElementById('opt-stack-enabled');
+const tierZone2 = document.getElementById('tier-zone-2');
+const tier2Hint = document.getElementById('tier2-hint');
+const tierZonesEl = document.getElementById('tier-zones');
+
+function isTier2Enabled() {
+  return !!stackCheckbox.checked;
+}
+
+function renderTierZones() {
+  const tier2Enabled = isTier2Enabled();
+  tierZone2.classList.toggle('tier-disabled', !tier2Enabled);
+  tier2Hint.style.display = tier2Enabled ? 'none' : 'block';
+
+  document.querySelectorAll('.tier-zone-drop').forEach((dropEl) => {
+    const tier = dropEl.dataset.tier;
+    dropEl.innerHTML = '';
+    for (const [part, counts] of Object.entries(tierPartState)) {
+      const count = counts[`tier${tier}`];
+      if (count > 0) {
+        const badge = document.createElement('span');
+        badge.className = 'part-badge';
+        badge.innerHTML = `${TIER_PART_LABELS[part]} ×${count} <button type="button" class="badge-remove" data-part="${part}" data-tier="${tier}" aria-label="1つ減らす">−</button>`;
+        dropEl.appendChild(badge);
+      }
+    }
+  });
+}
+
+// バッジの「−」ボタン（イベント委譲）
+tierZonesEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('.badge-remove');
+  if (!btn) return;
+  const { part, tier } = btn.dataset;
+  tierPartState[part][`tier${tier}`] = Math.max(0, tierPartState[part][`tier${tier}`] - 1);
+  renderTierZones();
+});
+
+stackCheckbox.addEventListener('change', renderTierZones);
+
+function tryDropPart(part, tier) {
+  if (tier === '2' && !isTier2Enabled()) {
+    statusEl.className = 'status error';
+    statusEl.textContent = '「本体2段重ね」を有効にすると2段目に取り付けられます。';
+    return;
+  }
+  const max = TIER_PART_MAX[part];
+  const current = tierPartState[part][`tier${tier}`];
+  if (current >= max) {
+    statusEl.className = 'status error';
+    statusEl.textContent = `${TIER_PART_LABELS[part]}は1段あたり最大${max}個までです。`;
+    return;
+  }
+  tierPartState[part][`tier${tier}`] = current + 1;
+  statusEl.className = 'status';
+  statusEl.textContent = '';
+  renderTierZones();
+}
+
+// Pointer Events（マウス・タッチ・ペンを統一的に扱える）でドラッグ&ドロップを実装する。
+// 素のHTML5 Drag and Drop APIはスマートフォンのタッチ操作では発火が安定しないため使わない。
+let dragState = null;
+
+function moveGhost(x, y) {
+  dragState.ghost.style.left = `${x}px`;
+  dragState.ghost.style.top = `${y}px`;
+}
+
+function findDropZoneAt(x, y) {
+  const el = document.elementFromPoint(x, y);
+  return el ? el.closest('.tier-zone-drop') : null;
+}
+
+document.querySelectorAll('.part-chip').forEach((chip) => {
+  chip.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    const ghost = chip.cloneNode(true);
+    ghost.classList.add('drag-ghost');
+    document.body.appendChild(ghost);
+    chip.classList.add('dragging');
+    dragState = { part: chip.dataset.part, ghost, overZone: null };
+    moveGhost(e.clientX, e.clientY);
+    chip.setPointerCapture(e.pointerId);
+  });
+
+  chip.addEventListener('pointermove', (e) => {
+    if (!dragState) return;
+    moveGhost(e.clientX, e.clientY);
+    const dropEl = findDropZoneAt(e.clientX, e.clientY);
+    if (dragState.overZone && dragState.overZone !== dropEl) {
+      dragState.overZone.classList.remove('drag-over');
+    }
+    if (dropEl) dropEl.classList.add('drag-over');
+    dragState.overZone = dropEl;
+  });
+
+  const endDrag = () => {
+    if (!dragState) return;
+    const { part, ghost, overZone } = dragState;
+    if (overZone) {
+      overZone.classList.remove('drag-over');
+      tryDropPart(part, overZone.dataset.tier);
+    }
+    ghost.remove();
+    chip.classList.remove('dragging');
+    dragState = null;
+  };
+
+  chip.addEventListener('pointerup', endDrag);
+  chip.addEventListener('pointercancel', endDrag);
+});
+
+renderTierZones();
+
+// 追加パーツ（土台パーツ＋段ごとのパーツ）の選択状態を、/api/renderのoptionsとして組み立てる。
+// 土台パーツの各inputはform="render-form"属性で紐付けているため、DOM上はform要素の外
+// （<aside>内）にあってもform.elements経由で取得できる
 function collectOptionsFromForm() {
   const val = (name) => form.elements.namedItem(name)?.value;
   const checked = (name) => !!form.elements.namedItem(name)?.checked;
-  return {
-    door: { enabled: checked('opt-door-enabled'), count: Number(val('opt-door-count')) },
-    drawer_front: { enabled: checked('opt-drawer_front-enabled'), count: Number(val('opt-drawer_front-count')) },
+  const options = {
     legs: {
       enabled: checked('opt-legs-enabled'),
       heightMm: Number(val('opt-legs-heightMm')),
       count: Number(val('opt-legs-count')),
     },
     apron: { enabled: checked('opt-apron-enabled'), heightMm: Number(val('opt-apron-heightMm')) },
-    pillars: { enabled: checked('opt-pillars-enabled'), count: Number(val('opt-pillars-count')) },
-    stack: { enabled: checked('opt-stack-enabled'), count: Number(val('opt-stack-count')) },
-    divider_v: { enabled: checked('opt-divider_v-enabled'), count: Number(val('opt-divider_v-count')) },
-    shelf_h: { enabled: checked('opt-shelf_h-enabled'), count: Number(val('opt-shelf_h-count')) },
-    back_batten: { enabled: checked('opt-back_batten-enabled'), count: Number(val('opt-back_batten-count')) },
     caster_block: { enabled: checked('opt-caster_block-enabled'), sizeMm: Number(val('opt-caster_block-sizeMm')) },
+    stack: { enabled: checked('opt-stack-enabled') },
   };
+  for (const part of Object.keys(tierPartState)) {
+    options[part] = { tier1: tierPartState[part].tier1, tier2: tierPartState[part].tier2 };
+  }
+  return options;
 }
 
 // フォームの現在の入力値から、/api/renderへ送るpayloadを組み立てる

@@ -34,7 +34,8 @@ sys.path.insert(0, BASE_DIR)
 from freecad_scripts.generate_model import (  # noqa: E402
     DEFAULT_BACK_THICKNESS_MM,
     FINISH_OPTIONS,
-    OPTION_PART_DEFS,
+    FOUNDATION_PART_DEFS,
+    TIER_PART_DEFS,
     compute_option_panels,
     compute_panels,
     write_cutlist_csv,
@@ -134,16 +135,19 @@ def parse_panel_finishes(data):
 def parse_options(data):
     """リクエストのoptions（扉・脚・棚板などの追加パーツ）を検証する。
 
-    OPTION_PART_DEFS（generate_model.py）に無いキー、enabledがfalsyなエントリ、
-    範囲外のパラメータは黙って除外・クランプする（generate_model.py側の
-    _resolve_option_paramsと同じ考え方だが、こちらはAPIの入力境界での防御用）。
+    generate_model.py側のFOUNDATION_PART_DEFS/TIER_PART_DEFSに無いキー、
+    範囲外のパラメータ・個数は黙って除外・クランプする（generate_model.py側の
+    _resolve_foundation_params／compute_option_panelsのクランプと同じ考え方だが、
+    こちらはAPIの入力境界での防御用）。
     """
     raw = data.get("options")
     if not isinstance(raw, dict):
         return {}
 
     result = {}
-    for key, opt_def in OPTION_PART_DEFS.items():
+
+    # 土台パーツ（脚・幕板・キャスター台座）: 常に本体最下部にのみ取り付く
+    for key, opt_def in FOUNDATION_PART_DEFS.items():
         opt = raw.get(key)
         if not isinstance(opt, dict) or not opt.get("enabled"):
             continue
@@ -155,6 +159,28 @@ def parse_options(data):
                 value = meta["default"]
             parsed[param_key] = max(meta["min"], min(meta["max"], value))
         result[key] = parsed
+
+    # 本体2段重ね（enabledのみのシンプルなトグル）
+    stack_opt = raw.get("stack")
+    if isinstance(stack_opt, dict) and stack_opt.get("enabled"):
+        result["stack"] = {"enabled": True}
+
+    # 段に取り付けるパーツ（扉・引き出し前板・支柱・縦仕切り・横棚板・背面補強桟）:
+    # tier1/tier2それぞれの個数を検証・クランプする
+    for key, part_def in TIER_PART_DEFS.items():
+        tier_opt = raw.get(key)
+        if not isinstance(tier_opt, dict):
+            continue
+        parsed = {}
+        for tier_key in ("tier1", "tier2"):
+            try:
+                count = int(tier_opt.get(tier_key, 0))
+            except (TypeError, ValueError):
+                count = 0
+            parsed[tier_key] = max(0, min(part_def["max_per_tier"], count))
+        if parsed["tier1"] or parsed["tier2"]:
+            result[key] = parsed
+
     return result
 
 

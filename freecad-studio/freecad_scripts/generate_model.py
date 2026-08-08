@@ -9,14 +9,17 @@ FreeCAD本体にバンドルされており、一般的なpip環境にはイン�
     ※freecadcmdは独自のCLIパーサーを持ち、一般的な `--` 以降パススルーの慣習を尊重しないため、
       パラメータはコマンドライン引数ではなく環境変数 TANEI_PARAMS_JSON で渡す（詳細はmain()参照）。
 
-    TANEI_PARAMS_JSON='{"item":"テレビ台","width":1200,"depth":400,"height":400,"thickness":18,"material":"パイン集成材","panelFinishes":{"天板":"walnut","側板":"white"},"options":{"legs":{"enabled":true,"heightMm":100,"count":4},"shelf_h":{"enabled":true,"count":1}},"outputDir":"./renders/job123"}' \\
+    TANEI_PARAMS_JSON='{"item":"テレビ台","width":1200,"depth":400,"height":400,"thickness":18,"material":"パイン集成材","panelFinishes":{"天板":"walnut","側板":"white"},"options":{"legs":{"enabled":true,"heightMm":100,"count":4},"stack":{"enabled":true},"shelf_h":{"tier1":1,"tier2":2}},"outputDir":"./renders/job123"}' \\
         freecadcmd generate_model.py
 
     panelFinishesは省略可能で、指定が無いパーツはデフォルトの"clear"（材質そのものの木目）になる。
     指定できる値: "clear"（クリア塗装）/ "walnut"（ウォルナット調）/ "white"（ホワイト）/ "black"（ブラック）
 
-    optionsも省略可能で、扉・脚・棚板などの追加パーツを個別に有効化できる
-    （キー・パラメータの一覧はOPTION_PART_DEFS参照）。
+    optionsも省略可能で、扉・脚・棚板などの追加パーツを個別に有効化できる（キー・パラメータの
+    一覧はFOUNDATION_PART_DEFS／TIER_PART_DEFS参照）。"legs"/"apron"/"caster_block"は
+    本体最下部にのみ取り付く土台パーツ、"stack"は2段目(tier2)を追加するトグル、それ以外
+    （"door"/"drawer_front"/"pillars"/"divider_v"/"shelf_h"/"back_batten"）は
+    { "tier1": 個数, "tier2": 個数 } の形で段ごとの取り付け数を指定する。
 
 処理の流れ:
   1. 入力パラメータ（幅・奥行・高さ・厚み・材質）から、天板・底板・側板・背板の
@@ -161,20 +164,10 @@ BATTEN_HEIGHT_MM = 30
 CORNER_INSET_MM = 15
 
 
-# 追加パーツの一覧・パラメータ定義。UI（static/index.html）側のラベル・初期値・
-# 範囲もこれと揃えてあるが、ここが実際のバリデーション・デフォルト値の正となる
-# （server.py側のparse_optionsもこの定義を参照してクランプする）
-OPTION_PART_DEFS = {
-    "door": {
-        "label": "扉",
-        "description": "本体前面を覆う開き戸",
-        "params": {"count": {"label": "枚数", "default": 1, "min": 1, "max": 2}},
-    },
-    "drawer_front": {
-        "label": "引き出し前板",
-        "description": "前面の引き出し用化粧板（段数分を縦に分割配置）",
-        "params": {"count": {"label": "段数", "default": 1, "min": 1, "max": 4}},
-    },
+# 土台パーツ（脚・幕板・キャスター台座）: 本体最下部（1段目の下）にのみ取り付く。
+# 段（tier）の選択肢は無く、UIもチェックボックス+パラメータの単純な形のまま
+# （「脚を天板側に取り付ける」といった誤操作を、UIの制約ではなく仕組みそのもので防ぐため）。
+FOUNDATION_PART_DEFS = {
     "legs": {
         "label": "脚",
         "description": "本体下面に取り付ける角材の脚（4本または6本）",
@@ -188,31 +181,6 @@ OPTION_PART_DEFS = {
         "description": "脚同士をつなぐ補強レール（本体前後面の下部）",
         "params": {"heightMm": {"label": "見付け高さ(mm)", "default": 60, "min": 30, "max": 120}},
     },
-    "pillars": {
-        "label": "支柱",
-        "description": "本体前面に追加する角材の支柱（間口が広い場合の中間支持など）",
-        "params": {"count": {"label": "本数", "default": 2, "min": 1, "max": 4}},
-    },
-    "stack": {
-        "label": "本体2段重ね",
-        "description": "同じ本体をもう1段（以上）上に積み重ねる",
-        "params": {"count": {"label": "追加段数", "default": 1, "min": 1, "max": 2}},
-    },
-    "divider_v": {
-        "label": "縦仕切り",
-        "description": "内部を左右に区切る縦板",
-        "params": {"count": {"label": "枚数", "default": 1, "min": 1, "max": 3}},
-    },
-    "shelf_h": {
-        "label": "横棚板",
-        "description": "内部の高さ方向を区切る棚板",
-        "params": {"count": {"label": "枚数", "default": 1, "min": 1, "max": 4}},
-    },
-    "back_batten": {
-        "label": "背面補強桟",
-        "description": "背板内側に取り付ける補強用の桟",
-        "params": {"count": {"label": "本数", "default": 2, "min": 1, "max": 4}},
-    },
     "caster_block": {
         "label": "キャスター台座",
         "description": "本体下面四隅に取り付けるキャスター取付用の台座",
@@ -220,13 +188,31 @@ OPTION_PART_DEFS = {
     },
 }
 
+# 本体2段重ね。段をもう1つ（tier2）追加するだけのシンプルなenabledトグル。
+# tier2にどのパーツをいくつ取り付けるかは、下のTIER_PART_DEFSの各パーツごとに指定する
+STACK_PART_DEF = {"label": "本体2段重ね", "description": "同じ本体をもう1段、真上に積み重ねる"}
 
-def _resolve_option_params(key, opt):
-    """1つのオプションパーツについて、渡されたパラメータをOPTION_PART_DEFSの
-    min/maxでクランプし、未指定分はdefaultで補って返す。countパラメータは整数に丸める。
+# 段（1段目=tier1／本体2段重ね有効時のみtier2）に、個数を指定して取り付けられるパーツ。
+# UI（static/index.html）側のドラッグ&ドロップ配置図で、パーツのアイコンを1段目・2段目の
+# ゾーンにドロップするたびにtier1/tier2の個数が1つずつ増える仕組みなので、
+# enabledフラグではなく「個数（0なら未使用）」で状態を持つ
+TIER_PART_DEFS = {
+    "door": {"label": "扉", "max_per_tier": 2},
+    "drawer_front": {"label": "引き出し前板", "max_per_tier": 15},
+    "pillars": {"label": "支柱", "max_per_tier": 4},
+    "divider_v": {"label": "縦仕切り", "max_per_tier": 3},
+    "shelf_h": {"label": "横棚板", "max_per_tier": 4},
+    "back_batten": {"label": "背面補強桟", "max_per_tier": 4},
+}
+
+
+def _resolve_foundation_params(key, opt):
+    """土台パーツ（脚・幕板・キャスター台座）1つについて、渡されたパラメータを
+    FOUNDATION_PART_DEFSのmin/maxでクランプし、未指定分はdefaultで補って返す。
+    countパラメータは整数に丸める。
     """
     resolved = {}
-    for param_key, meta in OPTION_PART_DEFS[key]["params"].items():
+    for param_key, meta in FOUNDATION_PART_DEFS[key]["params"].items():
         raw = opt.get(param_key, meta["default"])
         try:
             value = float(raw)
@@ -255,7 +241,7 @@ def _option_context(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_
 
 def _option_door(ctx, params, material, panel_finishes):
     """本体前面（y=0の開口部）を覆う扉。count=2で観音開き（左右分割）にする。"""
-    label = OPTION_PART_DEFS["door"]["label"]
+    label = TIER_PART_DEFS["door"]["label"]
     count = int(params["count"])
     t = ctx["thickness"]
     inner_w, inner_h = ctx["inner_w"], ctx["inner_h"]
@@ -278,7 +264,7 @@ def _option_door(ctx, params, material, panel_finishes):
 
 def _option_drawer_front(ctx, params, material, panel_finishes):
     """前面の引き出し前板。countで縦方向に段数分割する（扉が左右分割なのに対し、こちらは上下分割）。"""
-    label = OPTION_PART_DEFS["drawer_front"]["label"]
+    label = TIER_PART_DEFS["drawer_front"]["label"]
     count = int(params["count"])
     t = ctx["thickness"]
     inner_w, inner_h = ctx["inner_w"], ctx["inner_h"]
@@ -301,7 +287,7 @@ def _option_drawer_front(ctx, params, material, panel_finishes):
 
 def _option_legs(ctx, params, material, panel_finishes):
     """本体下面（z=0）から下方向に伸びる角材の脚。4本は四隅、6本は四隅+左右中央にも追加する。"""
-    label = OPTION_PART_DEFS["legs"]["label"]
+    label = FOUNDATION_PART_DEFS["legs"]["label"]
     leg_h = params["heightMm"]
     count = int(params["count"])
     width, depth = ctx["width"], ctx["depth"]
@@ -332,7 +318,7 @@ def _option_legs(ctx, params, material, panel_finishes):
 
 def _option_apron(ctx, params, material, panel_finishes):
     """脚同士をつなぐ幕板（前面・背面の下部に取り付ける薄板のレール）。"""
-    label = OPTION_PART_DEFS["apron"]["label"]
+    label = FOUNDATION_PART_DEFS["apron"]["label"]
     h = params["heightMm"]
     t = ctx["thickness"]
     width, depth = ctx["width"], ctx["depth"]
@@ -355,7 +341,7 @@ def _option_apron(ctx, params, material, panel_finishes):
 
 def _option_pillars(ctx, params, material, panel_finishes):
     """本体前面に追加する角材の支柱（間口が広い棚などの中間支持を想定）。"""
-    label = OPTION_PART_DEFS["pillars"]["label"]
+    label = TIER_PART_DEFS["pillars"]["label"]
     count = int(params["count"])
     t = ctx["thickness"]
     inner_w, inner_h = ctx["inner_w"], ctx["inner_h"]
@@ -379,27 +365,23 @@ def _option_pillars(ctx, params, material, panel_finishes):
     return panels
 
 
-def _option_stack(ctx, params, material, panel_finishes):
-    """同じ本体をもう1段(以上)、真上に積み重ねる。compute_panels()をそのまま再利用し、
-    高さ分だけz座標をずらす。ラベル（天板・底板等）は基本の5枚と同じにするため、
-    木取りCSVでは同一規格として枚数が自動的に加算される（例: 天板が2枚になる）。
+def _tier2_base_panels(ctx, material, panel_finishes):
+    """本体2段重ね有効時の2段目本体（天板・底板・側板・背板）。compute_panels()をそのまま
+    再利用し、高さ分だけz座標をずらす。ラベルは基本の5枚と同じにするため、木取りCSVでは
+    同一規格として枚数が自動的に加算される（例: 天板が2枚になる）。
     """
-    count = int(params["count"])
     width, depth, height = ctx["width"], ctx["depth"], ctx["height"]
     t, bt = ctx["thickness"], ctx["back_thickness"]
-    panels = []
-    for level in range(1, count + 1):
-        level_panels = compute_panels(width, depth, height, t, bt, material, panel_finishes)
-        for p in level_panels:
-            x, y, z = p["pos"]
-            p["pos"] = (x, y, z + level * height)
-        panels.extend(level_panels)
-    return panels
+    tier2_panels = compute_panels(width, depth, height, t, bt, material, panel_finishes)
+    for p in tier2_panels:
+        x, y, z = p["pos"]
+        p["pos"] = (x, y, z + height)
+    return tier2_panels
 
 
 def _option_divider_v(ctx, params, material, panel_finishes):
     """内部を左右に区切る縦仕切り板。countの数だけ内寸を等分する位置に配置する。"""
-    label = OPTION_PART_DEFS["divider_v"]["label"]
+    label = TIER_PART_DEFS["divider_v"]["label"]
     count = int(params["count"])
     t = ctx["thickness"]
     inner_w, inner_h, inner_d = ctx["inner_w"], ctx["inner_h"], ctx["inner_d"]
@@ -424,7 +406,7 @@ def _option_divider_v(ctx, params, material, panel_finishes):
 
 def _option_shelf_h(ctx, params, material, panel_finishes):
     """内部の高さ方向を区切る横棚板。countの数だけ内寸の高さを等分する位置に配置する。"""
-    label = OPTION_PART_DEFS["shelf_h"]["label"]
+    label = TIER_PART_DEFS["shelf_h"]["label"]
     count = int(params["count"])
     t = ctx["thickness"]
     inner_w, inner_h, inner_d = ctx["inner_w"], ctx["inner_h"], ctx["inner_d"]
@@ -449,7 +431,7 @@ def _option_shelf_h(ctx, params, material, panel_finishes):
 
 def _option_back_batten(ctx, params, material, panel_finishes):
     """背板の内側に取り付ける補強用の桟。countが1本なら中央、2本以上なら上下均等に配置する。"""
-    label = OPTION_PART_DEFS["back_batten"]["label"]
+    label = TIER_PART_DEFS["back_batten"]["label"]
     count = int(params["count"])
     t = ctx["thickness"]
     inner_w, inner_h = ctx["inner_w"], ctx["inner_h"]
@@ -479,7 +461,7 @@ def _option_back_batten(ctx, params, material, panel_finishes):
 
 def _option_caster_block(ctx, params, material, panel_finishes):
     """本体下面四隅に取り付けるキャスター取付用の台座（正方形の角材ブロック）。"""
-    label = OPTION_PART_DEFS["caster_block"]["label"]
+    label = FOUNDATION_PART_DEFS["caster_block"]["label"]
     size = params["sizeMm"]
     height = LEG_CROSS_SECTION_MM
     width, depth = ctx["width"], ctx["depth"]
@@ -501,37 +483,75 @@ def _option_caster_block(ctx, params, material, panel_finishes):
     ]
 
 
-OPTION_GENERATORS = {
-    "door": _option_door,
-    "drawer_front": _option_drawer_front,
+FOUNDATION_GENERATORS = {
     "legs": _option_legs,
     "apron": _option_apron,
+    "caster_block": _option_caster_block,
+}
+
+TIER_GENERATORS = {
+    "door": _option_door,
+    "drawer_front": _option_drawer_front,
     "pillars": _option_pillars,
-    "stack": _option_stack,
     "divider_v": _option_divider_v,
     "shelf_h": _option_shelf_h,
     "back_batten": _option_back_batten,
-    "caster_block": _option_caster_block,
 }
 
 
 def compute_option_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_mm, material, panel_finishes, options):
     """有効化された追加パーツ（扉・脚・棚板など）のパネル一覧を計算する。
 
-    optionsは { "legs": {"enabled": true, "heightMm": 100, "count": 4}, ... } の形（キーは
-    OPTION_PART_DEFSのキーと一致）。enabledがfalsyなキーはスキップする。戻り値は
-    compute_panels()と同じ形のパネル辞書のリストなので、呼び出し側は
+    optionsは3種類のキーを持つ:
+      - 土台パーツ（"legs"/"apron"/"caster_block"）: { "enabled": true, ...パラメータ }。
+        常に本体最下部にのみ取り付く（段の指定はできない）。
+      - "stack": { "enabled": true } のみ。有効なら本体の2段目（tier2）を追加する。
+      - 段に取り付けるパーツ（"door"/"drawer_front"/"pillars"/"divider_v"/"shelf_h"/
+        "back_batten"）: { "tier1": 個数, "tier2": 個数 }。tier2はstackが有効な場合のみ
+        反映され、無効な場合は指定があっても無視する（UIの制約に加えて、ここでも
+        「2段目が無いのに2段目にパーツを置く」ような不整合な状態を最終防衛する）。
+
+    戻り値はcompute_panels()と同じ形のパネル辞書のリストなので、呼び出し側は
     `base_panels + compute_option_panels(...)` と連結するだけでよい。
     """
     options = options or {}
     ctx = _option_context(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_mm)
     panels = []
-    for key, generator in OPTION_GENERATORS.items():
+
+    for key, generator in FOUNDATION_GENERATORS.items():
         opt = options.get(key)
         if not opt or not opt.get("enabled"):
             continue
-        params = _resolve_option_params(key, opt)
+        params = _resolve_foundation_params(key, opt)
         panels.extend(generator(ctx, params, material, panel_finishes))
+
+    stack_opt = options.get("stack")
+    has_tier2 = bool(stack_opt and stack_opt.get("enabled"))
+    if has_tier2:
+        panels.extend(_tier2_base_panels(ctx, material, panel_finishes))
+
+    for key, generator in TIER_GENERATORS.items():
+        tier_opt = options.get(key)
+        if not isinstance(tier_opt, dict):
+            continue
+        max_per_tier = TIER_PART_DEFS[key]["max_per_tier"]
+        for tier_index in (1, 2):
+            if tier_index == 2 and not has_tier2:
+                continue
+            try:
+                count = int(tier_opt.get(f"tier{tier_index}", 0))
+            except (TypeError, ValueError):
+                count = 0
+            count = max(0, min(max_per_tier, count))
+            if count == 0:
+                continue
+            tier_panels = generator(ctx, {"count": count}, material, panel_finishes)
+            z_offset = (tier_index - 1) * height_mm
+            for p in tier_panels:
+                x, y, z = p["pos"]
+                p["pos"] = (x, y, z + z_offset)
+            panels.extend(tier_panels)
+
     return panels
 
 
