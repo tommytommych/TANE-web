@@ -3,6 +3,12 @@
 // クライアント側の永続化ヘルパー。KVが接続されている環境では、サーバーから
 // 返る実際の残数との差分はより厳しい（小さい）方が優先される想定で使う
 
+// カット申込書PDF・完成イメージ（設計スタジオ）・写真AI空間診断・外部Gemini画像生成が
+// 共通で消費する「本日のAI機能利用」の上限・保存キー。app/app/page.tsxと
+// app/components/studio/StudioEmbed.tsxの両方から参照するため、ここで一元管理する
+export const DAILY_IMAGE_LIMIT = 5;
+export const IMAGE_USAGE_STORAGE_KEY = 'tanei-image-usage-v1';
+
 interface StoredUsage {
   dateKey: string;
   remaining: number;

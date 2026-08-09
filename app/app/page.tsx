@@ -27,7 +27,13 @@ import {
   bytesToDataUrl,
 } from '../lib/savedItemsStore';
 import { downloadPdfBytes } from '../lib/download';
-import { getLocalRemainingCount, consumeLocalUsage, setLocalRemainingCount } from '../lib/localUsage';
+import {
+  getLocalRemainingCount,
+  consumeLocalUsage,
+  setLocalRemainingCount,
+  DAILY_IMAGE_LIMIT,
+  IMAGE_USAGE_STORAGE_KEY,
+} from '../lib/localUsage';
 import { connectStudioSync, pushSpecToStudio } from '../lib/studioSync';
 
 import TopBar from '../components/layout/TopBar';
@@ -40,9 +46,9 @@ import StartCards from '../components/chat/StartCards';
 
 // LINE bot(app/api/line/route.js)・app/lib/rateLimit.tsと同じ回数・仕様
 const DAILY_MESSAGE_LIMIT = 10;
-const DAILY_IMAGE_LIMIT = 5;
 const MESSAGE_USAGE_STORAGE_KEY = 'tanei-message-usage-v1';
-const IMAGE_USAGE_STORAGE_KEY = 'tanei-image-usage-v1';
+// DAILY_IMAGE_LIMIT・IMAGE_USAGE_STORAGE_KEYはapp/lib/localUsage.tsからimport
+// （StudioEmbed.tsxからも同じ値を参照するため一元管理）
 // チャットとTANE:i設計スタジオ（/app/studio）を行き来しても会話が消えないよう、
 // タブを閉じるまで保持されるsessionStorageに会話状態を退避する（詳細は下のuseEffect参照）
 const CHAT_SESSION_STORAGE_KEY = 'tanei-chat-session-v1';
