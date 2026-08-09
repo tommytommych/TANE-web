@@ -122,6 +122,10 @@
    <div class="settings-row">
     <form id="render-form">
       <label>
+        家具プリセット選択
+        <select id="furniture-preset"></select>
+      </label>
+      <label>
         品名
         <input type="text" name="item" value="テレビ台" required />
       </label>
@@ -386,6 +390,47 @@ const statusEl = document.getElementById('status');
 const imageArea = document.getElementById('image-area');
 const cutlistArea = document.getElementById('cutlist-area');
 const resultTabs = document.getElementById('result-tabs');
+
+// --- 家具プリセット選択 ---
+// よく使う家具の代表的な寸法をあらかじめ登録しておき、選ぶだけで品名・幅・奥行・高さ・
+// 板厚がまとめて入力されるようにする（ゼロから寸法を考えなくても、まずは近い家具を
+// 選んで細部だけ調整する、という使い方を想定）。
+const FURNITURE_PRESETS = [
+  { name: 'テレビ台', w: 1200, d: 400, h: 400, t: 18 },
+  { name: 'オープンラック', w: 900, d: 300, h: 1200, t: 15 },
+  { name: 'ローテーブル', w: 900, d: 450, h: 350, t: 24 },
+  { name: 'キッチンラック', w: 600, d: 400, h: 850, t: 18 },
+  { name: '本棚（スリム）', w: 400, d: 250, h: 1500, t: 15 },
+  { name: 'デスク', w: 1000, d: 600, h: 700, t: 24 },
+  { name: 'シューズラック', w: 600, d: 300, h: 900, t: 15 },
+  { name: '壁面棚', w: 800, d: 200, h: 300, t: 18 },
+  { name: 'サイドテーブル', w: 400, d: 400, h: 500, t: 18 },
+  { name: '収納ボックス', w: 350, d: 350, h: 350, t: 12 },
+];
+
+const presetSelect = document.getElementById('furniture-preset');
+presetSelect.innerHTML = [
+  '<option value="">カスタム（自由入力）</option>',
+  ...FURNITURE_PRESETS.map(
+    (p, i) => `<option value="${i}">${p.name}（W${p.w}×D${p.d}×H${p.h}）</option>`
+  ),
+].join('');
+
+presetSelect.addEventListener('change', () => {
+  if (presetSelect.value === '') return;
+  const preset = FURNITURE_PRESETS[Number(presetSelect.value)];
+  if (!preset) return;
+
+  form.item.value = preset.name;
+  form.width.value = preset.w;
+  form.depth.value = preset.d;
+  form.height.value = preset.h;
+  form.thickness.value = preset.t;
+
+  // フォームへ反映したら、既存のレンダリング処理（フォーム送信と同じ経路）を
+  // 即座にトリガーして、選んだだけで完成イメージが更新されるようにする
+  renderPayload(collectPayloadFromForm());
+});
 
 // --- タブ切り替え ---
 document.querySelectorAll('.tab-btn').forEach((btn) => {
