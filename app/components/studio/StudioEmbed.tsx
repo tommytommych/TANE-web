@@ -133,6 +133,10 @@ export default function StudioEmbed() {
         </button>
       </div>
 
+      <p className="px-4 py-1.5 border-b border-tanei-border bg-amber-50 text-amber-800 text-[11px] text-center flex-shrink-0">
+        ⚠️ 設計スタジオはパソコン専用機能です。スマートフォンでご利用の場合は⚙️から接続先の設定が必要です。
+      </p>
+
       {isSettingsOpen && (
         <div className="px-4 py-3 border-b border-tanei-border bg-tanei-brand-soft flex-shrink-0 text-sm">
           <p className="font-bold text-tanei-ink mb-1">設計スタジオの接続先</p>

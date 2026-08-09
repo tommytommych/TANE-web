@@ -94,7 +94,7 @@ function CompletionCards({
     router.push('/app/studio');
   };
 
-  const cards: { icon: string; label: string; onClick: () => void; accent?: boolean; disabled?: boolean }[] = [
+  const cards: { icon: string; label: string; onClick: () => void; accent?: boolean; disabled?: boolean; title?: string }[] = [
     // シルエットカメオの相談には木取り図PDFが関係ないため、この相談ではPDFボタンを出さない
     ...(isCameoContent
       ? []
@@ -108,7 +108,9 @@ function CompletionCards({
           },
         ]),
     // 天板・底板・側板・背板からなる箱型の家具のみ、AIがtanei-studio-specブロックを出力する
-    ...(studioSpec ? [{ icon: '🪚', label: '設計スタジオで見る', onClick: handleOpenInStudio }] : []),
+    ...(studioSpec
+      ? [{ icon: '🪚', label: '設計スタジオで見る', onClick: handleOpenInStudio, title: 'パソコン専用機能です' }]
+      : []),
     { icon: '💚', label: 'LINE送信', onClick: handleLineShare },
     { icon: '💾', label: '保存', onClick: handleSaveDesign },
     { icon: '🔗', label: '共有', onClick: handleShare },
@@ -128,6 +130,7 @@ function CompletionCards({
             key={card.label}
             onClick={card.onClick}
             disabled={card.disabled}
+            title={card.title}
             className={`flex flex-col items-center justify-center gap-1 p-3 rounded-tanei-card border transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0 disabled:cursor-not-allowed ${
               card.accent
                 ? 'bg-tanei-accent text-white border-tanei-accent hover:bg-tanei-accent-dark'

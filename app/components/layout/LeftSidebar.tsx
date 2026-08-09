@@ -190,9 +190,14 @@ export default function LeftSidebar({
                   }
                   onClose();
                 }}
+                title="パソコン専用機能です"
                 className="flex items-center gap-3 px-3 py-2.5 rounded-tanei-control text-sm bg-tanei-surface hover:bg-white border border-transparent hover:border-tanei-border text-tanei-ink transition-colors w-full text-left"
               >
-                <span>🪚</span> TANE:i 設計スタジオ
+                <span>🪚</span>
+                <span className="flex flex-col leading-tight">
+                  <span>TANE:i 設計スタジオ</span>
+                  <span className="text-[10px] font-normal text-tanei-ink-muted">※パソコン専用機能です</span>
+                </span>
               </Link>
 
               <div className="mt-1.5 pt-2.5 border-t border-tanei-border">
