@@ -1,7 +1,6 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
 import RevealText from './motion/RevealText';
 
@@ -79,12 +78,16 @@ export default function Hero() {
 
         <FadeInSmall delay={0.55}>
           <div className="mt-12 flex flex-col items-center gap-4 sm:flex-row">
-            <Link
-              href="/app"
-              className="inline-flex items-center gap-2 rounded-full bg-[#1F3028] px-8 py-3.5 text-[14px] font-medium text-[#FAF8F4] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#5F8D69]"
+            {/* 公開準備中: TANE:i本体（/app）はまだ一般公開の準備ができていないため、CTAを一時的に無効化している */}
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              title="近日公開"
+              className="inline-flex items-center gap-2 rounded-full bg-[#1F3028]/40 px-8 py-3.5 text-[14px] font-medium text-[#FAF8F4]/70 cursor-not-allowed"
             >
-              TANE:iをはじめる
-            </Link>
+              TANE:iをはじめる（近日公開）
+            </button>
             <a
               href="#story"
               onClick={(e) => {

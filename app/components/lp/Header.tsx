@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState, type MouseEvent } from 'react';
 
 const NAV_ITEMS = [
@@ -89,13 +88,17 @@ export default function Header() {
           ))}
         </nav>
 
+        {/* 公開準備中: TANE:i本体（/app）はまだ一般公開の準備ができていないため、CTAを一時的に無効化している */}
         <div className="hidden lg:block">
-          <Link
-            href="/app"
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#1F3028] px-5 py-2.5 text-[13px] font-medium text-[#FAF8F4] transition-colors hover:bg-[#5F8D69]"
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            title="近日公開"
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#1F3028]/40 px-5 py-2.5 text-[13px] font-medium text-[#FAF8F4]/70 cursor-not-allowed"
           >
-            TANE:iをはじめる
-          </Link>
+            TANE:iをはじめる（近日公開）
+          </button>
         </div>
 
         <button
@@ -137,12 +140,15 @@ export default function Header() {
               {item.label}
             </a>
           ))}
-          <Link
-            href="/app"
-            className="mt-3 mb-2 flex items-center justify-center rounded-full bg-[#1F3028] px-5 py-3 text-[14px] font-medium text-[#FAF8F4]"
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            title="近日公開"
+            className="mt-3 mb-2 flex items-center justify-center rounded-full bg-[#1F3028]/40 px-5 py-3 text-[14px] font-medium text-[#FAF8F4]/70 cursor-not-allowed"
           >
-            TANE:iをはじめる
-          </Link>
+            TANE:iをはじめる（近日公開）
+          </button>
         </nav>
       )}
     </header>
