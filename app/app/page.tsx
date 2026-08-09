@@ -142,8 +142,9 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    // 画像生成回数はサーバー側で管理していないため、localStorageの値のみで
-    // マウント時に同期する（初期値5のままだとリロードで毎回リセットされてしまうため）。
+    // AI機能利用回数（カット申込書PDF・完成イメージ・写真AI空間診断・外部Gemini画像生成）は
+    // サーバー側で管理していないため、localStorageの値のみでマウント時に同期する
+    // （初期値5のままだとリロードで毎回リセットされてしまうため）。
     // 意図的なクライアント専用の外部システム同期のため、react-hooks/set-state-in-effectを明示的に抑制する
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setRemainingImageCount(getLocalRemainingCount(IMAGE_USAGE_STORAGE_KEY, DAILY_IMAGE_LIMIT));
@@ -307,10 +308,23 @@ export default function Home() {
     [showToast]
   );
 
+  // カット申込書PDF・完成イメージ（設計スタジオ）・写真AI空間診断・シルエットカメオ用の外部Gemini画像生成は、
+  // いずれも通常のテキスト相談より負荷の大きいAI機能のため、「本日のAI機能利用」として共通の1日5回の
+  // 上限で管理する（本日の無料相談＝テキストチャットの回数制限とは別枠）
+  const consumeImageUsage = useCallback((): boolean => {
+    if (remainingImageCount <= 0) {
+      showToast('本日のAI機能のご利用回数が上限（5回）に達しました🙏 また明日ご利用ください。');
+      return false;
+    }
+    setRemainingImageCount(consumeLocalUsage(IMAGE_USAGE_STORAGE_KEY, DAILY_IMAGE_LIMIT));
+    return true;
+  }, [remainingImageCount, showToast]);
+
   const handleDownloadCutSheetPdf = useCallback(async (
     materialGroups?: MaterialGroup[] | 'blank',
     sheetLayouts?: SheetLayout[]
   ) => {
+    if (!consumeImageUsage()) return;
     const isBlank = materialGroups === 'blank';
     const usingChatData = !isBlank && ((!!materialGroups && materialGroups.length > 0) || (!!sheetLayouts && sheetLayouts.length > 0));
     setIsGeneratingPdf(true);
@@ -359,7 +373,7 @@ export default function Home() {
     } finally {
       setIsGeneratingPdf(false);
     }
-  }, [addItem, showToast]);
+  }, [addItem, showToast, consumeImageUsage]);
 
   const handleDownloadAssemblyManualPdf = useCallback(async (manual?: AssemblyManual) => {
     const usingChatData = !!manual;
@@ -426,6 +440,11 @@ export default function Home() {
     }
 
     const currentImg = selectedImage;
+    // 写真AI空間診断（写真添付での相談）も、通常のテキスト相談より負荷の大きいAI機能のため
+    // 「本日のAI機能利用」の対象とする
+    if (currentImg && !consumeImageUsage()) {
+      return;
+    }
     const newMessages = [...messages, { role: 'user', content: textToSend, image: currentImg || undefined }];
     setMessages(newMessages);
     setInput('');
@@ -494,15 +513,12 @@ export default function Home() {
       setIsLoading(false);
       setIsAnalyzingPhoto(false);
     }
-  }, [messages, selectedImage, isLoading, addItem, remainingCount, showToast]);
+  }, [messages, selectedImage, isLoading, addItem, remainingCount, showToast, consumeImageUsage]);
 
   // 現状はベータ版のため、画像生成は外部のGemini Web版に任せる（プロンプトをコピーして新規タブで開く）。
   // 本格稼働時にAPI化する想定で、promptOverrideを渡せば任意のプロンプト（カメオのデザイン案など）でも同じ導線を使える
   const handleOpenGeminiImage = useCallback((promptOverride?: string) => {
-    if (remainingImageCount <= 0) {
-      showToast('本日の画像生成回数が上限（5回）に達しました。');
-      return;
-    }
+    if (!consumeImageUsage()) return;
 
     let promptText = promptOverride;
     if (promptText) {
@@ -533,9 +549,8 @@ export default function Home() {
       showToast(`Geminiのページを開きます。`);
     });
 
-    setRemainingImageCount(consumeLocalUsage(IMAGE_USAGE_STORAGE_KEY, DAILY_IMAGE_LIMIT));
     window.open('https://gemini.google.com/', '_blank');
-  }, [messages, remainingImageCount, showToast]);
+  }, [messages, showToast, consumeImageUsage]);
 
   // チャット入力欄の「完成イメージ」ボタン（家具の完成イメージ専用。シルエットカメオの
   // デザイン案はhandleOpenGeminiImageのまま外部Geminiを使い続ける）。以前は外部Geminiへの
@@ -548,7 +563,11 @@ export default function Home() {
   // 起きるため、ここでトーストを出しても表示されずに終わる（実機検証済み）。椅子など箱型に
   // 当てはまらない相談や、まだ寸法が固まっていない場合はブロックが無いため、その場合は
   // 仕様を送らず画面遷移のみ行う（設計スタジオ側のデフォルトフォームで手動入力すれば使える）。
+  // なお設計スタジオでの完成イメージ生成も「本日のAI機能利用」の対象とするため、遷移前に
+  // 消費・上限チェックを行う（上限到達時はconsumeImageUsage内でトーストを出して遷移せず終了する）
   const handleOpenCompletionImage = useCallback(() => {
+    if (!consumeImageUsage()) return;
+
     const latestSpec = [...messages]
       .reverse()
       .map((m) => (m.role === 'assistant' ? extractStudioSpecFromContent(m.content) : null))
@@ -558,7 +577,7 @@ export default function Home() {
       pushSpecToStudio(latestSpec);
     }
     router.push('/app/studio');
-  }, [messages, router]);
+  }, [messages, router, consumeImageUsage]);
 
   // RightPanel「ご意見、リクエストはこちらから」用。ご意見・ご質問フォームへ遷移する前に、
   // 一言添えることでLINE Bot側のハンドオフ案内メッセージと体験を揃える（docs/survey-schema.md参照）
@@ -626,6 +645,7 @@ export default function Home() {
             onSendMessage={sendMessage}
             onDownloadCutSheet={handleDownloadCutSheetPdf}
             onDownloadAssemblyManual={handleDownloadAssemblyManualPdf}
+            onConsumeImageUsage={consumeImageUsage}
             isGeneratingPdf={isGeneratingPdf}
             addItem={addItem}
             showToast={showToast}

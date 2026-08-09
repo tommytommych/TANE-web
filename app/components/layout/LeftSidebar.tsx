@@ -129,7 +129,7 @@ export default function LeftSidebar({
 
               <Card padding="sm" muted>
                 <div className="text-xs font-bold leading-tight text-tanei-ink">
-                  本日の画像生成
+                  本日のAI機能利用
                   <br />
                   {remainingImageCount} / 5回
                 </div>

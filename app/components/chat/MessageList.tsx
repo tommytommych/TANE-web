@@ -14,6 +14,7 @@ interface MessageListProps {
   onSendMessage: (text: string, countUp?: boolean) => void;
   onDownloadCutSheet: (materialGroups?: MaterialGroup[], sheetLayouts?: SheetLayout[]) => void;
   onDownloadAssemblyManual: (manual?: AssemblyManual) => void;
+  onConsumeImageUsage: () => boolean;
   isGeneratingPdf: boolean;
   addItem: (
     type: SavedItemType,
@@ -33,6 +34,7 @@ function MessageList({
   onSendMessage,
   onDownloadCutSheet,
   onDownloadAssemblyManual,
+  onConsumeImageUsage,
   isGeneratingPdf,
   addItem,
   showToast,
@@ -49,6 +51,7 @@ function MessageList({
           onSendMessage={onSendMessage}
           onDownloadCutSheet={onDownloadCutSheet}
           onDownloadAssemblyManual={onDownloadAssemblyManual}
+          onConsumeImageUsage={onConsumeImageUsage}
           isGeneratingPdf={isGeneratingPdf}
           addItem={addItem}
           showToast={showToast}

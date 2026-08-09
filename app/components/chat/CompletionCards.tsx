@@ -18,6 +18,7 @@ import { pushSpecToStudio } from '../../lib/studioSync';
 interface CompletionCardsProps {
   msg: Message;
   onDownloadCutSheet: (materialGroups?: MaterialGroup[], sheetLayouts?: SheetLayout[]) => void;
+  onConsumeImageUsage: () => boolean;
   isGeneratingPdf: boolean;
   addItem: (
     type: SavedItemType,
@@ -32,6 +33,7 @@ interface CompletionCardsProps {
 function CompletionCards({
   msg,
   onDownloadCutSheet,
+  onConsumeImageUsage,
   isGeneratingPdf,
   addItem,
   showToast,
@@ -83,6 +85,9 @@ function CompletionCards({
 
   const handleOpenInStudio = () => {
     if (!studioSpec) return;
+    // 設計スタジオでの完成イメージ生成も「本日のAI機能利用」の対象とする
+    // （上限到達時はonConsumeImageUsage内でトーストを出して遷移しない）
+    if (!onConsumeImageUsage()) return;
     // 遷移前に送信しておくことで、/app/studioのiframeが接続する頃には
     // サーバー（tanei-studio/server.py）側に最新仕様が反映されている
     pushSpecToStudio(studioSpec);
