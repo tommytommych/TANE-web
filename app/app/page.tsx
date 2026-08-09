@@ -43,6 +43,9 @@ const DAILY_MESSAGE_LIMIT = 10;
 const DAILY_IMAGE_LIMIT = 5;
 const MESSAGE_USAGE_STORAGE_KEY = 'tanei-message-usage-v1';
 const IMAGE_USAGE_STORAGE_KEY = 'tanei-image-usage-v1';
+// チャットとTANE:i設計スタジオ（/app/studio）を行き来しても会話が消えないよう、
+// タブを閉じるまで保持されるsessionStorageに会話状態を退避する（詳細は下のuseEffect参照）
+const CHAT_SESSION_STORAGE_KEY = 'tanei-chat-session-v1';
 
 // シルエットカメオ5でのカット作業（カス取り）を前提とした固定デザインルール。
 // AIが生成したimagePromptの内容によらず、カメオデザイン案の画像生成には常にこれを付加する
@@ -83,6 +86,48 @@ export default function Home() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // 保存用effectが、読み込み用effectより先に「読み込み前の初期state」で発火して
+  // sessionStorageを上書きしてしまわないようにするためのガード（マウント直後の1回だけスキップする）
+  const skipNextSaveRef = useRef(true);
+
+  useEffect(() => {
+    // 「設計スタジオ（/app/studio）」へ画面遷移して戻ってきた際にNext.jsがこのページを
+    // 再マウントしても会話が消えないよう、sessionStorageから復元する。タブを閉じれば
+    // 自然に消える（会話を無期限に残したいわけではないため、localStorageではなくこちらを使う）
+    try {
+      const raw = sessionStorage.getItem(CHAT_SESSION_STORAGE_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw) as {
+          messages?: Message[];
+          hasGeneratedPdf?: boolean;
+          hasGeneratedAssembly?: boolean;
+        };
+        if (Array.isArray(saved.messages) && saved.messages.length > 0) {
+          // eslint-disable-next-line react-hooks/set-state-in-effect
+          setMessages(saved.messages);
+          setHasGeneratedPdf(Boolean(saved.hasGeneratedPdf));
+          setHasGeneratedAssembly(Boolean(saved.hasGeneratedAssembly));
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
+    try {
+      sessionStorage.setItem(
+        CHAT_SESSION_STORAGE_KEY,
+        JSON.stringify({ messages, hasGeneratedPdf, hasGeneratedAssembly })
+      );
+    } catch (e) {
+      console.error(e);
+    }
+  }, [messages, hasGeneratedPdf, hasGeneratedAssembly]);
 
   useEffect(() => {
     (async () => {
@@ -167,6 +212,11 @@ export default function Home() {
     setInput('');
     setHasGeneratedPdf(false);
     setHasGeneratedAssembly(false);
+    try {
+      sessionStorage.removeItem(CHAT_SESSION_STORAGE_KEY);
+    } catch (e) {
+      console.error(e);
+    }
     showToast('新しい相談を始めましょう🌱');
   }, [messages.length, showToast]);
 
