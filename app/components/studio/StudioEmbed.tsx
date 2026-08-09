@@ -13,7 +13,9 @@ export default function StudioEmbed() {
   // SSRとの整合性のため初期値はデフォルトホストにしておき、マウント後にlocalStorageの
   // 保存値（スマートフォン等で設定済みの場合）へ差し替える
   const [studioHost, setStudioHostState] = useState(DEFAULT_STUDIO_HOST);
-  const [hostInput, setHostInput] = useState(DEFAULT_STUDIO_HOST);
+  // 入力欄は「例: 192.168.1.23:5002」というプレースホルダーだけを見せ、現在の接続先を
+  // 初期値として差し込まない（既定のlocalhost:5002が薄く入って見えて紛らわしいため）
+  const [hostInput, setHostInput] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [latestSpec, setLatestSpec] = useState<StudioSpec | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -23,7 +25,6 @@ export default function StudioEmbed() {
     const current = getStudioHost();
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setStudioHostState(current);
-    setHostInput(current);
 
     // 設計スタジオはオペレーターのパソコンでしか起動できないため、"localhost"のままだと
     // スマートフォン等の別端末では真っ白な画面になってしまう。狭い画面幅（おおよそスマートフォン・
@@ -152,7 +153,7 @@ export default function StudioEmbed() {
               value={hostInput}
               onChange={(e) => setHostInput(e.target.value)}
               placeholder="例: 192.168.1.23:5002"
-              className="flex-1 min-w-[180px] border border-tanei-border rounded-tanei-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-tanei-brand"
+              className="flex-1 min-w-[180px] border-2 border-tanei-ink-muted rounded-tanei-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-tanei-brand"
             />
             <button
               type="button"
@@ -171,7 +172,6 @@ export default function StudioEmbed() {
               </button>
             )}
           </div>
-          <p className="text-tanei-ink-muted text-xs mt-2">現在の接続先: {studioHost}</p>
         </div>
       )}
 
