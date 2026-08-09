@@ -7,17 +7,32 @@ import { studioSpecToSheetLayout, type StudioSpec } from '../../lib/studioSpec';
 import { buildUniversalCutSheetPdf } from '../../lib/cutSheetPdf';
 import { downloadPdfBytes } from '../../lib/download';
 import { consumeLocalUsage, getLocalRemainingCount, DAILY_IMAGE_LIMIT, IMAGE_USAGE_STORAGE_KEY } from '../../lib/localUsage';
-
-// TANE:i設計スタジオ（tanei-studio/）はFreeCAD/POV-Rayというローカルバイナリに依存するため、
-// TANE:i本体のサーバーレス環境（Vercel等）上では動かせず、オペレーターの手元PCで
-// 別プロセス（Flask、既定ポート5002）として起動しておく必要がある。このページはその
-// ローカルサーバーをiframeで埋め込んでいるだけ（サーバー未起動時は下部が空白になる）
-const STUDIO_URL = 'http://localhost:5002';
+import { DEFAULT_STUDIO_HOST, getStudioHost, setStudioHost } from '../../lib/studioHost';
 
 export default function StudioEmbed() {
+  // SSRとの整合性のため初期値はデフォルトホストにしておき、マウント後にlocalStorageの
+  // 保存値（スマートフォン等で設定済みの場合）へ差し替える
+  const [studioHost, setStudioHostState] = useState(DEFAULT_STUDIO_HOST);
+  const [hostInput, setHostInput] = useState(DEFAULT_STUDIO_HOST);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [latestSpec, setLatestSpec] = useState<StudioSpec | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const current = getStudioHost();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStudioHostState(current);
+    setHostInput(current);
+
+    // 設計スタジオはオペレーターのパソコンでしか起動できないため、"localhost"のままだと
+    // スマートフォン等の別端末では真っ白な画面になってしまう。狭い画面幅（おおよそスマートフォン・
+    // タブレット）で、かつ接続先が未設定（デフォルトのまま）の場合は、原因と対処が分かるよう
+    // 接続設定パネルを最初から開いておく
+    if (current === DEFAULT_STUDIO_HOST && window.innerWidth < 1024) {
+      setIsSettingsOpen(true);
+    }
+  }, []);
 
   // 設計スタジオ（iframe内）でレンダリングするたびに、tanei-studio/server.pyが
   // source: 'studio'のspec-updateをWebSocket経由でブロードキャストしてくる（双方向同期の
@@ -31,6 +46,20 @@ export default function StudioEmbed() {
   const showStatus = useCallback((msg: string) => {
     setStatusMessage(msg);
     setTimeout(() => setStatusMessage(null), 4000);
+  }, []);
+
+  const handleApplyHost = useCallback(() => {
+    const normalized = setStudioHost(hostInput);
+    setStudioHostState(normalized);
+    setHostInput(normalized);
+    setIsSettingsOpen(false);
+    showStatus(`接続先を ${normalized} に変更しました。`);
+  }, [hostInput, showStatus]);
+
+  const handleResetHost = useCallback(() => {
+    const normalized = setStudioHost(DEFAULT_STUDIO_HOST);
+    setStudioHostState(normalized);
+    setHostInput(normalized);
   }, []);
 
   const handleDownloadCutSheet = useCallback(async () => {
@@ -85,16 +114,64 @@ export default function StudioEmbed() {
 
         <button
           type="button"
+          onClick={() => setIsSettingsOpen((prev) => !prev)}
+          className="ml-auto flex-shrink-0 text-sm text-tanei-ink-muted hover:text-tanei-brand px-2 py-2 rounded-tanei-control transition-colors"
+          title="設計スタジオの接続先を設定"
+          aria-label="設計スタジオの接続先を設定"
+        >
+          ⚙️
+        </button>
+
+        <button
+          type="button"
           onClick={handleDownloadCutSheet}
           disabled={isGeneratingPdf}
-          className="ml-auto flex-shrink-0 flex items-center gap-1.5 bg-tanei-accent hover:bg-tanei-accent-dark text-white text-sm font-bold px-3 sm:px-4 py-2 rounded-tanei-control shadow-sm transition-all disabled:opacity-50"
+          className="flex-shrink-0 flex items-center gap-1.5 bg-tanei-accent hover:bg-tanei-accent-dark text-white text-sm font-bold px-3 sm:px-4 py-2 rounded-tanei-control shadow-sm transition-all disabled:opacity-50"
         >
           <span>📄</span>
           <span className="hidden sm:inline">{isGeneratingPdf ? '生成中…' : 'カット依頼用紙へ'}</span>
         </button>
       </div>
 
-      <iframe src={STUDIO_URL} title="TANE:i 設計スタジオ" className="flex-1 w-full border-0" />
+      {isSettingsOpen && (
+        <div className="px-4 py-3 border-b border-tanei-border bg-tanei-brand-soft flex-shrink-0 text-sm">
+          <p className="font-bold text-tanei-ink mb-1">設計スタジオの接続先</p>
+          <p className="text-tanei-ink-muted text-xs leading-relaxed mb-2">
+            設計スタジオはオペレーターのパソコン上でしか起動できません。そのパソコンのブラウザからは
+            そのまま使えますが、スマートフォン等の別端末から開く場合は、設計スタジオを起動している
+            パソコンと同じWi-Fiに接続したうえで、そのパソコンのIPアドレス（例: 192.168.1.23）を
+            下に入力してください。
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              value={hostInput}
+              onChange={(e) => setHostInput(e.target.value)}
+              placeholder="例: 192.168.1.23:5002"
+              className="flex-1 min-w-[180px] border border-tanei-border rounded-tanei-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-tanei-brand"
+            />
+            <button
+              type="button"
+              onClick={handleApplyHost}
+              className="bg-tanei-brand text-white px-4 py-2 rounded-tanei-control text-sm font-bold hover:bg-tanei-brand-dark transition-colors flex-shrink-0"
+            >
+              接続する
+            </button>
+            {studioHost !== DEFAULT_STUDIO_HOST && (
+              <button
+                type="button"
+                onClick={handleResetHost}
+                className="text-xs text-tanei-ink-muted hover:text-tanei-brand underline flex-shrink-0"
+              >
+                既定（同じパソコン）に戻す
+              </button>
+            )}
+          </div>
+          <p className="text-tanei-ink-muted text-xs mt-2">現在の接続先: {studioHost}</p>
+        </div>
+      )}
+
+      <iframe src={`http://${studioHost}`} title="TANE:i 設計スタジオ" className="flex-1 w-full border-0" />
     </div>
   );
 }

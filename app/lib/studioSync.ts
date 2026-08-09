@@ -2,13 +2,12 @@
 // freecad-studio/を複製してTANE:iに組み込んだ本番の実体)との双方向データ同期。
 // 設計スタジオはfreecadcmd/povrayというローカルバイナリに依存するため、このNext.jsアプリが
 // Vercel等にデプロイされていてもサーバー側から直接アクセスすることはできない。そのため同期は
-// ブラウザ側のJavaScriptが、オペレーターの同じPC上で起動している設計スタジオ
-// (http://localhost:5002、app/app/studio/でiframe埋め込み表示する)のWebSocketエンドポイントへ
-// 直結する形で行う（設計スタジオがローカルで起動していない環境では、単に接続が確立されない
-// だけでエラーにはならない）。
+// ブラウザ側のJavaScriptが、オペレーターの同じPC上（またはLAN上の別端末からはstudioHost.tsで
+// 設定したIPアドレス）で起動している設計スタジオ(既定はhttp://localhost:5002、
+// app/app/studio/でiframe埋め込み表示する)のWebSocketエンドポイントへ直結する形で行う
+// （設計スタジオがローカルで起動していない環境では、単に接続が確立されないだけでエラーにはならない）。
 import type { StudioSpec } from './studioSpec';
-
-const STUDIO_SYNC_WS_URL = 'ws://localhost:5002/ws/sync';
+import { getStudioWsUrl, onStudioHostChange } from './studioHost';
 
 let socket: WebSocket | null = null;
 const updateListeners = new Set<(spec: StudioSpec) => void>();
@@ -19,7 +18,7 @@ function ensureSocket(): WebSocket | null {
     return socket;
   }
   try {
-    const ws = new WebSocket(STUDIO_SYNC_WS_URL);
+    const ws = new WebSocket(getStudioWsUrl());
     ws.addEventListener('close', () => {
       if (socket === ws) socket = null;
     });
@@ -38,6 +37,16 @@ function ensureSocket(): WebSocket | null {
   } catch {
     return null;
   }
+}
+
+// 接続先ホスト（studioHost.ts）が変更されたら、古い接続を閉じて次回利用時に
+// 新しいホストへ繋ぎ直す。すでにリスナー登録済みなら、切り替わった直後に再接続しておく
+if (typeof window !== 'undefined') {
+  onStudioHostChange(() => {
+    socket?.close();
+    socket = null;
+    if (updateListeners.size > 0) ensureSocket();
+  });
 }
 
 // 設計スタジオ側で確定・保存された仕様の更新を受け取るリスナーを登録する。
