@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   type Message,
   type MaterialGroup,
@@ -35,6 +36,8 @@ function CompletionCards({
   addItem,
   showToast,
 }: CompletionCardsProps) {
+  const router = useRouter();
+
   // メッセージ本文から一度だけ抽出し、各カードのクリックハンドラで使い回す
   const materialGroups = useMemo(() => extractCutListFromContent(msg.content), [msg.content]);
   const sheetLayouts = useMemo(() => extractSheetLayoutFromContent(msg.content), [msg.content]);
@@ -80,8 +83,10 @@ function CompletionCards({
 
   const handleOpenInStudio = () => {
     if (!studioSpec) return;
+    // 遷移前に送信しておくことで、/app/studioのiframeが接続する頃には
+    // サーバー（tanei-studio/server.py）側に最新仕様が反映されている
     pushSpecToStudio(studioSpec);
-    showToast('TANE:i Studioに仕様を送りました🌱（起動していない場合は新しいタブで開きます）');
+    router.push('/app/studio');
   };
 
   const cards: { icon: string; label: string; onClick: () => void; accent?: boolean; disabled?: boolean }[] = [
@@ -98,7 +103,7 @@ function CompletionCards({
           },
         ]),
     // 天板・底板・側板・背板からなる箱型の家具のみ、AIがtanei-studio-specブロックを出力する
-    ...(studioSpec ? [{ icon: '🪚', label: 'Studioで確認', onClick: handleOpenInStudio }] : []),
+    ...(studioSpec ? [{ icon: '🪚', label: '設計スタジオで見る', onClick: handleOpenInStudio }] : []),
     { icon: '💚', label: 'LINE送信', onClick: handleLineShare },
     { icon: '💾', label: '保存', onClick: handleSaveDesign },
     { icon: '🔗', label: '共有', onClick: handleShare },

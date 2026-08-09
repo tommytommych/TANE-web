@@ -1,7 +1,13 @@
 """
-TANE:i FreeCAD Studio — 独立したFreeCAD中心の設計・レンダリングシステム（Phase 1: 最小プロトタイプ）。
+TANE:i 設計スタジオ — FreeCAD中心の設計・レンダリングシステム。
 
-既存のTANE:iメインシステム（Next.js / Gemini）には一切依存しない、単体のFlaskサーバー。
+`freecad-studio/`（独立プロトタイプ）を複製し、TANE:iチャット（Next.js / Gemini、
+app/app/studio/）に組み込んで使うための版。プロトタイプ側は不具合対応時の切り戻し用に
+そのまま残し、こちらを実際にTANE:iから参照する「本番」の実体として扱う。
+FreeCAD/POV-Rayというローカルバイナリに依存する都合上、単体のFlaskサーバーとして
+動かす点はプロトタイプ版と変わらない（TANE:i側はapp/app/studio/でこのサーバーを
+iframe埋め込みし、WebSocket同期でチャットの内容を自動反映する）。
+
 ユーザーの入力（幅・奥行・高さ・材質）を受け取り、freecad_scripts/generate_model.py を
 freecadcmd経由でサブプロセス実行し、FreeCADベースの完成イメージ（PNG）と木取りリストを返す。
 
@@ -70,8 +76,8 @@ os.makedirs(RENDERS_DIR, exist_ok=True)
 # 最新状態を送るためだけに使う簡易プロトタイプ実装（プロセス再起動で消える。複数案件の
 # 同時進行にはsessionId単位への拡張が必要）。
 # 【重要・実機検証で判明】新規接続時の再送で送信元を"studio"に決め打ちしていたところ、
-# 「チャットでpushしてから別ページへ画面遷移する」フロー（送信時点ではまだ誰も
-# 接続していない）で、遷移後に新規接続したクライアント側が「これはstudio発の通知だ」と
+# 「チャットでpushしてから/app/studioへ画面遷移する」フロー（送信時点ではまだ誰も
+# 接続していない）で、遷移後に新規接続したiframe側が「これはstudio発の通知だ」と
 # 誤認識し、自動反映はしても自動レンダリングが発火しない不具合があった
 # （static/index.html側はsource==='chat'の場合のみ自動レンダリングする）。
 # 直近の送信元を覚えておき、新規接続時の再送でもそれをそのまま使うことで解決した。
@@ -407,4 +413,4 @@ def api_render():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    app.run(host="0.0.0.0", port=5002, debug=True)

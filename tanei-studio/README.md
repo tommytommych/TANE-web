@@ -1,15 +1,18 @@
-# TANE:i FreeCAD Studio（独立プロトタイプ・凍結版）
-
-> **このディレクトリは開発用の独立プロトタイプで、TANE:iからは参照されていない。**
-> TANE:iチャット（`app/app/studio/`）が実際に統合・使用しているのは、このディレクトリを
-> 複製した [`tanei-studio/`](../tanei-studio/) （ポート5002）。連携ミスや不具合が起きた際に
-> 切り戻せる「動作確認済みの状態」を残しておく目的で、こちらは意図的に変更を加えず
-> 凍結してある。新機能・修正は基本的に`tanei-studio/`側に対して行うこと。
+# TANE:i 設計スタジオ
 
 Gemini等の画像生成AIに頼らず、FreeCADをバックエンドで動かして正確な寸法・構造に基づく
-完成イメージのレンダリングと木取りデータを直接出力する、既存のTANE:iメインシステム
-（Next.js／`app/`以下）とは完全に独立したアプリケーション。単体のFlaskサーバー＋
-シンプルなHTML/JSフロントエンドとして、このリポジトリの外に置いても成立するように作ってある。
+完成イメージのレンダリングと木取りデータを直接出力する機能。`freecad-studio/`
+（独立プロトタイプ、このリポジトリに残したままにしてある）を複製してTANE:iチャット
+（Next.js、`app/app/studio/`）に組み込んだ「本番」の実体で、チャットの「完成しました！」
+画面から遷移すると、そこまでの相談内容（品名・寸法・材質など）がそのままこのスタジオへ
+自動反映されてレンダリングされる。
+
+FreeCAD/POV-Rayというローカルバイナリに依存する都合上、実行形態そのものはプロトタイプ版と
+同じく単体のFlaskサーバー＋シンプルなHTML/JSフロントエンドのまま（`app/app/studio/`は
+このサーバーをiframe埋め込みしているだけで、TANE:i本体のサーバーレス環境
+（Vercel等）上でFreeCADを実行しているわけではない）。そのため、この機能を使うには
+オペレーターの手元PCでこのFlaskサーバー（`python3 server.py`、既定ポート5002）を
+起動しておく必要がある。
 
 ## ✅ 動作確認済み（本番のFreeCAD＋POV-Rayパイプライン含む）
 
@@ -143,12 +146,12 @@ export POVRAY_PATH=/usr/local/bin/povray
 ### 3. サーバーの起動
 
 ```bash
-cd freecad-studio
+cd tanei-studio
 pip install -r requirements.txt
 python3 server.py
 ```
 
-`http://localhost:5001/` を開き、フォームから寸法・材質を入力して送信する。
+`http://localhost:5002/` を開き、フォームから寸法・材質を入力して送信する。
 
 ### 4. スクリプト単体での動作確認（デバッグ用）
 
@@ -196,13 +199,13 @@ TANE:iチャット（`app/app/page.tsx`、Vercel等にデプロイされるメ�
 - **なぜWebSocketか**: Studioは`freecadcmd`/`povray`というローカルバイナリに依存するため、
   Vercel等にデプロイされたチャットのサーバー側から直接アクセスすることはできない。
   そのため同期はオペレーターのブラウザ内JavaScriptが、同じPC上で起動している
-  `localhost:5001`のStudioへ直結する形で行う（サーバー間連携ではなく、ブラウザが
+  `localhost:5002`のStudioへ直結する形で行う（サーバー間連携ではなく、ブラウザが
   両者の橋渡し役になる）。`postMessage`はウィンドウ参照が生きている間しか使えず、
   `localStorage`/`BroadcastChannel`はオリジンをまたげない（チャットのドメインと
-  `localhost:5001`は別オリジン）ため、オリジンをまたいで安定して使えるWebSocketを選んだ。
+  `localhost:5002`は別オリジン）ため、オリジンをまたいで安定して使えるWebSocketを選んだ。
 - Studio未起動時に「Studioで確認」を押した場合は、WebSocket接続がタイムアウトし、
   クエリパラメータ（`item`/`width`/`depth`/`height`/`thickness`/`material`/`panelFinishes`/
-  `autoRender=1`）付きで`http://localhost:5001/`を新規タブで開くフォールバックになる。
+  `autoRender=1`）付きで`http://localhost:5002/`を新規タブで開くフォールバックになる。
 - 既知の制約: `latest_spec`はFlaskプロセス内メモリのみで、複数案件の同時進行には
   `sessionId`単位への拡張が必要（現状は単一セッション運用前提）。また`server.py`は
   `host="0.0.0.0"`でLAN全体に公開されているため、同期チャネル追加後は同一Wi-Fi上の
