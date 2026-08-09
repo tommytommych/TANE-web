@@ -12,8 +12,7 @@ interface ChatInputProps {
   onSelectImage: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onClearImage: () => void;
   fileInputRef: RefObject<HTMLInputElement | null>;
-  onOpenGeminiImage: () => void;
-  remainingImageCount: number;
+  onOpenCompletionImage: () => void;
 }
 
 export default function ChatInput({
@@ -26,8 +25,7 @@ export default function ChatInput({
   onSelectImage,
   onClearImage,
   fileInputRef,
-  onOpenGeminiImage,
-  remainingImageCount,
+  onOpenCompletionImage,
 }: ChatInputProps) {
   return (
     <div className="p-3 sm:p-5 bg-white border-t border-tanei-border">
@@ -82,10 +80,10 @@ export default function ChatInput({
         </button>
 
         <button
-          onClick={onOpenGeminiImage}
-          disabled={isLoading || remainingImageCount <= 0}
+          onClick={onOpenCompletionImage}
+          disabled={isLoading}
           className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 text-white shadow-lg shadow-indigo-500/25 px-3 sm:px-5 py-3 rounded-tanei-control text-sm font-bold hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 flex-shrink-0 flex items-center gap-1.5 border border-white/20"
-          title="AI完成イメージ生成"
+          title="TANE:i 設計スタジオで完成イメージを見る"
         >
           <span>✨</span>
           <span className="hidden sm:inline">完成イメージ</span>

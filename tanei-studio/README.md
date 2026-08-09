@@ -185,27 +185,41 @@ TANE:iチャット（`app/app/page.tsx`、Vercel等にデプロイされるメ�
    connectStudioSync(cb)  <--受信--                                --broadcast-->
 ```
 
-- **チャット→Studio**: チャットでAIが設計提案を出すと、回答末尾に非表示の
+- **チャット→設計スタジオ**: チャットでAIが設計提案を出すと、回答末尾に非表示の
   `tanei-studio-spec`ブロック（品名・幅・奥行き・高さ・板厚・材質・パーツごとの塗装）が
-  付加される（`app/lib/systemPrompt.ts`）。ユーザーが「🪚 Studioで確認」ボタン
-  （`CompletionCards.tsx`）を押すと、`app/lib/studioSync.ts`の`pushSpecToStudio()`が
-  `/ws/sync`へWebSocketで送信し、Studio側（`static/index.html`）がフォームへ自動反映＋
-  自動レンダリングする。
-- **Studio→チャット**: Studio側でオペレーターが寸法・塗装を微調整して「FreeCADで
-  レンダリング」を押す（＝保存が確定する）たびに、`/api/render`成功時に
+  付加される（`app/lib/systemPrompt.ts`）。設計スタジオへの遷移経路は2つある:
+  「完成しました！」画面の「🪚 設計スタジオで見る」カード（`CompletionCards.tsx`、その
+  メッセージのtanei-studio-specブロックを使う）と、チャット入力欄の「✨完成イメージ」
+  ボタン（`ChatInput.tsx`のonOpenCompletionImage、会話を新しい方から遡って直近の
+  tanei-studio-specブロックを探す。以前はここから外部Geminiへ画像生成を投げていたが、
+  正確な寸法に基づく完成イメージを自社で出せるようになったため置き換えた）。どちらも
+  `app/lib/studioSync.ts`の`pushSpecToStudio()`で`/ws/sync`へWebSocket送信したうえで、
+  Next.jsルーターで`/app/studio`（`StudioEmbed.tsx`が設計スタジオをiframe埋め込み表示）
+  へアプリ内遷移する。iframe側が新たに`/ws/sync`へ接続すると、サーバーが保持している
+  最新仕様を接続直後に受け取ってフォームへ自動反映＋自動レンダリングするため、
+  送信と画面遷移のタイミングが前後しても確実に反映される。
+- **設計スタジオ→チャット**: 設計スタジオ側でオペレーターが寸法・塗装を微調整して
+  「FreeCADでレンダリング」を押す（＝保存が確定する）たびに、`/api/render`成功時に
   サーバー側（`server.py`の`broadcast_spec_update()`）が最新仕様を`/ws/sync`の
   全クライアントへブロードキャストする。チャット側は`connectStudioSync()`でこれを
   受け取り、トースト通知で最新仕様をユーザーに知らせる。
-- **なぜWebSocketか**: Studioは`freecadcmd`/`povray`というローカルバイナリに依存するため、
-  Vercel等にデプロイされたチャットのサーバー側から直接アクセスすることはできない。
-  そのため同期はオペレーターのブラウザ内JavaScriptが、同じPC上で起動している
-  `localhost:5002`のStudioへ直結する形で行う（サーバー間連携ではなく、ブラウザが
+- **なぜWebSocketか**: 設計スタジオは`freecadcmd`/`povray`というローカルバイナリに
+  依存するため、Vercel等にデプロイされたチャットのサーバー側から直接アクセスすることは
+  できない。そのため同期はオペレーターのブラウザ内JavaScriptが、同じPC上で起動している
+  `localhost:5002`の設計スタジオへ直結する形で行う（サーバー間連携ではなく、ブラウザが
   両者の橋渡し役になる）。`postMessage`はウィンドウ参照が生きている間しか使えず、
   `localStorage`/`BroadcastChannel`はオリジンをまたげない（チャットのドメインと
   `localhost:5002`は別オリジン）ため、オリジンをまたいで安定して使えるWebSocketを選んだ。
-- Studio未起動時に「Studioで確認」を押した場合は、WebSocket接続がタイムアウトし、
-  クエリパラメータ（`item`/`width`/`depth`/`height`/`thickness`/`material`/`panelFinishes`/
-  `autoRender=1`）付きで`http://localhost:5002/`を新規タブで開くフォールバックになる。
+- **実機検証で発見・修正したバグ**: 新規接続時に直近の確定仕様を再送する処理が送信元を
+  `"studio"`に決め打ちしていたため、「チャットでpushしてから`/app/studio`へ画面遷移する」
+  フロー（送信時点ではまだ誰も接続していない）で、遷移後に新規接続したiframe側が
+  「これはstudio発の通知だ」と誤認識し、自動反映はしても自動レンダリングが発火しない
+  不具合があった（フロントエンドはsource==="chat"の場合のみ自動レンダリングする設計の
+  ため）。直近の送信元を`latest_spec_source`として覚えておき、新規接続時の再送でも
+  それをそのまま使うよう修正した。WebSocketクライアントでチャット役のpushをシミュレート
+  したうえで`/app/studio`へPlaywrightで遷移し、iframe内で自動反映・実際のFreeCAD+POV-Ray
+  レンダリングが完走することと、実際のチャット会話（Gemini）からこの一連の流れが動くことの
+  両方をエンドツーエンドで確認済み。
 - 既知の制約: `latest_spec`はFlaskプロセス内メモリのみで、複数案件の同時進行には
   `sessionId`単位への拡張が必要（現状は単一セッション運用前提）。また`server.py`は
   `host="0.0.0.0"`でLAN全体に公開されているため、同期チャネル追加後は同一Wi-Fi上の
