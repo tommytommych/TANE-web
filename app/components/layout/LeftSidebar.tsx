@@ -14,6 +14,7 @@ interface LeftSidebarProps {
   onDownloadBlankCutSheet: () => void;
   isGeneratingPdf: boolean;
   onOpenModal: (type: SavedItemType) => void;
+  onConsumeImageUsage: () => boolean;
 }
 
 const MY_PAGE_ITEMS: { icon: string; label: string; type: SavedItemType }[] = [
@@ -57,6 +58,7 @@ export default function LeftSidebar({
   onDownloadBlankCutSheet,
   isGeneratingPdf,
   onOpenModal,
+  onConsumeImageUsage,
 }: LeftSidebarProps) {
   return (
     <>
@@ -179,7 +181,15 @@ export default function LeftSidebar({
 
               <Link
                 href="/app/studio"
-                onClick={onClose}
+                onClick={(e) => {
+                  // 完成イメージ・カット申込書PDF・写真AI空間診断と同じ「本日のAI機能利用」の
+                  // 対象とする。上限到達時は遷移自体をキャンセルする（トーストはonConsumeImageUsage内で表示）
+                  if (!onConsumeImageUsage()) {
+                    e.preventDefault();
+                    return;
+                  }
+                  onClose();
+                }}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-tanei-control text-sm bg-tanei-surface hover:bg-white border border-transparent hover:border-tanei-border text-tanei-ink transition-colors w-full text-left"
               >
                 <span>🪚</span> TANE:i 設計スタジオ

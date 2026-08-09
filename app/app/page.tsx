@@ -625,6 +625,7 @@ export default function Home() {
         onDownloadBlankCutSheet={() => handleDownloadCutSheetPdf('blank')}
         isGeneratingPdf={isGeneratingPdf}
         onOpenModal={(type) => setActiveModal(type)}
+        onConsumeImageUsage={consumeImageUsage}
       />
 
       {/* メインチャット画面 */}
