@@ -16,7 +16,7 @@ const CLIPS = [
     caption: '材料を、揃える。',
   },
   {
-    src: '/images/lp-work-build.mp4',
+    src: '/images/40683_1280x720.mov',
     poster: '/images/lp-work-build-poster.jpg',
     caption: '手を動かし、形に。',
   },
