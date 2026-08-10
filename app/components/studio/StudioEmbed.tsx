@@ -7,30 +7,30 @@ import { studioSpecToSheetLayout, type StudioSpec } from '../../lib/studioSpec';
 import { buildUniversalCutSheetPdf } from '../../lib/cutSheetPdf';
 import { downloadPdfBytes } from '../../lib/download';
 import { consumeLocalUsage, getLocalRemainingCount, DAILY_IMAGE_LIMIT, IMAGE_USAGE_STORAGE_KEY } from '../../lib/localUsage';
-import { DEFAULT_STUDIO_HOST, getStudioHost, setStudioHost } from '../../lib/studioHost';
+import { DEFAULT_STUDIO_BASE_URL, STUDIO_IS_CLOUD_HOSTED, getStudioBaseUrl, setStudioBaseUrl } from '../../lib/studioBaseUrl';
 
 export default function StudioEmbed() {
-  // SSRとの整合性のため初期値はデフォルトホストにしておき、マウント後にlocalStorageの
-  // 保存値（スマートフォン等で設定済みの場合）へ差し替える
-  const [studioHost, setStudioHostState] = useState(DEFAULT_STUDIO_HOST);
-  // 入力欄は「例: 192.168.1.23:5002」というプレースホルダーだけを見せ、現在の接続先を
-  // 初期値として差し込まない（既定のlocalhost:5002が薄く入って見えて紛らわしいため）
-  const [hostInput, setHostInput] = useState('');
+  // SSRとの整合性のため初期値は既定URL（NEXT_PUBLIC_STUDIO_BASE_URL、未設定時はlocalhost）に
+  // しておき、マウント後にlocalStorageの保存値（手動で接続先を変更していた場合）へ差し替える
+  const [studioBaseUrl, setStudioBaseUrlState] = useState(DEFAULT_STUDIO_BASE_URL);
+  // 入力欄は例のプレースホルダーだけを見せ、現在の接続先を初期値として差し込まない
+  // （既定値が薄く入って見えて紛らわしいため）
+  const [urlInput, setUrlInput] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [latestSpec, setLatestSpec] = useState<StudioSpec | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const current = getStudioHost();
+    const current = getStudioBaseUrl();
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setStudioHostState(current);
+    setStudioBaseUrlState(current);
 
-    // 設計スタジオはオペレーターのパソコンでしか起動できないため、"localhost"のままだと
-    // スマートフォン等の別端末では真っ白な画面になってしまう。狭い画面幅（おおよそスマートフォン・
-    // タブレット）で、かつ接続先が未設定（デフォルトのまま）の場合は、原因と対処が分かるよう
-    // 接続設定パネルを最初から開いておく
-    if (current === DEFAULT_STUDIO_HOST && window.innerWidth < 1024) {
+    // NEXT_PUBLIC_STUDIO_BASE_URL未設定（=クラウドの設計スタジオがまだ用意されておらず、
+    // ローカル開発中のlocalhost:5002が既定値のまま）の場合のみ、狭い画面幅（おおよそ
+    // スマートフォン・タブレット）でアクセスされたら接続設定パネルを最初から開いておく。
+    // クラウド化済みなら誰でもそのまま使えるはずなので、この自動表示は不要
+    if (!STUDIO_IS_CLOUD_HOSTED && current === DEFAULT_STUDIO_BASE_URL && window.innerWidth < 1024) {
       setIsSettingsOpen(true);
     }
   }, []);
@@ -49,18 +49,18 @@ export default function StudioEmbed() {
     setTimeout(() => setStatusMessage(null), 4000);
   }, []);
 
-  const handleApplyHost = useCallback(() => {
-    const normalized = setStudioHost(hostInput);
-    setStudioHostState(normalized);
-    setHostInput(normalized);
+  const handleApplyUrl = useCallback(() => {
+    const normalized = setStudioBaseUrl(urlInput);
+    setStudioBaseUrlState(normalized);
+    setUrlInput('');
     setIsSettingsOpen(false);
     showStatus(`接続先を ${normalized} に変更しました。`);
-  }, [hostInput, showStatus]);
+  }, [urlInput, showStatus]);
 
-  const handleResetHost = useCallback(() => {
-    const normalized = setStudioHost(DEFAULT_STUDIO_HOST);
-    setStudioHostState(normalized);
-    setHostInput(normalized);
+  const handleResetUrl = useCallback(() => {
+    const normalized = setStudioBaseUrl(DEFAULT_STUDIO_BASE_URL);
+    setStudioBaseUrlState(normalized);
+    setUrlInput('');
   }, []);
 
   const handleDownloadCutSheet = useCallback(async () => {
@@ -117,7 +117,7 @@ export default function StudioEmbed() {
           type="button"
           onClick={() => setIsSettingsOpen((prev) => !prev)}
           className="ml-auto flex-shrink-0 text-sm text-tanei-ink-muted hover:text-tanei-brand px-2 py-2 rounded-tanei-control transition-colors"
-          title="設計スタジオの接続先を設定"
+          title="設計スタジオの接続先を設定（通常は変更不要です）"
           aria-label="設計スタジオの接続先を設定"
         >
           ⚙️
@@ -134,48 +134,49 @@ export default function StudioEmbed() {
         </button>
       </div>
 
-      <p className="px-4 py-1.5 border-b border-tanei-border bg-amber-50 text-amber-800 text-[11px] text-center flex-shrink-0">
-        ⚠️ 設計スタジオはパソコン専用機能です。スマートフォンでご利用の場合は⚙️から接続先の設定が必要です。
-      </p>
+      {!STUDIO_IS_CLOUD_HOSTED && (
+        <p className="px-4 py-1.5 border-b border-tanei-border bg-amber-50 text-amber-800 text-[11px] text-center flex-shrink-0">
+          ⚠️ 設計スタジオはパソコン専用機能です。スマートフォンでご利用の場合は⚙️から接続先の設定が必要です。
+        </p>
+      )}
 
       {isSettingsOpen && (
         <div className="px-4 py-3 border-b border-tanei-border bg-tanei-brand-soft flex-shrink-0 text-sm">
           <p className="font-bold text-tanei-ink mb-1">設計スタジオの接続先</p>
           <p className="text-tanei-ink-muted text-xs leading-relaxed mb-2">
-            設計スタジオはオペレーターのパソコン上でしか起動できません。そのパソコンのブラウザからは
-            そのまま使えますが、スマートフォン等の別端末から開く場合は、設計スタジオを起動している
-            パソコンと同じWi-Fiに接続したうえで、そのパソコンのIPアドレス（例: 192.168.1.23）を
-            下に入力してください。
+            {STUDIO_IS_CLOUD_HOSTED
+              ? '通常は変更不要です。開発・検証用に別の設計スタジオサーバーへ一時的に繋ぎたい場合のみ、そのURLを下に入力してください。'
+              : '設計スタジオはオペレーターのパソコン上でしか起動できません。そのパソコンのブラウザからはそのまま使えますが、スマートフォン等の別端末から開く場合は、設計スタジオを起動しているパソコンと同じWi-Fiに接続したうえで、そのパソコンのIPアドレス（例: 192.168.1.23:5002）を下に入力してください。'}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="text"
-              value={hostInput}
-              onChange={(e) => setHostInput(e.target.value)}
-              placeholder="例: 192.168.1.23:5002"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              placeholder={STUDIO_IS_CLOUD_HOSTED ? '例: https://tanei-studio-dev.onrender.com' : '例: 192.168.1.23:5002'}
               className="flex-1 min-w-[180px] border-2 border-tanei-ink-muted rounded-tanei-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-tanei-brand"
             />
             <button
               type="button"
-              onClick={handleApplyHost}
+              onClick={handleApplyUrl}
               className="bg-tanei-brand text-white px-4 py-2 rounded-tanei-control text-sm font-bold hover:bg-tanei-brand-dark transition-colors flex-shrink-0"
             >
               接続する
             </button>
-            {studioHost !== DEFAULT_STUDIO_HOST && (
+            {studioBaseUrl !== DEFAULT_STUDIO_BASE_URL && (
               <button
                 type="button"
-                onClick={handleResetHost}
+                onClick={handleResetUrl}
                 className="text-xs text-tanei-ink-muted hover:text-tanei-brand underline flex-shrink-0"
               >
-                既定（同じパソコン）に戻す
+                既定に戻す
               </button>
             )}
           </div>
         </div>
       )}
 
-      <iframe src={`http://${studioHost}`} title="TANE:i 設計スタジオ" className="flex-1 w-full border-0" />
+      <iframe src={studioBaseUrl} title="TANE:i 設計スタジオ" className="flex-1 w-full border-0" />
     </div>
   );
 }

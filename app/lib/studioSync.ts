@@ -1,13 +1,13 @@
 // TANE:iチャットと「TANE:i設計スタジオ」(FreeCAD+POV-Rayによる木工設計スタジオ、tanei-studio/。
 // freecad-studio/を複製してTANE:iに組み込んだ本番の実体)との双方向データ同期。
-// 設計スタジオはfreecadcmd/povrayというローカルバイナリに依存するため、このNext.jsアプリが
-// Vercel等にデプロイされていてもサーバー側から直接アクセスすることはできない。そのため同期は
-// ブラウザ側のJavaScriptが、オペレーターの同じPC上（またはLAN上の別端末からはstudioHost.tsで
-// 設定したIPアドレス）で起動している設計スタジオ(既定はhttp://localhost:5002、
-// app/app/studio/でiframe埋め込み表示する)のWebSocketエンドポイントへ直結する形で行う
-// （設計スタジオがローカルで起動していない環境では、単に接続が確立されないだけでエラーにはならない）。
+// 設計スタジオはfreecadcmd/povrayというローカルバイナリに依存するため、このNext.jsアプリの
+// サーバー側（Vercel）から直接叩くことはできない。そのため同期はブラウザ側のJavaScriptが、
+// 設計スタジオ（既定はRender等クラウド上に常時稼働のURL。app/lib/studioBaseUrl.ts参照。
+// 未設定時はローカル開発用にhttp://localhost:5002にフォールバックする）のWebSocket
+// エンドポイントへ直結する形で行う（設計スタジオに接続できない環境では、単に接続が
+// 確立されないだけでエラーにはならない）。
 import type { StudioSpec } from './studioSpec';
-import { getStudioWsUrl, onStudioHostChange } from './studioHost';
+import { getStudioWsUrl, onStudioBaseUrlChange } from './studioBaseUrl';
 
 let socket: WebSocket | null = null;
 const updateListeners = new Set<(spec: StudioSpec) => void>();
@@ -39,10 +39,10 @@ function ensureSocket(): WebSocket | null {
   }
 }
 
-// 接続先ホスト（studioHost.ts）が変更されたら、古い接続を閉じて次回利用時に
+// 接続先ベースURL（studioBaseUrl.ts）が変更されたら、古い接続を閉じて次回利用時に
 // 新しいホストへ繋ぎ直す。すでにリスナー登録済みなら、切り替わった直後に再接続しておく
 if (typeof window !== 'undefined') {
-  onStudioHostChange(() => {
+  onStudioBaseUrlChange(() => {
     socket?.close();
     socket = null;
     if (updateListeners.size > 0) ensureSocket();

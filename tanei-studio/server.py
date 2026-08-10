@@ -75,6 +75,12 @@ os.makedirs(RENDERS_DIR, exist_ok=True)
 # latest_spec / latest_spec_sourceは直近の確定仕様（と、その送信元）で、新規接続時に
 # 最新状態を送るためだけに使う簡易プロトタイプ実装（プロセス再起動で消える。複数案件の
 # 同時進行にはsessionId単位への拡張が必要）。
+# 【クラウド公開時の既知の制約】この状態はプロセス全体でグローバル1つしかない。
+# オペレーター1人が自分のPC・スマホの2台で使う分には問題ないが、このサーバーを
+# 不特定多数の一般利用者に同時公開すると、Aさんの設計中にBさんが何か送信・レンダリングした
+# 瞬間にAさんの画面にBさんの仕様が割り込んで表示されてしまう（設計内容が他人と混ざる）。
+# 本格的に一般公開する前に、sessionId（例: URLクエリやCookieで発行）ごとに
+# sync_clients/latest_specを分離する対応が必須。
 # 【重要・実機検証で判明】新規接続時の再送で送信元を"studio"に決め打ちしていたところ、
 # 「チャットでpushしてから/app/studioへ画面遷移する」フロー（送信時点ではまだ誰も
 # 接続していない）で、遷移後に新規接続したiframe側が「これはstudio発の通知だ」と
@@ -413,4 +419,11 @@ def api_render():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5002, debug=True)
+    # ローカル開発時のみこのFlask開発サーバーを直接使う（`python3 server.py`）。
+    # クラウド本番環境ではgunicorn経由で起動する（Dockerfile参照。flask-sockのWebSocketは
+    # 開発サーバーでは1接続しか同時に捌けず本番運用に向かないため、gunicornでは
+    # スレッドを増やして起動する）。PORTはRender等のPaaSがコンテナ起動時に動的に
+    # 割り当てる環境変数で、ローカルでは未設定なので既定の5002を使う
+    port = int(os.environ.get("PORT", 5002))
+    debug = os.environ.get("FLASK_DEBUG", "1") == "1"
+    app.run(host="0.0.0.0", port=port, debug=debug)
