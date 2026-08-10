@@ -9,7 +9,9 @@
 // 3. ローカル開発用の既定値 http://localhost:5002（NEXT_PUBLIC_STUDIO_BASE_URL未設定時の
 //    フォールバック。オペレーターが手元でtanei-studio/を起動して使う場合はこちらになる）
 
-const STUDIO_BASE_URL_STORAGE_KEY = 'tanei-studio-base-url-v2';
+// v2→v3: クラウド化前にローカルIPを手動設定した端末が、NEXT_PUBLIC_STUDIO_BASE_URL設定後も
+// 古い手動設定をそのまま使い続けてしまわないよう、バージョンを上げて過去の値を無効化する
+const STUDIO_BASE_URL_STORAGE_KEY = 'tanei-studio-base-url-v3';
 export const LOCAL_DEV_STUDIO_BASE_URL = 'http://localhost:5002';
 
 // NEXT_PUBLIC_*はNext.jsのビルド時にクライアントバンドルへ直接インライン化される
