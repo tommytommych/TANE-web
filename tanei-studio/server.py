@@ -23,6 +23,7 @@ freecadcmd経由でサブプロセス実行し、FreeCADベースの完成イメ
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -61,58 +62,85 @@ MIN_DIMENSION_MM = 100
 MAX_DIMENSION_MM = 3000
 DEFAULT_THICKNESS_MM = 18
 
+# セッションID・ジョブIDはファイルパスや辞書キーにそのまま使うため、英数字・ハイフン・
+# アンダースコアのみに厳しく制限する（クラウド公開に伴い、不特定多数がURLへ直接任意の
+# 文字列を渡せるようになったため、`../`等によるパストラバーサルを確実に防ぐ）
+SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+JOB_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def resolve_session_id(raw):
+    """クライアントから受け取ったsessionIdを検証する。妥当な形式でなければNoneを返す
+    （呼び出し側でuuid4によるランダム生成にフォールバックする）。"""
+    if isinstance(raw, str) and SESSION_ID_RE.match(raw):
+        return raw
+    return None
+
+
+def resolve_job_id(raw):
+    """/renders/<session_id>/<job_id>/...のURLから渡されるjob_idを検証する。"""
+    if isinstance(raw, str) and JOB_ID_RE.match(raw):
+        return raw
+    return None
+
 app = Flask(__name__, static_folder=None)
 sock = Sock(app)
 
 os.makedirs(RENDERS_DIR, exist_ok=True)
 
-# --- チャット(Next.js)⇔Studio 双方向同期用の WebSocket ハブ ---
+# --- チャット(Next.js)⇔Studio 双方向同期用の WebSocket ハブ（セッションID単位で分離） ---
 # Studioはfreecadcmd/povrayというローカルバイナリに依存するため、Vercel等にデプロイした
 # チャットのサーバー側から直接叩くことはできない。そのため同期はオペレーターのブラウザが
 # 「チャットのタブ」「Studioのタブ」の両方からこの/ws/syncに直結する形で成立させる
 # （ブラウザ⇔ブラウザではなく、両方がこのFlaskサーバーの同一エンドポイントに接続することで
-# 中継する）。sync_clientsは接続中の全クライアント（チャット側・Studio側の両方を含む）、
-# latest_spec / latest_spec_sourceは直近の確定仕様（と、その送信元）で、新規接続時に
-# 最新状態を送るためだけに使う簡易プロトタイプ実装（プロセス再起動で消える。複数案件の
-# 同時進行にはsessionId単位への拡張が必要）。
-# 【クラウド公開時の既知の制約】この状態はプロセス全体でグローバル1つしかない。
-# オペレーター1人が自分のPC・スマホの2台で使う分には問題ないが、このサーバーを
-# 不特定多数の一般利用者に同時公開すると、Aさんの設計中にBさんが何か送信・レンダリングした
-# 瞬間にAさんの画面にBさんの仕様が割り込んで表示されてしまう（設計内容が他人と混ざる）。
-# 本格的に一般公開する前に、sessionId（例: URLクエリやCookieで発行）ごとに
-# sync_clients/latest_specを分離する対応が必須。
-# 【重要・実機検証で判明】新規接続時の再送で送信元を"studio"に決め打ちしていたところ、
-# 「チャットでpushしてから/app/studioへ画面遷移する」フロー（送信時点ではまだ誰も
-# 接続していない）で、遷移後に新規接続したiframe側が「これはstudio発の通知だ」と
-# 誤認識し、自動反映はしても自動レンダリングが発火しない不具合があった
-# （static/index.html側はsource==='chat'の場合のみ自動レンダリングする）。
-# 直近の送信元を覚えておき、新規接続時の再送でもそれをそのまま使うことで解決した。
-sync_clients = set()
-latest_spec = {}
-latest_spec_source = "chat"
+# 中継する）。
+#
+# 【セッション分離】クラウド上で不特定多数が同時に使うと、この状態がプロセス全体で
+# グローバル1つしかない場合、Aさんの設計中にBさんが何か送信・レンダリングした瞬間に
+# Aさんの画面にBさんの仕様が割り込んで表示されてしまう（設計内容が他人と混ざる）。
+# これを防ぐため、sessionId（チャット側のapp/lib/studioSession.tsがブラウザのタブごとに
+# 発行するUUID。/ws/syncへは`?sessionId=...`クエリで、/api/renderへはJSONボディの
+# sessionIdフィールドで渡ってくる）ごとにclients/spec/sourceを独立したdictへ分離して管理する。
+# sessionsは{session_id: {"clients": set(), "spec": {}, "source": "chat"}}で、
+# 該当セッションの接続が0になった時点でエントリごと破棄する（プロセスのメモリに
+# 使われなくなったセッションが溜まり続けないようにするための単純なガベージコレクション）。
+sessions = {}
 
 
-def broadcast_spec_update(payload, source, exclude=None):
-    """接続中の全クライアント（excludeを除く）へ、最新仕様をブロードキャストする。"""
-    global latest_spec_source
-    latest_spec.update(payload)
-    latest_spec_source = source
+def get_session_state(session_id):
+    return sessions.setdefault(session_id, {"clients": set(), "spec": {}, "source": "chat"})
+
+
+def broadcast_spec_update(payload, source, session_id, exclude=None):
+    """同じセッションに接続中の全クライアント（excludeを除く）へ、最新仕様をブロードキャストする。
+    他のセッションのクライアントには一切送られない（セッション間の分離の要）。"""
+    state = get_session_state(session_id)
+    state["spec"].update(payload)
+    state["source"] = source
     message = json.dumps({"type": "spec-update", "source": source, "payload": payload})
-    for client in list(sync_clients):
+    for client in list(state["clients"]):
         if client is exclude:
             continue
         try:
             client.send(message)
         except Exception:
-            sync_clients.discard(client)
+            state["clients"].discard(client)
 
 
 @sock.route("/ws/sync")
 def ws_sync(ws):
-    sync_clients.add(ws)
+    # 【重要・実機検証で判明】新規接続時の再送で送信元を"studio"に決め打ちしていたところ、
+    # 「チャットでpushしてから/app/studioへ画面遷移する」フロー（送信時点ではまだ誰も
+    # 接続していない）で、遷移後に新規接続したiframe側が「これはstudio発の通知だ」と
+    # 誤認識し、自動反映はしても自動レンダリングが発火しない不具合があった
+    # （static/index.html側はsource==='chat'の場合のみ自動レンダリングする）。
+    # 直近の送信元をセッションごとに覚えておき、新規接続時の再送でもそれをそのまま使うことで解決した。
+    session_id = resolve_session_id(request.args.get("sessionId")) or uuid.uuid4().hex
+    state = get_session_state(session_id)
+    state["clients"].add(ws)
     try:
-        if latest_spec:
-            ws.send(json.dumps({"type": "spec-update", "source": latest_spec_source, "payload": latest_spec}))
+        if state["spec"]:
+            ws.send(json.dumps({"type": "spec-update", "source": state["source"], "payload": state["spec"]}))
         while True:
             raw = ws.receive()
             if raw is None:
@@ -122,10 +150,12 @@ def ws_sync(ws):
             except ValueError:
                 continue
             if msg.get("type") == "spec-update" and isinstance(msg.get("payload"), dict):
-                # チャット側から送られてきた確定仕様を、Studio側（他の全クライアント）へ中継する
-                broadcast_spec_update(msg["payload"], msg.get("source", "chat"), exclude=ws)
+                # チャット側から送られてきた確定仕様を、同じセッションの他クライアントへ中継する
+                broadcast_spec_update(msg["payload"], msg.get("source", "chat"), session_id, exclude=ws)
     finally:
-        sync_clients.discard(ws)
+        state["clients"].discard(ws)
+        if not state["clients"]:
+            sessions.pop(session_id, None)
 
 
 def serialize_panels_for_viewer(panels):
@@ -250,9 +280,17 @@ def static_files(filename):
     return send_from_directory(STATIC_DIR, filename)
 
 
-@app.route("/renders/<job_id>/<path:filename>")
-def render_files(job_id, filename):
-    job_dir = os.path.join(RENDERS_DIR, job_id)
+@app.route("/renders/<session_id>/<job_id>/<path:filename>")
+def render_files(session_id, job_id, filename):
+    # session_id/job_idはURLから直接渡ってくるため、os.path.joinでパスを組み立てる前に
+    # 必ず英数字・ハイフン・アンダースコアのみであることを検証する（`../`によるパス
+    # トラバーサル対策。send_from_directoryはfilename側の脱出は防ぐが、job_dir自体が
+    # 不正な場所を指してしまうと意味がないため、ここで別途検証する）
+    session_id = resolve_session_id(session_id)
+    job_id = resolve_job_id(job_id)
+    if session_id is None or job_id is None:
+        return jsonify({"error": "不正なセッションID・ジョブIDです。"}), 400
+    job_dir = os.path.join(RENDERS_DIR, session_id, job_id)
     return send_from_directory(job_dir, filename)
 
 
@@ -353,6 +391,12 @@ def api_render():
     if error:
         return jsonify({"error": error}), 400
 
+    # チャット・設計スタジオ側（app/lib/studioSession.ts / static/index.html）が
+    # ブラウザのタブ単位で発行したUUIDを受け取る。不正・未指定の場合はランダムなIDに
+    # フォールバックする（この場合はどのセッションのWebSocketにも属さないため、
+    # チャットとの自動同期は効かないが、レンダリング自体は独立して問題なく動作する）
+    session_id = resolve_session_id(data.get("sessionId")) or uuid.uuid4().hex
+
     item = str(data.get("item") or "家具").strip()
     width = float(data["width"])
     depth = float(data["depth"])
@@ -362,8 +406,11 @@ def api_render():
     panel_finishes = parse_panel_finishes(data)
     options = parse_options(data)
 
+    # renders/配下をセッションIDごとのディレクトリに分けることで、他セッションの
+    # ジョブと物理的に混ざらないようにする（job_id自体もuuid4なので元々衝突しないが、
+    # セッション単位でまとめておくと、そのセッションの成果物一式を後から特定・削除しやすい）
     job_id = uuid.uuid4().hex[:12]
-    job_dir = os.path.join(RENDERS_DIR, job_id)
+    job_dir = os.path.join(RENDERS_DIR, session_id, job_id)
     os.makedirs(job_dir, exist_ok=True)
 
     try:
@@ -392,8 +439,8 @@ def api_render():
         return jsonify(error_payload), status
 
     # Studio側でレンダリングが確定した(=フォーム送信された)タイミングで、
-    # チャット側に接続中のWebSocketクライアントへ最新仕様をブロードキャストする
-    # (双方向同期の「Studio→チャット」方向。要件の「保存時に必ず反映」に対応)
+    # 同じセッションでチャット側に接続中のWebSocketクライアントへ最新仕様をブロードキャストする
+    # (双方向同期の「Studio→チャット」方向。要件の「保存時に必ず反映」に対応。他セッションには届かない)
     broadcast_spec_update(
         {
             "item": item,
@@ -406,12 +453,14 @@ def api_render():
             "options": options,
         },
         source="studio",
+        session_id=session_id,
     )
 
     return jsonify({
         "jobId": job_id,
+        "sessionId": session_id,
         "item": payload["item"],
-        "imageUrl": f"/renders/{job_id}/{payload['imageFilename']}",
+        "imageUrl": f"/renders/{session_id}/{job_id}/{payload['imageFilename']}",
         "cutlist": payload["cutlist"],
         "mockMode": payload["mockMode"],
         "panels": panels_for_viewer,

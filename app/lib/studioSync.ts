@@ -8,9 +8,18 @@
 // 確立されないだけでエラーにはならない）。
 import type { StudioSpec } from './studioSpec';
 import { getStudioWsUrl, onStudioBaseUrlChange } from './studioBaseUrl';
+import { getOrCreateStudioSessionId } from './studioSession';
 
 let socket: WebSocket | null = null;
 const updateListeners = new Set<(spec: StudioSpec) => void>();
+
+// タブごとに一意なsessionIdをクエリで渡すことで、サーバー（tanei-studio/server.py）が
+// このタブ専用の同期状態として分離して扱えるようにする（他の利用者の設計内容と混ざらない）
+function buildSyncWsUrl(): string {
+  const url = new URL(getStudioWsUrl());
+  url.searchParams.set('sessionId', getOrCreateStudioSessionId());
+  return url.toString();
+}
 
 function ensureSocket(): WebSocket | null {
   if (typeof window === 'undefined') return null;
@@ -18,7 +27,7 @@ function ensureSocket(): WebSocket | null {
     return socket;
   }
   try {
-    const ws = new WebSocket(getStudioWsUrl());
+    const ws = new WebSocket(buildSyncWsUrl());
     ws.addEventListener('close', () => {
       if (socket === ws) socket = null;
     });

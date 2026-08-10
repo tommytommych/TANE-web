@@ -8,6 +8,7 @@ import { buildUniversalCutSheetPdf } from '../../lib/cutSheetPdf';
 import { downloadPdfBytes } from '../../lib/download';
 import { consumeLocalUsage, getLocalRemainingCount, DAILY_IMAGE_LIMIT, IMAGE_USAGE_STORAGE_KEY } from '../../lib/localUsage';
 import { DEFAULT_STUDIO_BASE_URL, STUDIO_IS_CLOUD_HOSTED, getStudioBaseUrl, setStudioBaseUrl } from '../../lib/studioBaseUrl';
+import { getOrCreateStudioSessionId } from '../../lib/studioSession';
 
 export default function StudioEmbed() {
   // SSRとの整合性のため初期値は既定URL（NEXT_PUBLIC_STUDIO_BASE_URL、未設定時はlocalhost）に
@@ -17,6 +18,10 @@ export default function StudioEmbed() {
   // （既定値が薄く入って見えて紛らわしいため）
   const [urlInput, setUrlInput] = useState('');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  // 不特定多数が同時にアクセスしても設計内容が混ざらないよう、タブ単位のセッションIDを
+  // iframeのURLとチャット側のWebSocket接続の両方に使う（studioSession.ts参照）。
+  // SSRとの整合性のため初期値は空文字にしておき、マウント後に発行・差し替える
+  const [sessionId, setSessionId] = useState('');
   const [latestSpec, setLatestSpec] = useState<StudioSpec | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -25,6 +30,7 @@ export default function StudioEmbed() {
     const current = getStudioBaseUrl();
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setStudioBaseUrlState(current);
+    setSessionId(getOrCreateStudioSessionId());
 
     // NEXT_PUBLIC_STUDIO_BASE_URL未設定（=クラウドの設計スタジオがまだ用意されておらず、
     // ローカル開発中のlocalhost:5002が既定値のまま）の場合のみ、狭い画面幅（おおよそ
@@ -176,7 +182,11 @@ export default function StudioEmbed() {
         </div>
       )}
 
-      <iframe src={studioBaseUrl} title="TANE:i 設計スタジオ" className="flex-1 w-full border-0" />
+      <iframe
+        src={sessionId ? `${studioBaseUrl}?sessionId=${encodeURIComponent(sessionId)}` : studioBaseUrl}
+        title="TANE:i 設計スタジオ"
+        className="flex-1 w-full border-0"
+      />
     </div>
   );
 }

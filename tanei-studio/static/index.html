@@ -384,6 +384,16 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+// 【セッションID】不特定多数が同時にこのサーバーへアクセスしても設計内容が混ざらないよう、
+// タブ単位で一意なIDを発行し、/ws/syncの接続と/api/renderの全リクエストに必ず含める
+// （server.py側でこのIDごとにWebSocketクライアント・直近仕様を分離して管理している）。
+// TANE:iチャット（app/app/studio/でこのページをiframe埋め込みしている）からアクセスした
+// 場合は、チャット側が発行したIDが`?sessionId=...`クエリで渡ってくるのでそれをそのまま使う。
+// このURLへ直接アクセスした場合（チャット経由でない単体利用）はここで新規発行する
+const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+const sessionIdFromUrl = new URLSearchParams(location.search).get('sessionId');
+const sessionId = sessionIdFromUrl && SESSION_ID_PATTERN.test(sessionIdFromUrl) ? sessionIdFromUrl : crypto.randomUUID();
+
 const form = document.getElementById('render-form');
 const submitBtn = document.getElementById('submit-btn');
 const statusEl = document.getElementById('status');
@@ -692,6 +702,7 @@ function collectPanelFinishes() {
 function collectPayloadFromForm() {
   const formData = new FormData(form);
   return {
+    sessionId,
     item: formData.get('item'),
     width: Number(formData.get('width')),
     depth: Number(formData.get('depth')),
@@ -787,7 +798,7 @@ form.addEventListener('submit', (e) => {
 // 自動的にチャット側へブロードキャストされる
 const syncStatusEl = document.getElementById('sync-status');
 const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
-const syncSocket = new WebSocket(`${wsProtocol}://${location.host}/ws/sync`);
+const syncSocket = new WebSocket(`${wsProtocol}://${location.host}/ws/sync?sessionId=${encodeURIComponent(sessionId)}`);
 
 syncSocket.addEventListener('open', () => {
   syncStatusEl.textContent = '🔗 チャットとの連携: 待機中（チャット側で仕様が確定すると自動反映されます）';
