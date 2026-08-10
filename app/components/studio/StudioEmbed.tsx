@@ -7,12 +7,12 @@ import { studioSpecToSheetLayout, type StudioSpec } from '../../lib/studioSpec';
 import { buildUniversalCutSheetPdf } from '../../lib/cutSheetPdf';
 import { downloadPdfBytes } from '../../lib/download';
 import { consumeLocalUsage, getLocalRemainingCount, DAILY_IMAGE_LIMIT, IMAGE_USAGE_STORAGE_KEY } from '../../lib/localUsage';
-import { DEFAULT_STUDIO_BASE_URL, STUDIO_IS_CLOUD_HOSTED, getStudioBaseUrl, setStudioBaseUrl } from '../../lib/studioBaseUrl';
+import { DEFAULT_STUDIO_BASE_URL, getStudioBaseUrl, setStudioBaseUrl } from '../../lib/studioBaseUrl';
 import { getOrCreateStudioSessionId } from '../../lib/studioSession';
 
 export default function StudioEmbed() {
-  // SSRとの整合性のため初期値は既定URL（NEXT_PUBLIC_STUDIO_BASE_URL、未設定時はlocalhost）に
-  // しておき、マウント後にlocalStorageの保存値（手動で接続先を変更していた場合）へ差し替える
+  // SSRとの整合性のため初期値は既定URL（http://localhost:5002）にしておき、
+  // マウント後にlocalStorageの保存値（手動で接続先を変更していた場合）へ差し替える
   const [studioBaseUrl, setStudioBaseUrlState] = useState(DEFAULT_STUDIO_BASE_URL);
   // 入力欄は例のプレースホルダーだけを見せ、現在の接続先を初期値として差し込まない
   // （既定値が薄く入って見えて紛らわしいため）
@@ -32,11 +32,11 @@ export default function StudioEmbed() {
     setStudioBaseUrlState(current);
     setSessionId(getOrCreateStudioSessionId());
 
-    // NEXT_PUBLIC_STUDIO_BASE_URL未設定（=クラウドの設計スタジオがまだ用意されておらず、
-    // ローカル開発中のlocalhost:5002が既定値のまま）の場合のみ、狭い画面幅（おおよそ
-    // スマートフォン・タブレット）でアクセスされたら接続設定パネルを最初から開いておく。
-    // クラウド化済みなら誰でもそのまま使えるはずなので、この自動表示は不要
-    if (!STUDIO_IS_CLOUD_HOSTED && current === DEFAULT_STUDIO_BASE_URL && window.innerWidth < 1024) {
+    // 設計スタジオはPC専用機能。接続先が未設定（既定のlocalhost:5002のまま）で、かつ
+    // 狭い画面幅（おおよそスマートフォン・タブレット）でアクセスされた場合は、
+    // 原因と対処（⚙️からPCのIPアドレスを入力する）が分かるよう接続設定パネルを
+    // 最初から開いておく
+    if (current === DEFAULT_STUDIO_BASE_URL && window.innerWidth < 1024) {
       setIsSettingsOpen(true);
     }
   }, []);
@@ -123,7 +123,7 @@ export default function StudioEmbed() {
           type="button"
           onClick={() => setIsSettingsOpen((prev) => !prev)}
           className="ml-auto flex-shrink-0 text-sm text-tanei-ink-muted hover:text-tanei-brand px-2 py-2 rounded-tanei-control transition-colors"
-          title="設計スタジオの接続先を設定（通常は変更不要です）"
+          title="設計スタジオの接続先を設定"
           aria-label="設計スタジオの接続先を設定"
         >
           ⚙️
@@ -140,26 +140,25 @@ export default function StudioEmbed() {
         </button>
       </div>
 
-      {!STUDIO_IS_CLOUD_HOSTED && (
-        <p className="px-4 py-1.5 border-b border-tanei-border bg-amber-50 text-amber-800 text-[11px] text-center flex-shrink-0">
-          ⚠️ 設計スタジオはパソコン専用機能です。スマートフォンでご利用の場合は⚙️から接続先の設定が必要です。
-        </p>
-      )}
+      <p className="px-4 py-1.5 border-b border-tanei-border bg-amber-50 text-amber-800 text-[11px] text-center flex-shrink-0">
+        ⚠️ 設計スタジオはパソコン専用機能です。スマートフォンでご利用の場合は⚙️から接続先の設定が必要です。
+      </p>
 
       {isSettingsOpen && (
         <div className="px-4 py-3 border-b border-tanei-border bg-tanei-brand-soft flex-shrink-0 text-sm">
           <p className="font-bold text-tanei-ink mb-1">設計スタジオの接続先</p>
           <p className="text-tanei-ink-muted text-xs leading-relaxed mb-2">
-            {STUDIO_IS_CLOUD_HOSTED
-              ? '通常は変更不要です。開発・検証用に別の設計スタジオサーバーへ一時的に繋ぎたい場合のみ、そのURLを下に入力してください。'
-              : '設計スタジオはオペレーターのパソコン上でしか起動できません。そのパソコンのブラウザからはそのまま使えますが、スマートフォン等の別端末から開く場合は、設計スタジオを起動しているパソコンと同じWi-Fiに接続したうえで、そのパソコンのIPアドレス（例: 192.168.1.23:5002）を下に入力してください。'}
+            設計スタジオはオペレーターのパソコン上でしか起動できません。そのパソコンのブラウザからは
+            そのまま使えますが、スマートフォン等の別端末から開く場合は、設計スタジオを起動している
+            パソコンと同じWi-Fiに接続したうえで、そのパソコンのIPアドレス（例: 192.168.1.23:5002）を
+            下に入力してください。
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="text"
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
-              placeholder={STUDIO_IS_CLOUD_HOSTED ? '例: https://tanei-studio-dev.onrender.com' : '例: 192.168.1.23:5002'}
+              placeholder="例: 192.168.1.23:5002"
               className="flex-1 min-w-[180px] border-2 border-tanei-ink-muted rounded-tanei-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-tanei-brand"
             />
             <button

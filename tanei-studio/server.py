@@ -63,8 +63,8 @@ MAX_DIMENSION_MM = 3000
 DEFAULT_THICKNESS_MM = 18
 
 # セッションID・ジョブIDはファイルパスや辞書キーにそのまま使うため、英数字・ハイフン・
-# アンダースコアのみに厳しく制限する（クラウド公開に伴い、不特定多数がURLへ直接任意の
-# 文字列を渡せるようになったため、`../`等によるパストラバーサルを確実に防ぐ）
+# アンダースコアのみに厳しく制限する（URLに直接渡ってくる値なので、`../`等による
+# パストラバーサルを確実に防ぐ）
 SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 JOB_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
@@ -95,12 +95,13 @@ os.makedirs(RENDERS_DIR, exist_ok=True)
 # （ブラウザ⇔ブラウザではなく、両方がこのFlaskサーバーの同一エンドポイントに接続することで
 # 中継する）。
 #
-# 【セッション分離】クラウド上で不特定多数が同時に使うと、この状態がプロセス全体で
-# グローバル1つしかない場合、Aさんの設計中にBさんが何か送信・レンダリングした瞬間に
-# Aさんの画面にBさんの仕様が割り込んで表示されてしまう（設計内容が他人と混ざる）。
-# これを防ぐため、sessionId（チャット側のapp/lib/studioSession.tsがブラウザのタブごとに
-# 発行するUUID。/ws/syncへは`?sessionId=...`クエリで、/api/renderへはJSONボディの
-# sessionIdフィールドで渡ってくる）ごとにclients/spec/sourceを独立したdictへ分離して管理する。
+# 【セッション分離】この状態がプロセス全体でグローバル1つしかないと、例えば同じ端末で
+# チャットのタブを2つ開いて別々の相談をした場合などに、片方の設計中にもう片方が何か
+# 送信・レンダリングした瞬間に、互いの画面に相手の仕様が割り込んで表示されてしまう
+# （設計内容が混ざる）。これを防ぐため、sessionId（チャット側のapp/lib/studioSession.tsが
+# ブラウザのタブごとに発行するUUID。/ws/syncへは`?sessionId=...`クエリで、/api/renderへは
+# JSONボディのsessionIdフィールドで渡ってくる）ごとにclients/spec/sourceを独立した
+# dictへ分離して管理する。
 # sessionsは{session_id: {"clients": set(), "spec": {}, "source": "chat"}}で、
 # 該当セッションの接続が0になった時点でエントリごと破棄する（プロセスのメモリに
 # 使われなくなったセッションが溜まり続けないようにするための単純なガベージコレクション）。
@@ -468,11 +469,7 @@ def api_render():
 
 
 if __name__ == "__main__":
-    # ローカル開発時のみこのFlask開発サーバーを直接使う（`python3 server.py`）。
-    # クラウド本番環境ではgunicorn経由で起動する（Dockerfile参照。flask-sockのWebSocketは
-    # 開発サーバーでは1接続しか同時に捌けず本番運用に向かないため、gunicornでは
-    # スレッドを増やして起動する）。PORTはRender等のPaaSがコンテナ起動時に動的に
-    # 割り当てる環境変数で、ローカルでは未設定なので既定の5002を使う
-    port = int(os.environ.get("PORT", 5002))
-    debug = os.environ.get("FLASK_DEBUG", "1") == "1"
-    app.run(host="0.0.0.0", port=port, debug=debug)
+    # 設計スタジオはFreeCAD/POV-Rayに依存するため、オペレーターの手元PCで
+    # `python3 server.py` を起動して使うPC専用機能（host="0.0.0.0"なので、
+    # 同じWi-Fi上の別端末からはPCのIPアドレスでもアクセスできる）
+    app.run(host="0.0.0.0", port=5002, debug=True)

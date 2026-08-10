@@ -14,7 +14,6 @@ import {
 } from '../../lib/cutlist';
 import type { SavedItemType } from '../../lib/types';
 import { pushSpecToStudio } from '../../lib/studioSync';
-import { STUDIO_IS_CLOUD_HOSTED } from '../../lib/studioBaseUrl';
 
 interface CompletionCardsProps {
   msg: Message;
@@ -110,14 +109,7 @@ function CompletionCards({
         ]),
     // 天板・底板・側板・背板からなる箱型の家具のみ、AIがtanei-studio-specブロックを出力する
     ...(studioSpec
-      ? [
-          {
-            icon: '🪚',
-            label: '設計スタジオで見る',
-            onClick: handleOpenInStudio,
-            title: STUDIO_IS_CLOUD_HOSTED ? undefined : 'パソコン専用機能です',
-          },
-        ]
+      ? [{ icon: '🪚', label: '設計スタジオで見る', onClick: handleOpenInStudio, title: 'パソコン専用機能です' }]
       : []),
     { icon: '💚', label: 'LINE送信', onClick: handleLineShare },
     { icon: '💾', label: '保存', onClick: handleSaveDesign },

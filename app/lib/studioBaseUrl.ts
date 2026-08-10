@@ -1,36 +1,21 @@
 // TANE:i設計スタジオ（tanei-studio/、FreeCAD+POV-Ray）の接続先ベースURLを解決するヘルパー。
 //
-// 優先順位:
-// 1. ブラウザのlocalStorageに保存された上書き値（⚙️の接続設定パネルで手動設定した場合。
-//    クラウド化した後もローカル開発時に別ホストを指したい場合の逃げ道として残している）
-// 2. ビルド時の環境変数 NEXT_PUBLIC_STUDIO_BASE_URL（Vercelに設定した、Renderなど
-//    クラウド上に常時稼働でデプロイした設計スタジオのURL。例: https://tanei-studio.onrender.com。
-//    DEPLOY.md参照）
-// 3. ローカル開発用の既定値 http://localhost:5002（NEXT_PUBLIC_STUDIO_BASE_URL未設定時の
-//    フォールバック。オペレーターが手元でtanei-studio/を起動して使う場合はこちらになる）
+// 設計スタジオはPC専用機能: オペレーターの手元PCで`python3 server.py`（既定ポート5002）を
+// 起動して使う。既定では常に http://localhost:5002 を使い、同じWi-Fi上のスマートフォン等
+// 別端末から使いたい場合のみ、⚙️の接続設定パネルでPCのIPアドレス（例: 192.168.1.23:5002）に
+// 手動で切り替えられるようにしている（localStorageに保存、その端末だけで有効）。
 
-// v2→v3: クラウド化前にローカルIPを手動設定した端末が、NEXT_PUBLIC_STUDIO_BASE_URL設定後も
-// 古い手動設定をそのまま使い続けてしまわないよう、バージョンを上げて過去の値を無効化する
 const STUDIO_BASE_URL_STORAGE_KEY = 'tanei-studio-base-url-v3';
-export const LOCAL_DEV_STUDIO_BASE_URL = 'http://localhost:5002';
-
-// NEXT_PUBLIC_*はNext.jsのビルド時にクライアントバンドルへ直接インライン化される
-// （実行時にサーバーから読むのではない）ため、Vercel側で設定したら再デプロイが必要
-const CONFIGURED_STUDIO_BASE_URL = process.env.NEXT_PUBLIC_STUDIO_BASE_URL?.trim() || null;
-
-export const DEFAULT_STUDIO_BASE_URL = CONFIGURED_STUDIO_BASE_URL || LOCAL_DEV_STUDIO_BASE_URL;
-
-// クラウド上に常時稼働の設計スタジオが設定されているかどうか。trueなら「パソコン専用」の
-// 注意書きや、狭い画面幅での接続設定パネル自動表示は不要になる（誰でもそのまま使えるため）
-export const STUDIO_IS_CLOUD_HOSTED = CONFIGURED_STUDIO_BASE_URL !== null;
+export const DEFAULT_STUDIO_BASE_URL = 'http://localhost:5002';
 
 const changeListeners = new Set<(url: string) => void>();
 
-// プロトコル省略時はhttps://を補い、末尾のスラッシュを取り除く
+// プロトコル省略時はhttp://を補い（ローカル・LAN上のFlaskサーバーはTLSを持たないため）、
+// 末尾のスラッシュを取り除く
 export function normalizeStudioBaseUrl(input: string): string {
   const trimmed = input.trim().replace(/\/+$/, '');
   if (!trimmed) return '';
-  return /^[a-zA-Z]+:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
+  return /^[a-zA-Z]+:\/\//.test(trimmed) ? trimmed : `http://${trimmed}`;
 }
 
 export function getStudioBaseUrl(): string {

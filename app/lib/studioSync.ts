@@ -1,11 +1,11 @@
 // TANE:iチャットと「TANE:i設計スタジオ」(FreeCAD+POV-Rayによる木工設計スタジオ、tanei-studio/。
 // freecad-studio/を複製してTANE:iに組み込んだ本番の実体)との双方向データ同期。
-// 設計スタジオはfreecadcmd/povrayというローカルバイナリに依存するため、このNext.jsアプリの
-// サーバー側（Vercel）から直接叩くことはできない。そのため同期はブラウザ側のJavaScriptが、
-// 設計スタジオ（既定はRender等クラウド上に常時稼働のURL。app/lib/studioBaseUrl.ts参照。
-// 未設定時はローカル開発用にhttp://localhost:5002にフォールバックする）のWebSocket
-// エンドポイントへ直結する形で行う（設計スタジオに接続できない環境では、単に接続が
-// 確立されないだけでエラーにはならない）。
+// 設計スタジオはfreecadcmd/povrayというローカルバイナリに依存するPC専用機能のため、
+// このNext.jsアプリのサーバー側（Vercel）から直接叩くことはできない。そのため同期は
+// ブラウザ側のJavaScriptが、オペレーターの同じPC上（またはapp/lib/studioBaseUrl.tsで
+// 設定したLAN上の別端末のIPアドレス。既定はhttp://localhost:5002）で起動している
+// 設計スタジオのWebSocketエンドポイントへ直結する形で行う（設計スタジオが起動して
+// いない環境では、単に接続が確立されないだけでエラーにはならない）。
 import type { StudioSpec } from './studioSpec';
 import { getStudioWsUrl, onStudioBaseUrlChange } from './studioBaseUrl';
 import { getOrCreateStudioSessionId } from './studioSession';

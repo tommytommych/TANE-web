@@ -1,7 +1,0 @@
-renders/*/
-__pycache__/
-*.pyc
-.venv/
-.git/
-.DS_Store
-README.md

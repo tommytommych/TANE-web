@@ -1,7 +1,6 @@
 'use client';
 
 import type { RefObject } from 'react';
-import { STUDIO_IS_CLOUD_HOSTED } from '../../lib/studioBaseUrl';
 
 interface ChatInputProps {
   input: string;
@@ -43,11 +42,9 @@ export default function ChatInput({
         </div>
       )}
 
-      {!STUDIO_IS_CLOUD_HOSTED && (
-        <p className="text-[11px] text-tanei-ink-muted mb-1.5 sm:mb-2">
-          ⚠️ 完成イメージ・設計スタジオはパソコンでのご利用専用です（スマートフォンでは別途接続設定が必要です）
-        </p>
-      )}
+      <p className="text-[11px] text-tanei-ink-muted mb-1.5 sm:mb-2">
+        ⚠️ 完成イメージ・設計スタジオはパソコンでのご利用専用です（スマートフォンでは別途接続設定が必要です）
+      </p>
 
       <div className="w-full max-w-none flex gap-1.5 sm:gap-2 items-center">
         <input
@@ -90,7 +87,7 @@ export default function ChatInput({
           onClick={onOpenCompletionImage}
           disabled={isLoading}
           className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 text-white shadow-lg shadow-indigo-500/25 px-3 sm:px-5 py-3 rounded-tanei-control text-sm font-bold hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 flex-shrink-0 flex items-center gap-1.5 border border-white/20"
-          title={STUDIO_IS_CLOUD_HOSTED ? 'TANE:i 設計スタジオで完成イメージを見る' : 'TANE:i 設計スタジオで完成イメージを見る（パソコン専用機能です）'}
+          title="TANE:i 設計スタジオで完成イメージを見る（パソコン専用機能です）"
         >
           <span>✨</span>
           <span className="hidden sm:inline">完成イメージ</span>

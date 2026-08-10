@@ -1,5 +1,2 @@
 Flask==3.0.3
 flask-sock==0.7.0
-# クラウド本番環境（Dockerfile経由）でのみ使う本番用WSGIサーバー。
-# ローカルの `python3 server.py` では使わないが、常にインストールしておく
-gunicorn==22.0.0
