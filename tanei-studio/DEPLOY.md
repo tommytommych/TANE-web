@@ -97,6 +97,30 @@ Renderの手動フォーム作成で **Root Directory** を空欄のまま作成
    設計スタジオのフォーム（「家具プリセット選択」「品名」等の入力欄）が表示されることを
    確認する。TANE:iチャットの画面が出る場合はまだ直っていない。
 
+### トラブルシューティング: 「Root directory "tanei-studio" does not exist」エラー
+
+`tanei-studio/`ディレクトリ自体はリポジトリに存在する
+（`https://github.com/tommytommych/TANE-web/tree/main/tanei-studio`で確認可能）。
+このエラーが出る場合は、以下のいずれかが原因になっている。
+
+1. **Blueprint（`render.yaml`）使用時**: `render.yaml`自体がリポジトリルートではなく
+   `tanei-studio/`配下に置いてあるため、`rootDir: tanei-studio`のような指定をすると
+   「render.yamlのある場所からの相対パス」として二重解決され、存在しない
+   `tanei-studio/tanei-studio`を探しにいってしまうことを実機で確認した。
+   現在の`render.yaml`は`rootDir`を使わず、`dockerfilePath`/`dockerContext`
+   （常にリポジトリルートからの相対パスで、この曖昧さがない）だけで完結させてある。
+   このエラーが出た場合は、最新の`tanei-studio/render.yaml`を使っているか
+   （Blueprint再同期・最新コミットの取り込み）を確認する。
+2. **手動Web Service作成（方法B）時**: **Root Directory** 欄への入力ミスの可能性が高い。
+   - 前後に余計な空白・改行が入っていないか（コピペ時に混入しやすい）
+   - `./tanei-studio`や`/tanei-studio`のように先頭にスラッシュ・ドットを付けていないか
+     （`tanei-studio`のみでよい）
+   - 大文字・小文字が完全に一致しているか（`Tanei-Studio`等は不可）
+3. **Renderが古いリポジトリ構成をキャッシュしている可能性**: Renderにリポジトリを
+   接続した時点がtanei-studio/追加より前だった場合、ファイル一覧が更新されていないことが
+   ある。Render側のGitHub連携設定でリポジトリを一度切断→再接続するか、対象サービスの
+   **Settings** で接続リポジトリ・ブランチ（`main`）を選び直すと解消することがある。
+
 ### 3. Vercel（TANE:i本体）側の設定
 
 Next.jsアプリ（このリポジトリのルート）に、デプロイしたURLを環境変数として設定する。

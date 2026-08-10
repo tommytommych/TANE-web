@@ -6,6 +6,14 @@
 # 画面を返すという不具合が起きた。この設定ミスをダッシュボードの手入力に頼らず確実に
 # 再現できるよう、YAMLとして明示的に定義しておく。
 #
+# 【rootDirを使わない理由】このファイル自体がリポジトリルートではなくtanei-studio/配下に
+# 置いてあるため、rootDir: tanei-studioを指定すると「render.yamlのある場所からの相対パス」
+# として二重解決され、存在しないtanei-studio/tanei-studioを探しにいって
+# "Root directory 'tanei-studio' does not exist" エラーになることを実機で確認した。
+# dockerfilePath/dockerContextは公式ドキュメント上、常にリポジトリルートからの相対パスで
+# 曖昧さがないため、こちらだけで完結させている（rootDirは省略。ビルドトリガーの絞り込み
+# ができなくなるだけで、Docker中心の運用では実害はない）。
+#
 # 【使い方】Renderダッシュボード → New + → Blueprint → このリポジトリを接続 →
 # Blueprint Pathに `tanei-studio/render.yaml` を指定する。
 # 既存の誤設定サービス（tane-i-1）を削除してからこのBlueprintで作り直せば、
@@ -20,7 +28,6 @@ services:
     runtime: docker
     plan: starter
     region: singapore
-    rootDir: tanei-studio
     dockerfilePath: tanei-studio/Dockerfile
     dockerContext: tanei-studio
     healthCheckPath: /
