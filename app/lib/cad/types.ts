@@ -27,7 +27,7 @@ export interface Vector3Mm {
 /** パネル1枚の役割（意味的な種類）。tanei-studioのラベル方式と違い、UIの言語に依存しない
  * 識別子にしている（表示用の日本語ラベルは別途labelフィールドに持たせる）。
  * 一覧にない特殊パーツは 'custom' + label で表現できるようにし、将来の拡張を妨げない */
-export type FurniturePanelKind = 'top' | 'bottom' | 'left' | 'right' | 'back' | 'shelf' | 'custom';
+export type FurniturePanelKind = 'top' | 'bottom' | 'left' | 'right' | 'back' | 'shelf' | 'leg' | 'custom';
 
 /** パネルの仕上げ（tanei-studio/app/lib/studioSpec.tsのPanelFinishと同じ語彙で揃えている） */
 export type PanelFinish = 'clear' | 'walnut' | 'white' | 'black';
@@ -67,6 +67,37 @@ export interface FurnitureModel {
   thickness: number;
   panels: FurniturePanel[];
   options: FurnitureOptions;
+}
+
+/**
+ * 棚板1枚分の「編集可能な状態」。追加時は自動配置（geometry.tsのaddShelfToDesign）、
+ * 高さ・幅・奥行きはユーザーが個別に上書きできる（ただし側板・天板等を突き抜けない
+ * 範囲にmodel.tsのclampShelfEntryで自動的に収める）。
+ */
+export interface ShelfEntry {
+  id: string;
+  /** 棚板の下端の高さ位置（mm、本体の底面基準） */
+  zAtMm: number;
+  widthMm: number;
+  depthMm: number;
+}
+
+/**
+ * ブラウザCADの「編集状態」の中心データ（Phase 2-2）。ユーザーの操作（寸法変更・
+ * 棚板の追加/削除/編集・背板や脚の切り替え）は全てこの構造への更新として表現し、
+ * ここから毎回FurnitureModel.panelsを計算し直す（3Dオブジェクトそのものは状態管理の
+ * 中心にしない）。FurnitureDesign → Panel[]（buildFurnitureModel経由） → 3D Renderingという
+ * データ駆動の流れを維持するための入力型。
+ */
+export interface FurnitureDesign {
+  width: number;
+  depth: number;
+  height: number;
+  thickness: number;
+  backPanel: boolean;
+  /** 脚の有無のみ（個別の脚ごとの編集はPhase 2-3以降の検討課題） */
+  legs: boolean;
+  shelves: ShelfEntry[];
 }
 
 export const isFurnitureModel = (value: unknown): value is FurnitureModel => {
