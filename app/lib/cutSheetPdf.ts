@@ -133,7 +133,10 @@ const TOMISHIN_CHANNEL_URL = 'https://www.youtube.com/@tomishin_channel_DIY';
 // TANE:iオリジナルの汎用カット申込書を1枚にまとめて生成する
 export const buildUniversalCutSheetPdf = async (
   materialGroupsInput: MaterialGroup[] = DEMO_MATERIAL_GROUPS,
-  sheetLayouts: SheetLayout[] = []
+  sheetLayouts: SheetLayout[] = [],
+  // ブラウザCAD（Phase 2-4）から呼ぶ場合のみ指定。家具名・使用材料・必要枚数を
+  // ヘッダー直下に1行追加する（省略時は従来どおり何も表示しない＝既存呼び出し元は無変更）
+  furnitureInfo?: { name: string; material: string; sheetCount: number }
 ): Promise<Uint8Array> => {
   // 引数なし（デモ表示）の時だけデモデータを使い、シート材のみが渡された場合は
   // 1次元木取り図セクション自体を表示しない
@@ -210,6 +213,15 @@ export const buildUniversalCutSheetPdf = async (
   });
 
   cursorY = height - headerHeight - 16;
+
+  // ---------- 家具情報（家具名・使用材料・必要枚数） ----------
+  if (furnitureInfo) {
+    page.drawText(
+      `家具名: ${furnitureInfo.name}　使用材料: ${furnitureInfo.material}　必要枚数: ${furnitureInfo.sheetCount}枚`,
+      { x: margin, y: cursorY, size: 10.5, font: fontBold, color: black }
+    );
+    cursorY -= 18;
+  }
 
   // ---------- 対応店舗の注記（仕様4） ----------
   const compatNoteHeight = 28;
@@ -585,13 +597,15 @@ export const buildUniversalCutSheetPdf = async (
   // ---------- カット依頼リスト ----------
   const flatCutList = [
     ...materialGroups.flatMap((group) =>
-      group.parts.map((part) => ({ material: group.name, lengthMm: `${part.sizeMm}`, qty: part.qty }))
+      group.parts.map((part) => ({ material: group.name, lengthMm: `${part.sizeMm}`, qty: part.qty, note: '' }))
     ),
     ...sheetLayouts.flatMap((layout) =>
       layout.parts.map((part) => ({
         material: layout.name,
         lengthMm: `${part.widthMm}×${part.heightMm}`,
         qty: part.qty,
+        // パーツ名（例: 天板・棚板1）。ブラウザCAD経由のsheetLayoutのみ持つ情報
+        note: part.label ?? '',
       }))
     ),
   ];
@@ -639,7 +653,7 @@ export const buildUniversalCutSheetPdf = async (
 
   drawRow(0, columns.map((c) => c.label), true);
   flatCutList.forEach((item, i) => {
-    drawRow(i + 1, [item.material, `${item.lengthMm}`, `${item.qty}`, ''], false);
+    drawRow(i + 1, [item.material, `${item.lengthMm}`, `${item.qty}`, item.note], false);
   });
 
   cursorY = tableTop - rowHeight * (flatCutList.length + 1) - 20;
