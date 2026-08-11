@@ -159,6 +159,8 @@ export default function SavedItemsModal({ activeModal, savedItems, onClose, onRe
               />
               {fileError && <p className="text-xs text-red-500">{fileError}</p>}
               {newFileDataUrl && (
+                // base64のdata URL（外部URLではない一時プレビュー）のためnext/imageの最適化対象外。意図的にimgタグを使用
+                // eslint-disable-next-line @next/next/no-img-element
                 <img src={newFileDataUrl} alt="プレビュー" className="max-h-32 rounded-tanei-control border border-tanei-border" />
               )}
               <div className="flex gap-2 justify-end">
@@ -239,6 +241,8 @@ export default function SavedItemsModal({ activeModal, savedItems, onClose, onRe
                       <div className="text-sm font-bold text-tanei-ink">{item.title}</div>
 
                       {isImage && (
+                        // base64のdata URL（IndexedDB保存の画像）のためnext/imageの最適化対象外。意図的にimgタグを使用
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={item.fileDataUrl}
                           alt={item.title}

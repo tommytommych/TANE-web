@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { KOHNAN_WOOD_LIST, AMAZON_TOOLS, shuffleArray } from '../lib/constants';
@@ -14,7 +14,6 @@ import {
   extractStudioSpecFromContent,
   stripInternalBlocks,
 } from '../lib/cutlist';
-import { deriveProjectFlags } from '../lib/projectStatus';
 import { buildUniversalCutSheetPdf } from '../lib/cutSheetPdf';
 import { buildBlankCutSheetPdf } from '../lib/blankCutSheetPdf';
 import { buildAssemblyInstructionsPdf } from '../lib/assemblyPdf';
@@ -226,13 +225,6 @@ export default function Home() {
     }
     showToast('新しい相談を始めましょう🌱');
   }, [messages.length, showToast]);
-
-  // 木取り図・PDF・組立説明書の各生成機能は、必要な状態に達するまで実行できないようにする
-  // （ProjectStatus: Draft → Interviewing → DesignReady → CutListReady → PdfReady → AssemblyReady）
-  const projectFlags = useMemo(
-    () => deriveProjectFlags(messages, hasGeneratedPdf, hasGeneratedAssembly),
-    [messages, hasGeneratedPdf, hasGeneratedAssembly]
-  );
 
   const addItem = useCallback(
     async (type: SavedItemType, title: string, content: string, file?: { dataUrl: string; mimeType: string }) => {

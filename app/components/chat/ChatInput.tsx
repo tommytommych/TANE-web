@@ -31,6 +31,8 @@ export default function ChatInput({
     <div className="p-3 sm:p-5 bg-white border-t border-tanei-border">
       {selectedImage && (
         <div className="mb-2 flex items-center gap-3 bg-tanei-surface-muted p-2 rounded-tanei-control border border-tanei-border w-fit max-w-full">
+          {/* base64のdata URL（外部URLではない一時プレビュー）のためnext/imageの最適化対象外。意図的にimgタグを使用 */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={selectedImage} alt="添付写真" className="h-12 w-12 object-cover rounded-lg flex-shrink-0" />
           <div className="text-xs min-w-0">
             <span className="font-bold text-tanei-ink block">📷 写真を添付中（写真で相談）</span>

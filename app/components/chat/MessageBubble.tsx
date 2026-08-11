@@ -89,6 +89,8 @@ function MessageBubble({
       >
         {imageUrl && (
           <div className="mb-3">
+            {/* base64のdata URL（外部URLではない一時プレビュー）のためnext/imageの最適化対象外。意図的にimgタグを使用 */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={imageUrl} alt="相談写真" className="max-h-48 rounded-xl object-cover border border-white/20 shadow-sm" />
             <button
               onClick={() => {
