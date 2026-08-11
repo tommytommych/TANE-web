@@ -87,6 +87,10 @@ export default function Home() {
   // で来た場合のみ使う（Phase 3-1）。CAD側からこのページの関数を直接importするのではなく、
   // URLのクエリパラメータだけを橋渡しに使うことで、ルート間の依存を増やさないようにしている
   const [pendingFinishedTitle, setPendingFinishedTitle] = useState<string | undefined>(undefined);
+  // 完成作品の元になったCADプロジェクトのid（Phase 3-14）。保存前の設計（projectIdがまだ
+  // 無い）から完成作品として保存した場合はundefinedのままになる（それ自体は問題なく、
+  // その完成作品には単に「元の設計を開く」導線が出ないだけ）
+  const [pendingFinishedProjectId, setPendingFinishedProjectId] = useState<string | undefined>(undefined);
   const [autoOpenFinishedAdd, setAutoOpenFinishedAdd] = useState(false);
   // SSRとの整合性のため初期値はfalse（閉）にしておき、デスクトップ幅の場合だけ
   // マウント後に開く。true始まりだとモバイルで初回表示時に全画面ドロワーが
@@ -158,9 +162,11 @@ export default function Home() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('openFinished') !== '1') return;
     const title = params.get('finishedTitle') ?? undefined;
+    const relatedProjectId = params.get('finishedProjectId') ?? undefined;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveModal('finished');
     setPendingFinishedTitle(title);
+    setPendingFinishedProjectId(relatedProjectId);
     setAutoOpenFinishedAdd(true);
     window.history.replaceState(null, '', '/app');
   }, []);
@@ -250,7 +256,13 @@ export default function Home() {
   }, [messages.length, showToast]);
 
   const addItem = useCallback(
-    async (type: SavedItemType, title: string, content: string, file?: { dataUrl: string; mimeType: string }) => {
+    async (
+      type: SavedItemType,
+      title: string,
+      content: string,
+      file?: { dataUrl: string; mimeType: string },
+      relatedProjectId?: string
+    ) => {
       const newItem: SavedItem = {
         id: Date.now().toString(),
         type,
@@ -258,6 +270,7 @@ export default function Home() {
         content,
         fileDataUrl: file?.dataUrl,
         fileMimeType: file?.mimeType,
+        relatedProjectId,
         date: new Date().toLocaleDateString('ja-JP') + ' ' + new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
       };
       // IndexedDBへの保存に失敗しても（プライベートブラウジング等）、画面上の表示は継続させる
@@ -706,6 +719,7 @@ export default function Home() {
         onAdd={addItem}
         showToast={showToast}
         initialAddTitle={pendingFinishedTitle}
+        initialAddRelatedProjectId={pendingFinishedProjectId}
         autoOpenAdd={autoOpenFinishedAdd}
         onAutoOpenAddHandled={handleAutoOpenFinishedAddHandled}
       />

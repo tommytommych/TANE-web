@@ -16,12 +16,16 @@ interface SavedItemsModalProps {
     type: SavedItemType,
     title: string,
     content: string,
-    file?: { dataUrl: string; mimeType: string }
+    file?: { dataUrl: string; mimeType: string },
+    relatedProjectId?: string
   ) => void;
   showToast?: (msg: string) => void;
   /** ブラウザCAD（Phase 3-1）の「完成作品として保存する」から遷移してきた場合のみ指定。
    * 新規保存フォームを自動的に開き、プロジェクト名をタイトルの初期値にする */
   initialAddTitle?: string;
+  /** 同じくブラウザCADからの遷移時のみ指定。元になったCADプロジェクトのid（Phase 3-14）。
+   * 保存済みの設計から来た場合のみ値があり、新規保存する完成作品に関連付けられる */
+  initialAddRelatedProjectId?: string;
   autoOpenAdd?: boolean;
   onAutoOpenAddHandled?: () => void;
 }
@@ -49,6 +53,7 @@ export default function SavedItemsModal({
   onAdd,
   showToast,
   initialAddTitle,
+  initialAddRelatedProjectId,
   autoOpenAdd,
   onAutoOpenAddHandled,
 }: SavedItemsModalProps) {
@@ -69,6 +74,9 @@ export default function SavedItemsModal({
   const [newContent, setNewContent] = useState('');
   const [newFileDataUrl, setNewFileDataUrl] = useState<string | null>(null);
   const [newFileMimeType, setNewFileMimeType] = useState<string | null>(null);
+  // ブラウザCADから完成作品として保存する際の、元プロジェクトへの関連付け（Phase 3-14）。
+  // 通常の新規保存（マイページから直接「＋新規保存」した場合）ではundefinedのまま
+  const [newRelatedProjectId, setNewRelatedProjectId] = useState<string | undefined>(undefined);
   const [fileError, setFileError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -91,6 +99,7 @@ export default function SavedItemsModal({
     if (autoOpenAdd) {
       setIsAdding(true);
       setNewTitle(initialAddTitle ?? '');
+      setNewRelatedProjectId(initialAddRelatedProjectId);
     }
   }
 
@@ -124,6 +133,7 @@ export default function SavedItemsModal({
     setNewContent('');
     setNewFileDataUrl(null);
     setNewFileMimeType(null);
+    setNewRelatedProjectId(undefined);
     setFileError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -145,7 +155,7 @@ export default function SavedItemsModal({
 
   const submitAdd = () => {
     if (!newTitle.trim() || !newFileDataUrl || !newFileMimeType) return;
-    onAdd(activeModal, newTitle.trim(), newContent.trim(), { dataUrl: newFileDataUrl, mimeType: newFileMimeType });
+    onAdd(activeModal, newTitle.trim(), newContent.trim(), { dataUrl: newFileDataUrl, mimeType: newFileMimeType }, newRelatedProjectId);
     showToast?.(activeModal === 'finished' ? '完成作品として保存しました🌱' : '画像を保存しました🌱');
     resetAddForm();
   };
@@ -417,6 +427,24 @@ export default function SavedItemsModal({
                         <div className="text-sm text-tanei-ink whitespace-pre-wrap bg-white p-3 rounded-tanei-control border border-tanei-border">
                           {item.content}
                         </div>
+                      )}
+
+                      {/* 完成作品から元の設計へ戻る導線（Phase 3-14）。ブラウザCADの「完成作品として
+                          保存する」経由で保存されたitemだけがrelatedProjectIdを持つ。既存の
+                          type='cadProject'一覧（savedItems）に該当する設計がまだ残っている場合のみ
+                          ボタンを表示し、削除済み・旧データの場合は安全な文言に留める（クラッシュしない） */}
+                      {activeModal === 'finished' && item.relatedProjectId && (
+                        savedItems.some((si) => si.type === 'cadProject' && si.id === item.relatedProjectId) ? (
+                          <Link
+                            href={`/app/cad?projectId=${item.relatedProjectId}`}
+                            onClick={onClose}
+                            className="inline-flex items-center gap-1.5 self-start text-xs font-bold bg-tanei-accent text-white px-3 py-1.5 rounded-tanei-control hover:bg-tanei-accent-dark transition-colors"
+                          >
+                            元の設計を開く
+                          </Link>
+                        ) : (
+                          <p className="text-xs text-tanei-ink-muted">元の設計は保存されていません</p>
+                        )
                       )}
                     </>
                   )}

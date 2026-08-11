@@ -303,6 +303,7 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
           setViewMode('cutlist');
         }}
         onConfirmSection={handleConfirmChecklistSection}
+        projectId={projectId}
       />
     );
   }

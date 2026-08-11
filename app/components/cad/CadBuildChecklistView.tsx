@@ -64,6 +64,10 @@ interface CadBuildChecklistViewProps {
   /** 各項目の「確認する」導線から呼ばれる（Phase 3-10）。buildChecklistは一切変更せず、
    * 既存の画面（cutlist内の該当セクション、またはcutMaterials画面）へ移動するだけ */
   onConfirmSection: (target: { viewMode: 'cutlist' | 'cutMaterials'; anchorId?: string }) => void;
+  /** 保存済みプロジェクトのid（CadStudio.tsxのprojectId）。まだ一度も保存していない
+   * 設計の場合はnull。完成作品として保存する際、元の設計へ戻れるようにするための
+   * 関連付けに使うだけで、それ以外の用途では一切使わない（Phase 3-14） */
+  projectId: string | null;
 }
 
 export default function CadBuildChecklistView({
@@ -73,6 +77,7 @@ export default function CadBuildChecklistView({
   onNext,
   projectName,
   onConfirmSection,
+  projectId,
 }: CadBuildChecklistViewProps) {
   const doneCount = BUILD_CHECKLIST_STEPS.filter((_, i) => checked[String(i + 1)]).length;
   // 既存のbuildChecklistから、その場で「最初の未完了項目」を計算するだけ。
@@ -120,7 +125,9 @@ export default function CadBuildChecklistView({
               <p className="text-xs text-tanei-ink mt-1">すべての制作チェックが完了しました。</p>
             </div>
             <Link
-              href={`/app?openFinished=1&finishedTitle=${encodeURIComponent(projectName)}`}
+              href={`/app?openFinished=1&finishedTitle=${encodeURIComponent(projectName)}${
+                projectId ? `&finishedProjectId=${encodeURIComponent(projectId)}` : ''
+              }`}
               className="self-start bg-tanei-brand text-white text-sm font-bold px-4 py-2.5 rounded-tanei-control hover:bg-tanei-brand-dark transition-colors"
             >
               🏆 完成作品として保存する
