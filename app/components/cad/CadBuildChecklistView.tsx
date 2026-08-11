@@ -103,9 +103,10 @@ export default function CadBuildChecklistView({
           </div>
         ) : (
           <div className="rounded-tanei-control border border-tanei-accent bg-white px-4 py-3">
-            <p className="text-xs font-bold text-tanei-ink-muted">次にやること</p>
-            <p className="text-base font-black text-tanei-ink mt-1">▶ {nextStepLabel}</p>
-            <p className="text-xs text-tanei-ink-muted mt-1">この作業が終わったらチェックしてください</p>
+            <p className="text-xs font-bold text-tanei-ink-muted">現在の作業</p>
+            <p className="text-[11px] font-black text-tanei-accent mt-1">STEP {nextStep.stepNumber}</p>
+            <p className="text-base font-black text-tanei-ink mt-0.5">{nextStepLabel}</p>
+            <p className="text-xs text-tanei-ink-muted mt-1">ここまで終わったら、チェックを入れて次へ進みましょう。</p>
           </div>
         )}
 
@@ -117,14 +118,24 @@ export default function CadBuildChecklistView({
           {BUILD_CHECKLIST_STEPS.map((label, i) => {
             const stepNumber = i + 1;
             const isChecked = Boolean(checked[String(stepNumber)]);
+            // 既存のnextStep（getNextBuildStep、Phase 2-9と共通）と同じ判定を使い、
+            // 「最初の未完了項目」だけを現在の作業として強調する（新しい判定ロジックは作らない）
+            const isCurrent = !isChecked && nextStep !== null && stepNumber === nextStep.stepNumber;
             const confirmTarget = CONFIRM_TARGETS[i];
             return (
               <li
                 key={stepNumber}
                 className={`rounded-tanei-control border overflow-hidden transition-colors ${
-                  isChecked ? 'bg-tanei-brand-soft border-tanei-brand' : 'bg-white border-tanei-border'
+                  isChecked
+                    ? 'bg-tanei-brand-soft border-tanei-brand'
+                    : isCurrent
+                      ? 'bg-white border-tanei-accent ring-1 ring-tanei-accent'
+                      : 'bg-white border-tanei-border'
                 }`}
               >
+                {isCurrent && (
+                  <p className="text-[10px] font-black text-tanei-accent px-3 pt-2">▶ 現在の作業</p>
+                )}
                 <label
                   className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
                     isChecked ? '' : 'hover:bg-tanei-surface'
