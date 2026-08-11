@@ -31,6 +31,8 @@ interface CadCutlistViewProps {
    * （Phase 2-7の通常の「🪚 木取り図を見る」からの遷移では常にfalse／未指定） */
   scrollToBuildGuide?: boolean;
   onScrolledToBuildGuide?: () => void;
+  /** 「作るパーツ」の「このパーツを見る」から呼ばれる（Phase 3-2） */
+  onViewPanel: (panelId: string) => void;
 }
 
 export default function CadCutlistView({
@@ -41,6 +43,7 @@ export default function CadCutlistView({
   onOpenCutList,
   scrollToBuildGuide,
   onScrolledToBuildGuide,
+  onViewPanel,
 }: CadCutlistViewProps) {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -174,7 +177,13 @@ export default function CadCutlistView({
             </div>
 
             <div id={BUILD_GUIDE_ANCHOR_ID}>
-              <CadBuildGuide model={model} material={material} sheetLayout={sheetLayout} sheetCount={sheets.length} />
+              <CadBuildGuide
+                model={model}
+                material={material}
+                sheetLayout={sheetLayout}
+                sheetCount={sheets.length}
+                onViewPanel={onViewPanel}
+              />
             </div>
           </>
         ) : (

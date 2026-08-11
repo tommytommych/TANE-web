@@ -250,6 +250,14 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
     setSelectedPanelId(panelId);
   }, []);
 
+  // 「作るパーツ」一覧（CadBuildGuide、Phase 3-2）の「このパーツを見る」から呼ばれる。
+  // 既存のselectedPanelId・CadViewportのハイライト表示をそのまま再利用するだけで、
+  // 新しい3D選択の仕組みは作らない
+  const handleViewPanel = useCallback((panelId: string) => {
+    setSelectedPanelId(panelId);
+    setViewMode('design');
+  }, []);
+
   if (viewMode === 'cutMaterials') {
     return (
       <CadCutMaterialsView
@@ -287,6 +295,7 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
         onOpenCutList={() => setViewMode('cutMaterials')}
         scrollToBuildGuide={scrollToBuildGuide}
         onScrolledToBuildGuide={handleScrolledToBuildGuide}
+        onViewPanel={handleViewPanel}
       />
     );
   }

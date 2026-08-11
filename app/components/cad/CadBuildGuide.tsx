@@ -15,6 +15,9 @@ interface CadBuildGuideProps {
   material: string;
   sheetLayout: SheetLayout;
   sheetCount: number;
+  /** 「作るパーツ」の「このパーツを見る」から、既存の3D CADへ該当パーツを
+   * ハイライトした状態で移動する（Phase 3-2） */
+  onViewPanel: (panelId: string) => void;
 }
 
 const SAFETY_NOTES = [
@@ -26,7 +29,7 @@ const SAFETY_NOTES = [
   '安全第一で、無理のない範囲で作業してください。',
 ];
 
-export default function CadBuildGuide({ model, material, sheetLayout, sheetCount }: CadBuildGuideProps) {
+export default function CadBuildGuide({ model, material, sheetLayout, sheetCount, onViewPanel }: CadBuildGuideProps) {
   const steps = buildFurnitureSteps(model.panels);
   // 既存のAIチャット用木材価格目安リスト（app/lib/constants.ts）から、現在選択中の材料と
   // 名前が一致するものだけを表示する。一致しなければ「価格情報なし」と正直に表示する
@@ -71,11 +74,20 @@ export default function CadBuildGuide({ model, material, sheetLayout, sheetCount
         <h3 className="text-sm font-bold text-tanei-ink mb-1">作るパーツ</h3>
         <ul className="rounded-tanei-control border border-tanei-border divide-y divide-tanei-border overflow-hidden bg-white">
           {model.panels.map((panel) => (
-            <li key={panel.id} className="flex items-center justify-between px-3 py-2 text-sm">
-              <span className="font-bold text-tanei-ink">{panel.label}</span>
-              <span className="text-tanei-ink-muted text-xs">
-                {Math.round(panel.size.x)} × {Math.round(panel.size.y)} × {Math.round(panel.size.z)} mm
-              </span>
+            <li key={panel.id} className="flex flex-col gap-1.5 px-3 py-2.5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-tanei-ink">{panel.label}</span>
+                <span className="text-tanei-ink-muted text-xs">
+                  {Math.round(panel.size.x)} × {Math.round(panel.size.y)} × {Math.round(panel.size.z)} mm
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => onViewPanel(panel.id)}
+                className="self-start text-xs font-bold text-tanei-brand border border-tanei-brand/40 hover:bg-tanei-brand-soft hover:border-tanei-brand rounded-full px-3 py-1 transition-colors"
+              >
+                👁 このパーツを見る
+              </button>
             </li>
           ))}
         </ul>
