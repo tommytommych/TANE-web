@@ -100,6 +100,32 @@ export interface FurnitureDesign {
   shelves: ShelfEntry[];
 }
 
+/** 保存データ（IndexedDB）から読み込んだFurnitureDesignの構造検証。ブラウザの保存領域が
+ * 壊れている・別バージョンのデータが混ざっている等の場合でもアプリを落とさないために使う */
+export const isValidFurnitureDesign = (value: unknown): value is FurnitureDesign => {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.width === 'number' &&
+    typeof v.depth === 'number' &&
+    typeof v.height === 'number' &&
+    typeof v.thickness === 'number' &&
+    typeof v.backPanel === 'boolean' &&
+    typeof v.legs === 'boolean' &&
+    Array.isArray(v.shelves) &&
+    v.shelves.every((s) => {
+      if (typeof s !== 'object' || s === null) return false;
+      const shelf = s as Record<string, unknown>;
+      return (
+        typeof shelf.id === 'string' &&
+        typeof shelf.zAtMm === 'number' &&
+        typeof shelf.widthMm === 'number' &&
+        typeof shelf.depthMm === 'number'
+      );
+    })
+  );
+};
+
 export const isFurnitureModel = (value: unknown): value is FurnitureModel => {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;

@@ -1,0 +1,98 @@
+// ブラウザCADの設計プロジェクト（FurnitureDesign）の保存・一覧・復元・削除。
+//
+// 【重要】新しいデータベースは作らない。既存のapp/lib/savedItemsStore.ts（IndexedDB
+// 「tanei-saved-items」、AIチャット側の「保存した設計・アイデア」「保存した画像」等と
+// 同じ仕組み）をそのまま再利用し、SavedItemTypeに'cadProject'を1種類追加しただけの
+// 薄いアダプタ層にしている。
+//
+// 【最重要】木取り図・パーツ一覧・制作手順は保存しない。保存するのはFurnitureDesign
+// （+ プロジェクト名・材料・作成/更新日時）だけで、再読み込み後は既存の
+// buildFurnitureModel() → furnitureModelToSheetLayout() 等で毎回再生成する
+// （Phase 2-3〜2-5で維持してきた「Panel[]が唯一の入力」という方針をここでも崩さない）。
+
+import type { SavedItem } from '../types';
+import { deleteSavedItem, loadAllSavedItems, putSavedItem } from '../savedItemsStore';
+import { isValidFurnitureDesign, type FurnitureDesign } from './types';
+
+export interface SavedFurnitureProject {
+  id: string;
+  version: 1;
+  projectName: string;
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
+  design: FurnitureDesign;
+  material: string;
+}
+
+export const DEFAULT_FURNITURE_PROJECT_NAME = '新しい設計';
+
+export const createNewFurnitureProjectId = (): string => `cad-${Date.now()}`;
+
+const formatUpdatedAtForDisplay = (iso: string): string => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('ja-JP') + ' ' + d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+};
+
+const toSavedItem = (project: SavedFurnitureProject): SavedItem => ({
+  id: project.id,
+  type: 'cadProject',
+  title: project.projectName || DEFAULT_FURNITURE_PROJECT_NAME,
+  content: JSON.stringify(project),
+  date: formatUpdatedAtForDisplay(project.updatedAt),
+});
+
+// content（JSON文字列）は他バージョンのデータ・ブラウザ保存領域の破損等で壊れている
+// 可能性があるため、必ず構造を検証してから使う（不正な場合はnullを返し、呼び出し側で
+// 「読み込めませんでした」という初心者向けメッセージを出す。アプリを落とさない）
+const parseSavedItem = (item: SavedItem): SavedFurnitureProject | null => {
+  if (item.type !== 'cadProject') return null;
+  try {
+    const parsed: unknown = JSON.parse(item.content);
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    const p = parsed as Record<string, unknown>;
+    if (
+      typeof p.id !== 'string' ||
+      typeof p.projectName !== 'string' ||
+      typeof p.createdAt !== 'string' ||
+      typeof p.updatedAt !== 'string' ||
+      typeof p.material !== 'string' ||
+      !isValidFurnitureDesign(p.design)
+    ) {
+      return null;
+    }
+    return {
+      id: p.id,
+      version: 1,
+      projectName: p.projectName,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+      design: p.design,
+      material: p.material,
+    };
+  } catch {
+    return null;
+  }
+};
+
+export const saveFurnitureProject = async (project: SavedFurnitureProject): Promise<void> => {
+  await putSavedItem(toSavedItem(project));
+};
+
+export const loadFurnitureProjects = async (): Promise<SavedFurnitureProject[]> => {
+  const items = await loadAllSavedItems();
+  return items
+    .map(parseSavedItem)
+    .filter((p): p is SavedFurnitureProject => p !== null)
+    .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+};
+
+export const loadFurnitureProject = async (id: string): Promise<SavedFurnitureProject | null> => {
+  const items = await loadAllSavedItems();
+  const found = items.find((item) => item.id === id && item.type === 'cadProject');
+  return found ? parseSavedItem(found) : null;
+};
+
+export const deleteFurnitureProject = async (id: string): Promise<void> => {
+  await deleteSavedItem(id);
+};

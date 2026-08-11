@@ -20,6 +20,7 @@ interface LeftSidebarProps {
 const MY_PAGE_ITEMS: { icon: string; label: string; type: SavedItemType }[] = [
   { icon: '⭐', label: 'お気に入り', type: 'favorite' },
   { icon: '💾', label: '保存した設計・アイデア', type: 'design' },
+  { icon: '🧊', label: '保存した設計（ブラウザCAD）', type: 'cadProject' },
   { icon: '📏', label: '木取り図', type: 'cutlist' },
   { icon: '📄', label: '保存したPDF', type: 'pdf' },
   { icon: '🖼️', label: '保存した画像', type: 'image' },

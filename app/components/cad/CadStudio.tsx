@@ -5,7 +5,7 @@
 // せず、常にFurnitureDesign（状態）→ FurnitureModel.panels（buildFurnitureModelで
 // 毎回再計算） → 3D表示、というデータ駆動の流れを維持している。
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import CadViewport from './CadViewport';
 import CadControls from './CadControls';
 import CadPartsPanel from './CadPartsPanel';
@@ -23,6 +23,13 @@ import {
   updateShelfInDesign,
 } from '../../lib/cad/model';
 import type { FurnitureDesign } from '../../lib/cad/types';
+import {
+  createNewFurnitureProjectId,
+  DEFAULT_FURNITURE_PROJECT_NAME,
+  loadFurnitureProject,
+  saveFurnitureProject,
+  type SavedFurnitureProject,
+} from '../../lib/cad/projectStore';
 
 interface CadStudioProps {
   initialDesign?: FurnitureDesign;
@@ -33,6 +40,77 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
   const [material, setMaterial] = useState<string>(FURNITURE_MATERIALS[0]);
   const [viewMode, setViewMode] = useState<'design' | 'cutlist'>('design');
+
+  // 保存済みプロジェクトの管理状態。projectIdがnull＝まだ一度も保存していない新規設計
+  // （「保存する」を押すと新規プロジェクトになる）、値がある＝既存プロジェクトの更新になる
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectCreatedAt, setProjectCreatedAt] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState(DEFAULT_FURNITURE_PROJECT_NAME);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
+
+  // マイページ「保存した設計」の「開く」から /app/cad?projectId=... で来た場合、
+  // 保存済みのFurnitureDesignを読み込んで復元する（木取り図・パーツ一覧・制作情報は
+  // 保存していないため、復元後にPanel[]から毎回作り直す既存の仕組みでそのまま再生成される）
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('projectId');
+    if (!id) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const project = await loadFurnitureProject(id);
+        if (cancelled) return;
+        if (!project) {
+          setLoadErrorMessage('この設計データを読み込めませんでした。新しい設計として続けられます。');
+          return;
+        }
+        setDesign(project.design);
+        setMaterial(project.material);
+        setProjectId(project.id);
+        setProjectCreatedAt(project.createdAt);
+        setProjectName(project.projectName);
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          setLoadErrorMessage('この設計データを読み込めませんでした。新しい設計として続けられます。');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    setIsSaving(true);
+    const now = new Date().toISOString();
+    const id = projectId ?? createNewFurnitureProjectId();
+    const project: SavedFurnitureProject = {
+      id,
+      version: 1,
+      projectName: projectName.trim() || DEFAULT_FURNITURE_PROJECT_NAME,
+      createdAt: projectCreatedAt ?? now,
+      updatedAt: now,
+      design,
+      material,
+    };
+    try {
+      await saveFurnitureProject(project);
+      setProjectId(project.id);
+      setProjectCreatedAt(project.createdAt);
+      setProjectName(project.projectName);
+      setSaveMessage('設計を保存しました🌱');
+    } catch (error) {
+      console.error(error);
+      setSaveMessage('保存に失敗しました。時間をおいて再度お試しください。');
+    } finally {
+      setIsSaving(false);
+      setTimeout(() => setSaveMessage(null), 4000);
+    }
+  }, [projectId, projectCreatedAt, projectName, design, material]);
 
   const { model, errorMessage } = useMemo(() => {
     try {
@@ -109,14 +187,38 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
 
   return (
     <div className="flex h-full w-full flex-col">
-      <div className="px-4 py-2 border-b border-tanei-border bg-white flex-shrink-0">
-        <button
-          type="button"
-          onClick={() => setViewMode('cutlist')}
-          className="flex items-center gap-1.5 bg-tanei-accent hover:bg-tanei-accent-dark text-white text-sm font-bold px-3 py-1.5 rounded-tanei-control shadow-sm transition-colors"
-        >
-          🪚 木取り図を見る
-        </button>
+      <div className="px-4 py-2 border-b border-tanei-border bg-white flex-shrink-0 flex flex-col gap-2">
+        {loadErrorMessage && (
+          <p className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-tanei-control px-2.5 py-1.5">
+            {loadErrorMessage}
+          </p>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            placeholder={DEFAULT_FURNITURE_PROJECT_NAME}
+            aria-label="設計の名前"
+            className="min-w-0 flex-1 border border-tanei-border rounded-tanei-control px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-tanei-brand"
+          />
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex items-center gap-1.5 bg-tanei-brand hover:bg-tanei-brand-dark text-white text-sm font-bold px-3 py-1.5 rounded-tanei-control shadow-sm transition-colors disabled:opacity-50"
+          >
+            {isSaving ? '保存中…' : '💾 保存する'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('cutlist')}
+            className="flex items-center gap-1.5 bg-tanei-accent hover:bg-tanei-accent-dark text-white text-sm font-bold px-3 py-1.5 rounded-tanei-control shadow-sm transition-colors"
+          >
+            🪚 木取り図を見る
+          </button>
+        </div>
+        {saveMessage && <p className="text-xs font-bold text-tanei-brand">{saveMessage}</p>}
       </div>
 
       <div className="flex flex-1 min-h-0 flex-col sm:flex-row">

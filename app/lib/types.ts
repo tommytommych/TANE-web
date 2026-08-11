@@ -1,4 +1,4 @@
-export type SavedItemType = 'design' | 'pdf' | 'cutlist' | 'image' | 'history' | 'favorite' | 'finished';
+export type SavedItemType = 'design' | 'pdf' | 'cutlist' | 'image' | 'history' | 'favorite' | 'finished' | 'cadProject';
 
 export interface SavedItem {
   id: string;

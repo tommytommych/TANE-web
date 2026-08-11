@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import type { SavedItem, SavedItemType } from '../../lib/types';
 
 interface SavedItemsModalProps {
@@ -25,6 +26,7 @@ const MODAL_META: Record<SavedItemType, { icon: string; label: string }> = {
   image: { icon: '🖼️', label: '保存した画像' },
   finished: { icon: '🏆', label: '完成作品' },
   history: { icon: '🕒', label: '相談履歴' },
+  cadProject: { icon: '🧊', label: '保存した設計（ブラウザCAD）' },
 };
 
 // 手動で新規保存できるのは「画像」「完成作品」（他は会話中のボタンから保存される）
@@ -34,6 +36,14 @@ export default function SavedItemsModal({ activeModal, savedItems, onClose, onRe
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [prevActiveModal, setPrevActiveModal] = useState(activeModal);
+  if (activeModal !== prevActiveModal) {
+    // モーダルの表示対象が切り替わったら、削除確認状態を持ち越さないようにリセットする
+    // （Reactが公式に認めている「レンダー中に直接状態を調整する」パターン）
+    setPrevActiveModal(activeModal);
+    setDeleteConfirmId(null);
+  }
 
   const [isAdding, setIsAdding] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -181,7 +191,55 @@ export default function SavedItemsModal({ activeModal, savedItems, onClose, onRe
             </div>
           )}
 
-          {items.length === 0 ? (
+          {activeModal === 'cadProject' ? (
+            items.length === 0 ? (
+              <p className="text-center text-gray-400 py-10 text-sm">保存した設計はまだありません。</p>
+            ) : (
+              items.map((item) => (
+                <div key={item.id} className="border border-tanei-border p-4 rounded-tanei-card bg-tanei-bg flex flex-col gap-2">
+                  <div className="text-xs text-gray-500">最終更新：{item.date}</div>
+                  <div className="text-sm font-bold text-tanei-ink">{item.title}</div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Link
+                      href={`/app/cad?projectId=${item.id}`}
+                      onClick={onClose}
+                      className="text-xs font-bold bg-tanei-accent text-white px-3 py-1.5 rounded-tanei-control hover:bg-tanei-accent-dark transition-colors"
+                    >
+                      開く
+                    </Link>
+
+                    {deleteConfirmId === item.id ? (
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-red-600">削除すると元に戻せません。</span>
+                        <button
+                          onClick={() => setDeleteConfirmId(null)}
+                          className="font-bold px-2 py-1 rounded-tanei-control bg-white border border-tanei-border text-tanei-ink-muted hover:bg-tanei-surface-muted"
+                        >
+                          キャンセル
+                        </button>
+                        <button
+                          onClick={() => {
+                            onRemove(item.id);
+                            setDeleteConfirmId(null);
+                          }}
+                          className="font-bold px-2 py-1 rounded-tanei-control bg-red-500 text-white hover:bg-red-600"
+                        >
+                          削除する
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setDeleteConfirmId(item.id)}
+                        className="text-red-500 hover:underline text-xs"
+                      >
+                        削除
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )
+          ) : items.length === 0 ? (
             <p className="text-center text-gray-400 py-10 text-sm">まだ保存されているデータはありません。</p>
           ) : (
             items.map((item) => {
