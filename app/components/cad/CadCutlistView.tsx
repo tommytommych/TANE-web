@@ -15,6 +15,7 @@ import { buildUniversalCutSheetPdf } from '../../lib/cutSheetPdf';
 import { downloadPdfBytes } from '../../lib/download';
 import type { FurnitureModel } from '../../lib/cad/types';
 import { FURNITURE_MATERIALS, furnitureModelToSheetLayout } from '../../lib/cad/model';
+import CadBuildGuide from './CadBuildGuide';
 
 interface CadCutlistViewProps {
   model: FurnitureModel;
@@ -139,6 +140,8 @@ export default function CadCutlistView({ model, material, onMaterialChange, onBa
             >
               {isGeneratingPdf ? 'PDFを作成中…' : '📄 PDFを保存'}
             </button>
+
+            <CadBuildGuide model={model} material={material} sheetLayout={sheetLayout} sheetCount={sheets.length} />
           </>
         ) : (
           <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-tanei-control px-4 py-3 text-sm">

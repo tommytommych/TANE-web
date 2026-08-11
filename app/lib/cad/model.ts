@@ -14,6 +14,7 @@
 import type { SheetLayout, SheetPart } from '../sheetLayout';
 import type { FurnitureDesign, FurnitureModel, FurniturePanel, ShelfEntry } from './types';
 import { buildFurniturePanels, clampShelfEntry, defaultShelfSize, panelToCutSizeMm } from './geometry';
+import { DEMO_ASSEMBLY_MANUAL } from '../assemblyManual';
 
 // systemPrompt.ts（tanei-studio-specブロック）・tanei-studio/freecad_scripts/generate_model.pyと
 // 語彙を揃えている（AIの提案・FreeCAD版・ブラウザCADのどれでも同じ材質名で扱えるようにするため）
@@ -297,3 +298,80 @@ export function furnitureModelToViewerPanels(model: FurnitureModel): ViewerPanel
     color: colorForPanel(panel, model.material),
   }));
 }
+
+/** 「制作する」画面（Phase 2-4の木取り図から続く制作情報）で使う、初心者向け作業手順。
+ * AIによる自由生成は行わず、現在のPanel[]から機械的に判断できる範囲（背板・棚板・脚の
+ * 有無）だけを文面に反映する、決まった手順のテンプレートを組み立てる */
+export interface FurnitureBuildStep {
+  stepNumber: number;
+  title: string;
+  description: string;
+}
+
+export function buildFurnitureSteps(panels: FurniturePanel[]): FurnitureBuildStep[] {
+  const hasBackPanel = panels.some((p) => p.kind === 'back');
+  const hasLegs = panels.some((p) => p.kind === 'leg');
+  const shelfCount = panels.filter((p) => p.kind === 'shelf').length;
+
+  const cutTargets = ['天板・底板・側板', hasBackPanel && '背板', shelfCount > 0 && '棚板']
+    .filter((v): v is string => Boolean(v))
+    .join('・');
+
+  const assembleTargets = [
+    '側板に底板・天板を固定',
+    shelfCount > 0 && '棚板を取り付け',
+    hasBackPanel && '背板を取り付け',
+    hasLegs && '脚を取り付け',
+  ]
+    .filter((v): v is string => Boolean(v))
+    .join('、');
+
+  const positionTargets = ['天板・底板・側板', hasBackPanel && '背板', shelfCount > 0 && `棚板（${shelfCount}枚）`, hasLegs && '脚']
+    .filter((v): v is string => Boolean(v))
+    .join('・');
+
+  const steps: Omit<FurnitureBuildStep, 'stepNumber'>[] = [
+    {
+      title: '材料を準備する',
+      description: '木取り図で選んだ材料と、必要な枚数がそろっているか確認します。',
+    },
+    {
+      title: '木取り図を確認する',
+      description: '木取り図を見ながら、どのパーツをどこから切り出すかを確認します。',
+    },
+    {
+      title: '各パーツを寸法どおりにカットする',
+      description: `パーツ一覧の寸法を確認しながら、${cutTargets}をカットします。`,
+    },
+    {
+      title: 'カットしたパーツの寸法を確認する',
+      description: '切り出したパーツが木取り図・パーツ一覧の寸法と合っているか、メジャーで確認します。',
+    },
+    {
+      title: '組み立て位置を確認する',
+      description: `${positionTargets}の位置を仮に合わせ、向きや配置を確認します。`,
+    },
+    {
+      title: '下穴を開ける',
+      description: 'ビスを打つ位置に、割れ防止のための下穴を開けます。',
+    },
+    {
+      title: 'ビスで組み立てる',
+      description: `${assembleTargets}ます。`,
+    },
+    {
+      title: 'ガタつきや寸法を確認する',
+      description: '全体がガタついていないか、直角や水平が保たれているかを確認します。',
+    },
+    {
+      title: '必要に応じて仕上げを行う',
+      description: '角をやすりで整えたり、塗装やオイル仕上げをしたい場合はここで行います。',
+    },
+  ];
+
+  return steps.map((s, i) => ({ stepNumber: i + 1, ...s }));
+}
+
+/** 「制作する」画面で表示する工具リスト。新しい工具データベースは作らず、
+ * 既存のAssemblyManual（AIチャット側の組立説明書機能）が持つ工具リストをそのまま再利用する */
+export const FURNITURE_BUILD_TOOLS: string[] = DEMO_ASSEMBLY_MANUAL.tools;
