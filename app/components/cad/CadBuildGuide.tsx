@@ -33,6 +33,8 @@ const MATERIALS_ANCHOR_ID = 'cad-materials';
 const TOOLS_ANCHOR_ID = 'cad-tools';
 const PARTS_ANCHOR_ID = 'cad-parts';
 const BUILD_STEPS_ANCHOR_ID = 'cad-build-steps';
+// 制作チェックの「仕上げを行った」からの確認導線（Phase 3-10）のスクロール先
+const SAFETY_NOTES_ANCHOR_ID = 'cad-safety-notes';
 
 interface CadBuildGuideProps {
   model: FurnitureModel;
@@ -440,7 +442,7 @@ export default function CadBuildGuide({
       </div>
 
       <div>
-        <h3 className="text-sm font-bold text-tanei-ink mb-1">安全ポイント</h3>
+        <h3 id={SAFETY_NOTES_ANCHOR_ID} className="text-sm font-bold text-tanei-ink mb-1 scroll-mt-4">安全ポイント</h3>
         <ul className="rounded-tanei-control border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 flex flex-col gap-1.5">
           {SAFETY_NOTES.map((note) => (
             <li key={note} className="flex gap-1.5">

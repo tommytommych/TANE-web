@@ -48,6 +48,10 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
   // 「制作する」セクションまで自動スクロールするためのフラグ（Phase 2-9）。
   // viewModeの種類は増やさず、既存のcutlist画面内の見せ方だけを変える
   const [scrollToBuildGuide, setScrollToBuildGuide] = useState(false);
+  // 制作チェックの各項目にある「確認する」導線（Phase 3-10）から、cutlist画面内の
+  // 特定セクションへスクロールするための、Phase 2-9とは別の一時的なターゲットid。
+  // Phase 2-9のscrollToBuildGuideは変更せず、並行する専用の状態として持つ
+  const [pendingCutlistAnchor, setPendingCutlistAnchor] = useState<string | null>(null);
 
   // 保存済みプロジェクトの管理状態。projectIdがnull＝まだ一度も保存していない新規設計
   // （「保存する」を押すと新規プロジェクトになる）、値がある＝既存プロジェクトの更新になる
@@ -188,6 +192,23 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
     setScrollToBuildGuide(false);
   }, []);
 
+  // 制作チェックの各項目の「確認する」導線（Phase 3-10）。cutMaterials（カットリスト）へは
+  // そのまま画面ごと切り替え、cutlist内の特定セクションへはpendingCutlistAnchorを
+  // 立ててから切り替える。buildChecklist自体は一切読み書きしない（表示・遷移のみ）
+  const handleConfirmChecklistSection = useCallback(
+    (target: { viewMode: 'cutlist' | 'cutMaterials'; anchorId?: string }) => {
+      if (target.anchorId) {
+        setPendingCutlistAnchor(target.anchorId);
+      }
+      setViewMode(target.viewMode);
+    },
+    []
+  );
+
+  const handleScrolledToPendingAnchor = useCallback(() => {
+    setPendingCutlistAnchor(null);
+  }, []);
+
   const { model, errorMessage } = useMemo(() => {
     try {
       return { model: buildFurnitureModel(design, { material }), errorMessage: null as string | null };
@@ -281,6 +302,7 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
           setScrollToBuildGuide(true);
           setViewMode('cutlist');
         }}
+        onConfirmSection={handleConfirmChecklistSection}
       />
     );
   }
@@ -298,6 +320,8 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
         onViewPanel={handleViewPanel}
         buildChecklist={buildChecklist}
         onViewBuildCheck={() => setViewMode('buildCheck')}
+        pendingAnchor={pendingCutlistAnchor}
+        onScrolledToPendingAnchor={handleScrolledToPendingAnchor}
       />
     );
   }

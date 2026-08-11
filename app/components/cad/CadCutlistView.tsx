@@ -20,6 +20,8 @@ import CadBuildGuide from './CadBuildGuide';
 // 制作チェック画面の「制作へ進む」から来たときだけ、この要素まで自動スクロールする
 // （CadBuildGuide自体は変更せず、外側にidを持つラッパーを用意するだけにしている）
 const BUILD_GUIDE_ANCHOR_ID = 'cad-build-guide';
+// 制作チェックの「木取り図を確認した」からの確認導線（Phase 3-10）のスクロール先
+const CUT_LAYOUT_ANCHOR_ID = 'cad-cut-layout';
 
 interface CadCutlistViewProps {
   model: FurnitureModel;
@@ -38,6 +40,10 @@ interface CadCutlistViewProps {
   buildChecklist: Record<string, boolean>;
   /** CadBuildGuideの「制作チェックを見る」から呼ばれる（Phase 3-5） */
   onViewBuildCheck: () => void;
+  /** 制作チェックの各項目の「確認する」導線（Phase 3-10）から指定される、この画面内の
+   * スクロール先id。Phase 2-9のscrollToBuildGuideとは別の、並行する仕組み */
+  pendingAnchor?: string | null;
+  onScrolledToPendingAnchor?: () => void;
 }
 
 export default function CadCutlistView({
@@ -51,6 +57,8 @@ export default function CadCutlistView({
   onViewPanel,
   buildChecklist,
   onViewBuildCheck,
+  pendingAnchor,
+  onScrolledToPendingAnchor,
 }: CadCutlistViewProps) {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -63,6 +71,14 @@ export default function CadCutlistView({
     document.getElementById(BUILD_GUIDE_ANCHOR_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     onScrolledToBuildGuide?.();
   }, [scrollToBuildGuide, onScrolledToBuildGuide]);
+
+  // Phase 2-9のscrollToBuildGuide用useEffectとは別に、Phase 3-10専用の並行したスクロール処理。
+  // 既存のuseEffectは変更せず、新しい対象（pendingAnchor）だけを扱う
+  useEffect(() => {
+    if (!pendingAnchor) return;
+    document.getElementById(pendingAnchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    onScrolledToPendingAnchor?.();
+  }, [pendingAnchor, onScrolledToPendingAnchor]);
 
   const showStatus = (msg: string) => {
     setStatusMessage(msg);
@@ -100,7 +116,7 @@ export default function CadCutlistView({
         </div>
       )}
 
-      <div className="p-4 max-w-2xl mx-auto w-full flex flex-col gap-4">
+      <div className="p-4 pb-24 max-w-2xl mx-auto w-full flex flex-col gap-4">
         <button
           type="button"
           onClick={onBack}
@@ -147,7 +163,7 @@ export default function CadCutlistView({
         {sheetLayout && sheets.length > 0 ? (
           <>
             <div>
-              <h3 className="text-sm font-bold text-tanei-ink mb-1">木取り図</h3>
+              <h3 id={CUT_LAYOUT_ANCHOR_ID} className="text-sm font-bold text-tanei-ink mb-1 scroll-mt-4">木取り図</h3>
               <SheetLayoutSvgView layout={sheetLayout} showToast={showStatus} />
             </div>
 
