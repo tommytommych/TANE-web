@@ -1,42 +1,56 @@
 'use client';
 
-// ブラウザCADの最上位コンポーネント（Phase 1時点の土台）。
-// まだどのルートにも組み込んでいない（既存UIに影響を与えないため）。Phase 2以降で
-// 専用ページ（例: app/app/cad/page.tsx）を新設し、ここから組み込む想定。
-//
-// CadViewport（3D表示）とCadControls（寸法等の表示）の両方が、同じFurnitureModelを
-// 参照するだけで動くことを確認するための最小構成。モデルを渡さない場合は
-// createFurnitureModel()でデモ用の箱を1つ生成して表示する。
+// ブラウザCADの最上位コンポーネント。「基本寸法」を変更すると、
+// FurnitureDesign（寸法）→ Panels（自動計算） → 3D Geometry という流れで
+// 3Dモデルをリアルタイムに再生成する（3Dモデルを直接ハードコードしない）。
+// 初期モデルは「シンプルな木製棚」（幅750×奥行300×高さ900mm、板厚18mm、棚板2枚）。
 
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import CadViewport from './CadViewport';
 import CadControls from './CadControls';
-import { createFurnitureModel } from '../../lib/cad/model';
-import type { FurnitureModel } from '../../lib/cad/types';
+import { createShelfModel, DEFAULT_SHELF_DESIGN, type ShelfDesign } from '../../lib/cad/model';
 
 interface CadStudioProps {
-  model?: FurnitureModel;
+  initialDesign?: ShelfDesign;
 }
 
-export default function CadStudio({ model }: CadStudioProps) {
-  const resolvedModel = useMemo(
-    () =>
-      model ??
-      createFurnitureModel({
-        projectId: 'demo',
-        name: 'テレビ台（サンプル）',
-        width: 1200,
-        depth: 400,
-        height: 400,
-      }),
-    [model]
-  );
+export default function CadStudio({ initialDesign }: CadStudioProps) {
+  const [design, setDesign] = useState<ShelfDesign>(initialDesign ?? DEFAULT_SHELF_DESIGN);
+
+  const { model, errorMessage } = useMemo(() => {
+    try {
+      return { model: createShelfModel(design), errorMessage: null as string | null };
+    } catch (error) {
+      // 板厚に対して高さが小さすぎる等、生成できない寸法の組み合わせを入力中でも
+      // アプリを落とさず、直前まで有効だったモデルは保持しつつエラー文だけ表示する
+      const message = error instanceof Error ? error.message : '寸法の組み合わせが正しくありません。';
+      return { model: null, errorMessage: message };
+    }
+  }, [design]);
+
+  // 直前に有効だった3Dモデルを保持し、入力途中の一時的な不正値（例: 高さを消して
+  // まだ何も入力していない一瞬）でビューアが空白にならないようにする
+  const [lastValidModel, setLastValidModel] = useState(() => createShelfModel(design));
+  if (model && model !== lastValidModel) {
+    // レンダー中に直接更新することで、余分な再レンダーなしに「直前の有効なモデル」を
+    // 常に最新化する（Reactが公式に認めているderived state更新パターンの一つ）
+    setLastValidModel(model);
+  }
+
+  const handleDesignChange = useCallback((next: ShelfDesign) => {
+    setDesign(next);
+  }, []);
 
   return (
     <div className="flex h-full w-full flex-col sm:flex-row">
-      <CadViewport model={resolvedModel} className="h-64 w-full sm:h-full sm:flex-1" />
-      <div className="w-full border-t border-tanei-border sm:w-72 sm:border-l sm:border-t-0">
-        <CadControls model={resolvedModel} />
+      <CadViewport model={lastValidModel} className="h-64 w-full sm:h-full sm:flex-1" />
+      <div className="w-full border-t border-tanei-border sm:w-72 sm:border-l sm:border-t-0 sm:overflow-y-auto">
+        <CadControls
+          design={design}
+          onChange={handleDesignChange}
+          panelCount={lastValidModel.panels.length}
+          errorMessage={errorMessage}
+        />
       </div>
     </div>
   );

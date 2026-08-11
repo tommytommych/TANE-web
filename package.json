@@ -36,6 +36,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.11",
     "tailwindcss": "^4",
+    "three-stdlib": "^2.36.1",
     "typescript": "^5"
   }
 }

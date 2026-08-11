@@ -1,14 +1,15 @@
 'use client';
 
-// ブラウザCADの3Dビューア（Phase 1時点では最小限の土台のみ）。
-// FurnitureModelのpanelsをそのままBoxGeometryとして描画するだけで、パーツの選択・
-// ドラッグ編集などのインタラクションはPhase 3以降で追加する。
+// ブラウザCADの3Dビューア。FurnitureModelのpanelsをBoxGeometryとして描画する。
+// パーツの選択・ドラッグ編集などのインタラクションはPhase 2-2以降で追加する。
 // tanei-studio/static/index.htmlの素のThree.js実装（カメラ・ライティングの考え方）を
-// React Three Fiberへ移植した最小構成。FreeCAD版と違いネイティブアプリ・サーバーに
+// React Three Fiberへ移植した構成。FreeCAD版と違いネイティブアプリ・サーバーに
 // 一切依存せず、ブラウザだけで完結する。
 
+import { useMemo, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import type { FurnitureModel } from '../../lib/cad/types';
 import { furnitureModelToViewerPanels } from '../../lib/cad/model';
 
@@ -23,11 +24,12 @@ interface CadViewportProps {
 const MM_TO_SCENE = 1 / 1000;
 
 function PanelMesh({ x, y, z, dx, dy, dz, color, label }: ReturnType<typeof furnitureModelToViewerPanels>[number]) {
-  // tanei-studioの座標系（原点=本体の左手前下）を、Three.jsの中心原点に近い配置へ
-  // 変換するため、パネル位置にサイズの半分を足して「箱の中心座標」にしている
+  // tanei-studioの座標系（原点=本体の左手前下、y=奥行方向で背板側が大きい値）を、
+  // Three.jsの座標系（X=幅, Y=高さ, Z=奥行）へ変換するため、パネル位置にサイズの
+  // 半分を足して「箱の中心座標」にしている
   const position: [number, number, number] = [
     (x + dx / 2) * MM_TO_SCENE,
-    (z + dz / 2) * MM_TO_SCENE, // Three.jsのY軸=上下、家具モデルのZ軸=高さに対応
+    (z + dz / 2) * MM_TO_SCENE,
     (y + dy / 2) * MM_TO_SCENE,
   ];
   const size: [number, number, number] = [dx * MM_TO_SCENE, dz * MM_TO_SCENE, dy * MM_TO_SCENE];
@@ -41,22 +43,72 @@ function PanelMesh({ x, y, z, dx, dy, dz, color, label }: ReturnType<typeof furn
 }
 
 export default function CadViewport({ model, className }: CadViewportProps) {
-  const panels = furnitureModelToViewerPanels(model);
-  // カメラをモデルの最大寸法に応じて後方へ引く（tanei-studio側のカメラ距離計算の簡易版。
-  // 厳密なフィッティングはPhase 3で必要になれば追加する）
+  const controlsRef = useRef<OrbitControlsImpl>(null);
+  const panels = useMemo(() => furnitureModelToViewerPanels(model), [model]);
+
+  // モデルの中心座標とおおよそのカメラ距離（最大寸法に応じて後方へ引く。
+  // 厳密なフィッティングが必要になればPhase 2-2以降で調整する）
+  const center: [number, number, number] = [
+    (model.width / 2) * MM_TO_SCENE,
+    (model.height / 2) * MM_TO_SCENE,
+    (model.depth / 2) * MM_TO_SCENE,
+  ];
   const maxDimMm = Math.max(model.width, model.depth, model.height, 1);
-  const cameraDistance = (maxDimMm * MM_TO_SCENE) * 1.8;
+  const distance = maxDimMm * MM_TO_SCENE * 1.8;
+
+  const setView = (mode: 'front' | 'oblique') => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+    const [cx, cy, cz] = center;
+    if (mode === 'front') {
+      controls.object.position.set(cx, cy, cz + distance);
+    } else {
+      controls.object.position.set(cx + distance, cy + distance * 0.8, cz + distance);
+    }
+    controls.target.set(cx, cy, cz);
+    controls.update();
+  };
 
   return (
-    <div className={className ?? 'h-full w-full'}>
-      <Canvas camera={{ position: [cameraDistance, cameraDistance * 0.8, cameraDistance], fov: 45 }}>
+    <div className={`relative ${className ?? 'h-full w-full'}`}>
+      {/* 初心者向けのカメラプリセット。OrbitControlsでも同じ視点に手動で回せるが、
+          「正面」「斜め」というボタンにしておくと、3D操作に不慣れな人でも迷わない */}
+      <div className="absolute top-3 left-3 z-10 flex gap-1.5">
+        <button
+          type="button"
+          onClick={() => setView('front')}
+          className="bg-white/90 hover:bg-white text-tanei-ink text-xs font-bold px-3 py-1.5 rounded-full border border-tanei-border shadow-sm transition-colors"
+        >
+          正面から見る
+        </button>
+        <button
+          type="button"
+          onClick={() => setView('oblique')}
+          className="bg-white/90 hover:bg-white text-tanei-ink text-xs font-bold px-3 py-1.5 rounded-full border border-tanei-border shadow-sm transition-colors"
+        >
+          斜めから見る
+        </button>
+      </div>
+
+      <Canvas
+        camera={{ position: [center[0] + distance, center[1] + distance * 0.8, center[2] + distance], fov: 45 }}
+        style={{ touchAction: 'none' }}
+      >
         <color attach="background" args={['#FAF8F4']} />
         <ambientLight intensity={0.7} />
         <directionalLight position={[3, 5, 2]} intensity={0.8} />
         {panels.map((panel) => (
-          <PanelMesh key={panel.label} {...panel} />
+          <PanelMesh key={panel.id} {...panel} />
         ))}
-        <OrbitControls makeDefault />
+        <OrbitControls
+          ref={controlsRef}
+          makeDefault
+          target={center}
+          enableDamping
+          dampingFactor={0.15}
+          minDistance={distance * 0.4}
+          maxDistance={distance * 3}
+        />
       </Canvas>
     </div>
   );

@@ -90,6 +90,23 @@ export function addShelfPanel(
   };
 }
 
+/**
+ * 天板・底板・側板×2・背板（buildDefaultFurniturePanels）に加え、内部を等間隔に
+ * 区切る棚板をshelfCount枚追加した、シンプルな木製棚のパネル一式を計算する。
+ */
+export function buildShelfDesignPanels(dims: BoxDimensions, shelfCount: number): FurniturePanel[] {
+  const panels = buildDefaultFurniturePanels(dims);
+  const interiorStart = dims.thickness;
+  const interiorEnd = dims.height - dims.thickness;
+
+  for (let i = 1; i <= shelfCount; i++) {
+    const zAtMm = interiorStart + ((interiorEnd - interiorStart) * i) / (shelfCount + 1);
+    panels.push(addShelfPanel(dims, zAtMm, `shelf-${i}`));
+  }
+
+  return panels;
+}
+
 /** パネルの3辺(dx,dy,dz)のうち、板厚に相当する最小の1辺を除いた残り2辺を、
  * 木取り図（2次元カット）用の縦横寸法として返す。どの向きの板でも正しく板厚軸を除ける */
 export function panelToCutSizeMm(panel: FurniturePanel): { widthMm: number; heightMm: number } {

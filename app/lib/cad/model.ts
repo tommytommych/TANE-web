@@ -6,7 +6,7 @@
 
 import type { SheetLayout, SheetPart } from '../sheetLayout';
 import type { FurnitureModel, FurniturePanel } from './types';
-import { buildDefaultFurniturePanels, panelToCutSizeMm } from './geometry';
+import { buildDefaultFurniturePanels, buildShelfDesignPanels, panelToCutSizeMm } from './geometry';
 
 // systemPrompt.ts（tanei-studio-specブロック）・tanei-studio/freecad_scripts/generate_model.pyと
 // 語彙を揃えている（AIの提案・FreeCAD版・ブラウザCADのどれでも同じ材質名で扱えるようにするため）
@@ -43,6 +43,53 @@ export function createFurnitureModel(input: {
   };
 }
 
+/** ブラウザCADの最初の実装対象「シンプルな木製棚」の寸法。幅750×奥行300×高さ900mm、
+ * 板厚18mm、棚板2枚（天板・底板・側板×2・背板の5枚と合わせて計7枚）が既定値 */
+export interface ShelfDesign {
+  width: number;
+  depth: number;
+  height: number;
+  thickness: number;
+  shelfCount: number;
+}
+
+export const DEFAULT_SHELF_DESIGN: ShelfDesign = {
+  width: 750,
+  depth: 300,
+  height: 900,
+  thickness: 18,
+  shelfCount: 2,
+};
+
+// 寸法入力欄で許容する範囲（tanei-studio/server.pyのMIN/MAX_DIMENSION_MMと揃えている）
+export const MIN_DIMENSION_MM = 100;
+export const MAX_DIMENSION_MM = 3000;
+export const MIN_THICKNESS_MM = 10;
+export const MAX_THICKNESS_MM = 40;
+
+/** ShelfDesign（寸法・板厚・棚板枚数）から、シンプルな木製棚のFurnitureModelを作る。
+ * 幅・奥行・高さ・板厚のいずれかが変わるたびに呼び直すことで、3Dモデルを
+ * リアルタイムに再生成する想定（CadStudio.tsx参照） */
+export function createShelfModel(
+  design: ShelfDesign,
+  overrides?: { projectId?: string; name?: string; material?: string }
+): FurnitureModel {
+  const material = overrides?.material ?? FURNITURE_MATERIALS[0];
+
+  return {
+    kind: 'furniture',
+    projectId: overrides?.projectId ?? 'shelf-demo',
+    name: overrides?.name ?? 'シンプルな木製棚',
+    width: design.width,
+    depth: design.depth,
+    height: design.height,
+    material,
+    thickness: design.thickness,
+    panels: buildShelfDesignPanels(design, design.shelfCount),
+    options: { shelfCount: design.shelfCount },
+  };
+}
+
 /** FurnitureModelのpanelsを、既存の木取り図PDF/SVG（app/lib/sheetLayout.ts,
  * app/lib/cutSheetPdf.ts）がそのまま受け取れるSheetLayoutへ変換する。
  * 新しいビンパッキングロジックは実装しない（既存ロジックの再利用）。 */
@@ -64,8 +111,10 @@ export function furnitureModelToSheetLayout(model: FurnitureModel): SheetLayout 
 
 /** Three.js/React Three Fiber（Phase 2以降）でそのまま描画できる形式。
  * tanei-studio/server.pyのserialize_panels_for_viewer()と同じ形（label/x/y/z/dx/dy/dz/color）
- * にしてあるため、あちらの実装知見（カメラ位置・ライティング等）を移植しやすい */
+ * にidを加えたもの。同じ役割のパネルが複数枚（棚板2枚など）あるとlabelが重複するため、
+ * Reactのkeyにはpanel.idではなくlabelを使わないよう、idを別途持たせている */
 export interface ViewerPanel {
+  id: string;
   label: string;
   x: number;
   y: number;
@@ -100,6 +149,7 @@ function colorForPanel(panel: FurniturePanel, modelMaterial: string): string {
 
 export function furnitureModelToViewerPanels(model: FurnitureModel): ViewerPanel[] {
   return model.panels.map((panel) => ({
+    id: panel.id,
     label: panel.label,
     x: panel.position.x,
     y: panel.position.y,

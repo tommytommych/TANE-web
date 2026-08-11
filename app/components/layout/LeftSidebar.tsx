@@ -200,6 +200,21 @@ export default function LeftSidebar({
                 </span>
               </Link>
 
+              {/* ブラウザCAD（React Three Fiber）はPC不要でスマホからも使えるため、
+                  設計スタジオ（FreeCAD版）とは別枠のリンクにしている。サーバー負荷が
+                  ないため「本日のAI機能利用」の消費対象にもしていない */}
+              <Link
+                href="/app/cad"
+                onClick={onClose}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-tanei-control text-sm bg-tanei-surface hover:bg-white border border-transparent hover:border-tanei-border text-tanei-ink transition-colors w-full text-left"
+              >
+                <span>🧊</span>
+                <span className="flex flex-col leading-tight">
+                  <span>TANE:i ブラウザCAD</span>
+                  <span className="text-[10px] font-normal text-tanei-ink-muted">※試験提供中</span>
+                </span>
+              </Link>
+
               <div className="mt-1.5 pt-2.5 border-t border-tanei-border">
                 <button
                   onClick={onDownloadBlankCutSheet}
