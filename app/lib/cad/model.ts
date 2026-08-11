@@ -444,9 +444,37 @@ export interface FurnitureProjectProgress {
   isComplete: boolean;
 }
 
-// CadBuildChecklistView.tsxの固定10ステップと揃えている（新しいチェック項目を増減する場合は
-// 両方を同時に見直す必要がある）
-const BUILD_CHECKLIST_TOTAL_STEPS = 10;
+// 制作チェックの固定10項目（Phase 2-7）。CadBuildChecklistView.tsx・CadBuildGuide.tsx
+// （Phase 3-5）の両方から、ここを唯一の情報源として参照する（別々に配列を持たない）
+export const BUILD_CHECKLIST_STEPS = [
+  '材料を用意した',
+  '木取り図を確認した',
+  '材料に寸法を書いた',
+  'パーツをカットした',
+  'カット寸法を確認した',
+  '組み立て位置を確認した',
+  '下穴を確認した',
+  '組み立てた',
+  'ガタつきを確認した',
+  '仕上げを行った',
+] as const;
+
+const BUILD_CHECKLIST_TOTAL_STEPS = BUILD_CHECKLIST_STEPS.length;
+
+export interface NextBuildStep {
+  stepNumber: number;
+  label: string;
+}
+
+/** buildChecklistから「最初の未完了項目」を求める（Phase 2-9でCadBuildChecklistView.tsxに
+ * 実装したものと全く同じロジック）。全て完了していれば、または旧バージョンデータで
+ * buildChecklistが存在しない場合は、それぞれ正しい結果（完了 or 先頭のステップ）を返す */
+export function getNextBuildStep(buildChecklist: Record<string, boolean> | undefined): NextBuildStep | null {
+  const checked = buildChecklist ?? {};
+  const index = BUILD_CHECKLIST_STEPS.findIndex((_, i) => !checked[String(i + 1)]);
+  if (index === -1) return null;
+  return { stepNumber: index + 1, label: BUILD_CHECKLIST_STEPS[index] };
+}
 
 export function computeFurnitureProjectProgress(
   design: FurnitureDesign,

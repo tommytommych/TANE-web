@@ -33,6 +33,11 @@ interface CadCutlistViewProps {
   onScrolledToBuildGuide?: () => void;
   /** 「作るパーツ」の「このパーツを見る」から呼ばれる（Phase 3-2） */
   onViewPanel: (panelId: string) => void;
+  /** 制作チェック（Phase 2-7）のチェック状態。CadBuildGuideの制作進捗表示にそのまま渡す
+   * だけで、ここでは読み書きしない（Phase 3-5） */
+  buildChecklist: Record<string, boolean>;
+  /** CadBuildGuideの「制作チェックを見る」から呼ばれる（Phase 3-5） */
+  onViewBuildCheck: () => void;
 }
 
 export default function CadCutlistView({
@@ -44,6 +49,8 @@ export default function CadCutlistView({
   scrollToBuildGuide,
   onScrolledToBuildGuide,
   onViewPanel,
+  buildChecklist,
+  onViewBuildCheck,
 }: CadCutlistViewProps) {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -183,6 +190,8 @@ export default function CadCutlistView({
                 sheetLayout={sheetLayout}
                 sheetCount={sheets.length}
                 onViewPanel={onViewPanel}
+                buildChecklist={buildChecklist}
+                onViewBuildCheck={onViewBuildCheck}
               />
             </div>
           </>

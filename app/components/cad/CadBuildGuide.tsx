@@ -9,10 +9,12 @@ import { useState } from 'react';
 import type { FurnitureModel } from '../../lib/cad/types';
 import type { SheetLayout } from '../../lib/sheetLayout';
 import {
+  BUILD_CHECKLIST_STEPS,
   FURNITURE_BUILD_TOOLS,
   buildFurnitureSteps,
   calculateMaterialCostEstimate,
   findMaterialPriceInfo,
+  getNextBuildStep,
 } from '../../lib/cad/model';
 import { AMAZON_TOOLS } from '../../lib/constants';
 
@@ -32,6 +34,11 @@ interface CadBuildGuideProps {
   /** 「作るパーツ」の「このパーツを見る」から、既存の3D CADへ該当パーツを
    * ハイライトした状態で移動する（Phase 3-2） */
   onViewPanel: (panelId: string) => void;
+  /** 制作チェック（Phase 2-7）のチェック状態。ここでは表示専用で、チェックの追加・変更は
+   * 既存のCadBuildChecklistViewからのみ行う（Phase 3-5） */
+  buildChecklist: Record<string, boolean>;
+  /** 「制作チェックを見る」から、既存のviewMode切り替えでCadBuildChecklistViewへ戻る */
+  onViewBuildCheck: () => void;
 }
 
 const SAFETY_NOTES = [
@@ -43,8 +50,20 @@ const SAFETY_NOTES = [
   '安全第一で、無理のない範囲で作業してください。',
 ];
 
-export default function CadBuildGuide({ model, material, sheetLayout, sheetCount, onViewPanel }: CadBuildGuideProps) {
+export default function CadBuildGuide({
+  model,
+  material,
+  sheetLayout,
+  sheetCount,
+  onViewPanel,
+  buildChecklist,
+  onViewBuildCheck,
+}: CadBuildGuideProps) {
   const steps = buildFurnitureSteps(model.panels);
+  // 制作チェック（Phase 2-7）と全く同じ関数・同じデータを使い、進捗表示が食い違わないようにする
+  const buildDoneCount = BUILD_CHECKLIST_STEPS.filter((_, i) => buildChecklist[String(i + 1)]).length;
+  const buildPercent = Math.round((buildDoneCount / BUILD_CHECKLIST_STEPS.length) * 100);
+  const nextBuildStep = getNextBuildStep(buildChecklist);
   // 既存のAIチャット用木材価格目安リスト（app/lib/constants.ts）から、現在選択中の材料と
   // 名前が一致するものだけを表示する。一致しなければ「価格情報なし」と正直に表示する
   const priceInfo = findMaterialPriceInfo(material);
@@ -67,6 +86,32 @@ export default function CadBuildGuide({ model, material, sheetLayout, sheetCount
         <p className="text-xs text-tanei-ink-muted mt-0.5">
           この家具を作るために必要なもの・作り方をまとめています
         </p>
+      </div>
+
+      <div className="rounded-tanei-control border border-tanei-border bg-white p-3 flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-tanei-ink-muted">制作進捗</span>
+          <span className="text-sm font-black text-tanei-brand">
+            {buildDoneCount} / {BUILD_CHECKLIST_STEPS.length}（{buildPercent}%）
+          </span>
+        </div>
+        <div className="w-full bg-tanei-border h-2 rounded-full overflow-hidden">
+          <div className="bg-tanei-brand h-full transition-all duration-300" style={{ width: `${buildPercent}%` }} />
+        </div>
+        {nextBuildStep ? (
+          <p className="text-xs text-tanei-ink">
+            次にやること：<span className="font-bold">{nextBuildStep.label}</span>
+          </p>
+        ) : (
+          <p className="text-xs font-bold text-tanei-brand">✓ 制作完了</p>
+        )}
+        <button
+          type="button"
+          onClick={onViewBuildCheck}
+          className="self-start text-xs font-bold text-tanei-brand hover:text-tanei-brand-dark underline"
+        >
+          制作チェックを見る
+        </button>
       </div>
 
       <div>

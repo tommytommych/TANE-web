@@ -9,6 +9,7 @@
 // 渡しながら遷移するリンクを追加する。CAD側に新しい保存の仕組みは一切作らない。
 
 import Link from 'next/link';
+import { BUILD_CHECKLIST_STEPS, getNextBuildStep } from '../../lib/cad/model';
 
 interface CadBuildChecklistViewProps {
   checked: Record<string, boolean>;
@@ -18,26 +19,14 @@ interface CadBuildChecklistViewProps {
   projectName: string;
 }
 
-const BUILD_CHECKLIST_STEPS = [
-  '材料を用意した',
-  '木取り図を確認した',
-  '材料に寸法を書いた',
-  'パーツをカットした',
-  'カット寸法を確認した',
-  '組み立て位置を確認した',
-  '下穴を確認した',
-  '組み立てた',
-  'ガタつきを確認した',
-  '仕上げを行った',
-];
-
 export default function CadBuildChecklistView({ checked, onToggle, onBack, onNext, projectName }: CadBuildChecklistViewProps) {
   const doneCount = BUILD_CHECKLIST_STEPS.filter((_, i) => checked[String(i + 1)]).length;
   // 既存のbuildChecklistから、その場で「最初の未完了項目」を計算するだけ。
-  // 新しい進捗データは作らない（保存もしない）
-  const nextIncompleteIndex = BUILD_CHECKLIST_STEPS.findIndex((_, i) => !checked[String(i + 1)]);
-  const isAllComplete = nextIncompleteIndex === -1;
-  const nextStepLabel = isAllComplete ? null : BUILD_CHECKLIST_STEPS[nextIncompleteIndex];
+  // 新しい進捗データは作らない（保存もしない）。CadBuildGuide.tsx（Phase 3-5）と
+  // 完全に同じ関数を使うことで、進捗表示が食い違わないようにしている
+  const nextStep = getNextBuildStep(checked);
+  const isAllComplete = nextStep === null;
+  const nextStepLabel = nextStep?.label ?? null;
 
   return (
     <div className="flex h-full w-full flex-col overflow-y-auto">

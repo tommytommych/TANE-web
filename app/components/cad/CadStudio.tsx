@@ -296,6 +296,8 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
         scrollToBuildGuide={scrollToBuildGuide}
         onScrolledToBuildGuide={handleScrolledToBuildGuide}
         onViewPanel={handleViewPanel}
+        buildChecklist={buildChecklist}
+        onViewBuildCheck={() => setViewMode('buildCheck')}
       />
     );
   }
