@@ -10,10 +10,12 @@ import CadViewport from './CadViewport';
 import CadControls from './CadControls';
 import CadPartsPanel from './CadPartsPanel';
 import CadSelectedPartPanel from './CadSelectedPartPanel';
+import CadCutlistView from './CadCutlistView';
 import {
   addShelfToDesign,
   buildFurnitureModel,
   createDefaultFurnitureDesign,
+  FURNITURE_MATERIALS,
   removeShelfFromDesign,
   resizeFurnitureDesign,
   setBackPanel,
@@ -29,21 +31,23 @@ interface CadStudioProps {
 export default function CadStudio({ initialDesign }: CadStudioProps) {
   const [design, setDesign] = useState<FurnitureDesign>(initialDesign ?? createDefaultFurnitureDesign());
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
+  const [material, setMaterial] = useState<string>(FURNITURE_MATERIALS[0]);
+  const [viewMode, setViewMode] = useState<'design' | 'cutlist'>('design');
 
   const { model, errorMessage } = useMemo(() => {
     try {
-      return { model: buildFurnitureModel(design), errorMessage: null as string | null };
+      return { model: buildFurnitureModel(design, { material }), errorMessage: null as string | null };
     } catch (error) {
       // 板厚に対して高さが小さすぎる等、生成できない寸法の組み合わせを入力中でも
       // アプリを落とさず、直前まで有効だったモデルは保持しつつエラー文だけ表示する
       const message = error instanceof Error ? error.message : '寸法の組み合わせが正しくありません。';
       return { model: null, errorMessage: message };
     }
-  }, [design]);
+  }, [design, material]);
 
   // 直前に有効だった3Dモデルを保持し、入力途中の一時的な不正値（例: 高さを消して
   // まだ何も入力していない一瞬）でビューアが空白にならないようにする
-  const [lastValidModel, setLastValidModel] = useState(() => buildFurnitureModel(design));
+  const [lastValidModel, setLastValidModel] = useState(() => buildFurnitureModel(design, { material }));
   if (model && model !== lastValidModel) {
     // レンダー中に直接更新することで、余分な再レンダーなしに「直前の有効なモデル」を
     // 常に最新化する（Reactが公式に認めているderived state更新パターンの一つ）
@@ -92,33 +96,56 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
     setSelectedPanelId(panelId);
   }, []);
 
-  return (
-    <div className="flex h-full w-full flex-col sm:flex-row">
-      <CadViewport
+  if (viewMode === 'cutlist') {
+    return (
+      <CadCutlistView
         model={lastValidModel}
-        className="h-64 w-full flex-shrink-0 sm:h-full sm:flex-1"
-        selectedPanelId={selectedPanelId}
-        onSelectPanel={handleSelectPanel}
+        material={material}
+        onMaterialChange={setMaterial}
+        onBack={() => setViewMode('design')}
       />
-      <div className="w-full min-h-0 border-t border-tanei-border sm:w-80 sm:border-l sm:border-t-0 sm:overflow-y-auto">
-        <CadControls design={design} onDimensionChange={handleDimensionChange} errorMessage={errorMessage} />
-        <CadPartsPanel
+    );
+  }
+
+  return (
+    <div className="flex h-full w-full flex-col">
+      <div className="px-4 py-2 border-b border-tanei-border bg-white flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => setViewMode('cutlist')}
+          className="flex items-center gap-1.5 bg-tanei-accent hover:bg-tanei-accent-dark text-white text-sm font-bold px-3 py-1.5 rounded-tanei-control shadow-sm transition-colors"
+        >
+          🪚 木取り図を見る
+        </button>
+      </div>
+
+      <div className="flex flex-1 min-h-0 flex-col sm:flex-row">
+        <CadViewport
           model={lastValidModel}
-          backPanel={design.backPanel}
-          legs={design.legs}
+          className="h-64 w-full flex-shrink-0 sm:h-full sm:flex-1"
           selectedPanelId={selectedPanelId}
-          onAddShelf={handleAddShelf}
-          onToggleBackPanel={handleToggleBackPanel}
-          onToggleLegs={handleToggleLegs}
           onSelectPanel={handleSelectPanel}
         />
-        <CadSelectedPartPanel
-          design={design}
-          selectedPanel={selectedPanel}
-          onUpdateShelf={handleUpdateShelf}
-          onRemoveShelf={handleRemoveShelf}
-          onDeselect={() => handleSelectPanel(null)}
-        />
+        <div className="w-full min-h-0 border-t border-tanei-border sm:w-80 sm:border-l sm:border-t-0 sm:overflow-y-auto">
+          <CadControls design={design} onDimensionChange={handleDimensionChange} errorMessage={errorMessage} />
+          <CadPartsPanel
+            model={lastValidModel}
+            backPanel={design.backPanel}
+            legs={design.legs}
+            selectedPanelId={selectedPanelId}
+            onAddShelf={handleAddShelf}
+            onToggleBackPanel={handleToggleBackPanel}
+            onToggleLegs={handleToggleLegs}
+            onSelectPanel={handleSelectPanel}
+          />
+          <CadSelectedPartPanel
+            design={design}
+            selectedPanel={selectedPanel}
+            onUpdateShelf={handleUpdateShelf}
+            onRemoveShelf={handleRemoveShelf}
+            onDeselect={() => handleSelectPanel(null)}
+          />
+        </div>
       </div>
     </div>
   );

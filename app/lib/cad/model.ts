@@ -182,21 +182,64 @@ export function buildFurnitureModel(
   };
 }
 
+export interface StandardBoardSize {
+  label: string;
+  widthMm: number;
+  heightMm: number;
+}
+
+// ホームセンター（コーナン・カインズ・コメリ等）で共通して手に入る定尺サイズ。
+// freecad-integration/src/boardSizes.tsのSTANDARD_BOARD_SIZESと同じ2種類（小さい順）を
+// 採用している（値の重複はあるが、あちらはNode.js単体パッケージとして意図的に
+// 依存関係を持たないため、ここでも同じ値をそのまま定義する）
+export const STANDARD_BOARD_SIZES: StandardBoardSize[] = [
+  { label: 'サブロク板 (910×1820mm)', widthMm: 910, heightMm: 1820 },
+  { label: 'シハチ板 (1210×2430mm)', widthMm: 1210, heightMm: 2430 },
+];
+
+/** 全パネルの中で最大の辺が収まる、最小の定尺サイズを選ぶ（回転して収まる向きも考慮）。
+ * どの定尺にも収まらないパネルがあればnullを返す */
+function pickBoardSizeForPanels(panels: FurniturePanel[]): StandardBoardSize | null {
+  let maxWidthMm = 0;
+  let maxHeightMm = 0;
+  for (const panel of panels) {
+    const { widthMm, heightMm } = panelToCutSizeMm(panel);
+    maxWidthMm = Math.max(maxWidthMm, widthMm);
+    maxHeightMm = Math.max(maxHeightMm, heightMm);
+  }
+
+  const fitting = STANDARD_BOARD_SIZES.filter((board) => {
+    const fitsAsIs = maxWidthMm <= board.widthMm && maxHeightMm <= board.heightMm;
+    const fitsRotated = maxHeightMm <= board.widthMm && maxWidthMm <= board.heightMm;
+    return fitsAsIs || fitsRotated;
+  });
+
+  if (fitting.length === 0) return null;
+  return fitting.reduce((smallest, board) =>
+    board.widthMm * board.heightMm < smallest.widthMm * smallest.heightMm ? board : smallest
+  );
+}
+
 /** FurnitureModelのpanelsを、既存の木取り図PDF/SVG（app/lib/sheetLayout.ts,
  * app/lib/cutSheetPdf.ts）がそのまま受け取れるSheetLayoutへ変換する。
- * 新しいビンパッキングロジックは実装しない（既存ロジックの再利用）。 */
-export function furnitureModelToSheetLayout(model: FurnitureModel): SheetLayout {
+ * 新しいビンパッキングロジックは実装しない（既存ロジックの再利用）。パネルの中に
+ * どの定尺サイズにも収まらないもの（家具の幅・奥行が非常に大きい場合など）があれば、
+ * 計算不能を示すnullを返す（呼び出し側で初心者向けのエラー文を出す） */
+export function furnitureModelToSheetLayout(model: FurnitureModel): SheetLayout | null {
+  if (model.panels.length === 0) return null;
+
+  const boardSize = pickBoardSizeForPanels(model.panels);
+  if (!boardSize) return null;
+
   const parts: SheetPart[] = model.panels.map((panel) => {
     const { widthMm, heightMm } = panelToCutSizeMm(panel);
     return { widthMm, heightMm, qty: 1, label: panel.label };
   });
 
   return {
-    name: `${model.material}（${model.thickness}mm厚）`,
-    // 国内ホームセンターの一般的なサブロク板サイズ。将来、材質ごとの定尺選定
-    // （freecad-integration/src/boardSizes.tsのpickBoardSize相当）を組み込む余地を残す
-    sheetWidthMm: 910,
-    sheetHeightMm: 1820,
+    name: `${model.material}（${model.thickness}mm厚）・${boardSize.label}`,
+    sheetWidthMm: boardSize.widthMm,
+    sheetHeightMm: boardSize.heightMm,
     parts,
   };
 }
