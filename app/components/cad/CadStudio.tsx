@@ -44,6 +44,10 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
   const [material, setMaterial] = useState<string>(FURNITURE_MATERIALS[0]);
   const [viewMode, setViewMode] = useState<CadViewMode>('design');
+  // 制作チェック画面の「制作へ進む」から木取り図画面（cutlist）へ戻ったときだけ、
+  // 「制作する」セクションまで自動スクロールするためのフラグ（Phase 2-9）。
+  // viewModeの種類は増やさず、既存のcutlist画面内の見せ方だけを変える
+  const [scrollToBuildGuide, setScrollToBuildGuide] = useState(false);
 
   // 保存済みプロジェクトの管理状態。projectIdがnull＝まだ一度も保存していない新規設計
   // （「保存する」を押すと新規プロジェクトになる）、値がある＝既存プロジェクトの更新になる
@@ -178,6 +182,12 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
     [buildChecklist, persistChecklists]
   );
 
+  // 自動スクロール後にフラグを戻すためのコールバック。参照を固定しておくことで、
+  // CadCutlistView側のuseEffectが不要に再実行されないようにしている
+  const handleScrolledToBuildGuide = useCallback(() => {
+    setScrollToBuildGuide(false);
+  }, []);
+
   const { model, errorMessage } = useMemo(() => {
     try {
       return { model: buildFurnitureModel(design, { material }), errorMessage: null as string | null };
@@ -258,7 +268,10 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
         checked={buildChecklist}
         onToggle={handleToggleBuildStep}
         onBack={() => setViewMode('cutMaterials')}
-        onNext={() => setViewMode('cutlist')}
+        onNext={() => {
+          setScrollToBuildGuide(true);
+          setViewMode('cutlist');
+        }}
       />
     );
   }
@@ -271,6 +284,8 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
         onMaterialChange={setMaterial}
         onBack={() => setViewMode('design')}
         onOpenCutList={() => setViewMode('cutMaterials')}
+        scrollToBuildGuide={scrollToBuildGuide}
+        onScrolledToBuildGuide={handleScrolledToBuildGuide}
       />
     );
   }

@@ -26,6 +26,11 @@ const BUILD_CHECKLIST_STEPS = [
 
 export default function CadBuildChecklistView({ checked, onToggle, onBack, onNext }: CadBuildChecklistViewProps) {
   const doneCount = BUILD_CHECKLIST_STEPS.filter((_, i) => checked[String(i + 1)]).length;
+  // 既存のbuildChecklistから、その場で「最初の未完了項目」を計算するだけ。
+  // 新しい進捗データは作らない（保存もしない）
+  const nextIncompleteIndex = BUILD_CHECKLIST_STEPS.findIndex((_, i) => !checked[String(i + 1)]);
+  const isAllComplete = nextIncompleteIndex === -1;
+  const nextStepLabel = isAllComplete ? null : BUILD_CHECKLIST_STEPS[nextIncompleteIndex];
 
   return (
     <div className="flex h-full w-full flex-col overflow-y-auto">
@@ -45,6 +50,19 @@ export default function CadBuildChecklistView({ checked, onToggle, onBack, onNex
             今どこまで進んだかを確認しながら、順番に作業を進めましょう。
           </p>
         </div>
+
+        {isAllComplete ? (
+          <div className="rounded-tanei-control border border-tanei-brand bg-tanei-brand-soft px-4 py-3">
+            <p className="text-sm font-black text-tanei-brand">✓ 制作完了</p>
+            <p className="text-xs text-tanei-ink mt-1">すべての制作チェックが完了しました。</p>
+          </div>
+        ) : (
+          <div className="rounded-tanei-control border border-tanei-accent bg-white px-4 py-3">
+            <p className="text-xs font-bold text-tanei-ink-muted">次にやること</p>
+            <p className="text-base font-black text-tanei-ink mt-1">▶ {nextStepLabel}</p>
+            <p className="text-xs text-tanei-ink-muted mt-1">この作業が終わったらチェックしてください</p>
+          </div>
+        )}
 
         <p className="text-sm text-tanei-ink">
           制作進捗：<span className="font-black text-tanei-brand">{doneCount} / {BUILD_CHECKLIST_STEPS.length}</span> 完了

@@ -8,7 +8,7 @@
 // 「CAD」「Panel」「SheetLayout」といった開発者向けの言葉は画面に出さず、
 // 「設計」「材料」「木取り図」という言葉だけを使う。
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { packSheetLayout } from '../../lib/sheetLayout';
 import SheetLayoutSvgView from '../chat/SheetLayoutSvg';
 import { buildUniversalCutSheetPdf } from '../../lib/cutSheetPdf';
@@ -17,20 +17,42 @@ import type { FurnitureModel } from '../../lib/cad/types';
 import { FURNITURE_MATERIALS, furnitureModelToSheetLayout } from '../../lib/cad/model';
 import CadBuildGuide from './CadBuildGuide';
 
+// 制作チェック画面の「制作へ進む」から来たときだけ、この要素まで自動スクロールする
+// （CadBuildGuide自体は変更せず、外側にidを持つラッパーを用意するだけにしている）
+const BUILD_GUIDE_ANCHOR_ID = 'cad-build-guide';
+
 interface CadCutlistViewProps {
   model: FurnitureModel;
   material: string;
   onMaterialChange: (material: string) => void;
   onBack: () => void;
   onOpenCutList: () => void;
+  /** trueのとき、マウント時に「制作する」セクションまで自動スクロールする
+   * （Phase 2-7の通常の「🪚 木取り図を見る」からの遷移では常にfalse／未指定） */
+  scrollToBuildGuide?: boolean;
+  onScrolledToBuildGuide?: () => void;
 }
 
-export default function CadCutlistView({ model, material, onMaterialChange, onBack, onOpenCutList }: CadCutlistViewProps) {
+export default function CadCutlistView({
+  model,
+  material,
+  onMaterialChange,
+  onBack,
+  onOpenCutList,
+  scrollToBuildGuide,
+  onScrolledToBuildGuide,
+}: CadCutlistViewProps) {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const sheetLayout = useMemo(() => furnitureModelToSheetLayout(model), [model]);
   const sheets = useMemo(() => (sheetLayout ? packSheetLayout(sheetLayout) : []), [sheetLayout]);
+
+  useEffect(() => {
+    if (!scrollToBuildGuide) return;
+    document.getElementById(BUILD_GUIDE_ANCHOR_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    onScrolledToBuildGuide?.();
+  }, [scrollToBuildGuide, onScrolledToBuildGuide]);
 
   const showStatus = (msg: string) => {
     setStatusMessage(msg);
@@ -151,7 +173,9 @@ export default function CadCutlistView({ model, material, onMaterialChange, onBa
               </button>
             </div>
 
-            <CadBuildGuide model={model} material={material} sheetLayout={sheetLayout} sheetCount={sheets.length} />
+            <div id={BUILD_GUIDE_ANCHOR_ID}>
+              <CadBuildGuide model={model} material={material} sheetLayout={sheetLayout} sheetCount={sheets.length} />
+            </div>
           </>
         ) : (
           <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-tanei-control px-4 py-3 text-sm">
