@@ -158,6 +158,20 @@ export default function CadBuildGuide({
             </button>
           </div>
         </div>
+
+        <div className="mt-3 pt-3 border-t border-tanei-border text-center">
+          <p className="text-xs font-bold text-tanei-ink">準備ができたら制作を開始</p>
+          <p className="text-[11px] text-tanei-ink-muted mt-0.5 mb-2">
+            材料・工具・パーツ・作り方を確認したら、制作を始めましょう。
+          </p>
+          <button
+            type="button"
+            onClick={onViewBuildCheck}
+            className="w-full sm:w-auto bg-tanei-brand text-white text-sm font-bold px-6 py-2.5 rounded-tanei-control hover:bg-tanei-brand-dark transition-colors"
+          >
+            {!nextBuildStep ? '✓ 制作完了を見る' : buildDoneCount > 0 ? '制作を続ける' : '制作を開始する'}
+          </button>
+        </div>
       </div>
 
       <div className="rounded-tanei-control border border-tanei-border bg-white p-3 flex flex-col gap-2">
