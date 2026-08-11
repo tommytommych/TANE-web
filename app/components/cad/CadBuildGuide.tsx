@@ -5,6 +5,7 @@
 // 必要な工具・安全ポイントを表示する。AIによる自由生成やGemini APIは使わず、現在の
 // 家具構造（背板・棚板・脚の有無）から機械的に判断できる範囲だけを文面に反映する。
 
+import { useState } from 'react';
 import type { FurnitureModel } from '../../lib/cad/types';
 import type { SheetLayout } from '../../lib/sheetLayout';
 import {
@@ -18,6 +19,10 @@ import { AMAZON_TOOLS } from '../../lib/constants';
 // 「約1,200円〜」のような下限のみの表記と「約300〜500円」のような範囲表記の両方に対応する
 const formatYenRange = (low: number, high: number | null): string =>
   high !== null ? `約${low.toLocaleString()}〜${high.toLocaleString()}円` : `約${low.toLocaleString()}円〜`;
+
+// 「必要な工具」内の既存Amazonリンク一覧（Phase 2-8）へのスクロール先id。
+// 買い物リストの「購入先を見る」から、新しいリンクを作らずここへ誘導するだけに使う
+const AMAZON_TOOLS_ANCHOR_ID = 'cad-amazon-tools';
 
 interface CadBuildGuideProps {
   model: FurnitureModel;
@@ -46,6 +51,14 @@ export default function CadBuildGuide({ model, material, sheetLayout, sheetCount
   // 木取り図（sheetLayout）が既にここまで生成できている＝木取り可能な状態でのみ
   // CadBuildGuideが描画されるため、必要枚数（sheetCount）は常に既存の木取りデータそのまま
   const costEstimate = calculateMaterialCostEstimate(material, sheetCount);
+
+  // 買い物リストのチェック状態は、このセクション内だけの一時的な表示用状態。
+  // IndexedDB・SavedFurnitureProjectには一切保存せず、リロードすれば初期状態に戻る
+  const [isShoppingListOpen, setIsShoppingListOpen] = useState(true);
+  const [checkedShoppingItems, setCheckedShoppingItems] = useState<Record<string, boolean>>({});
+  const toggleShoppingItem = (key: string) => {
+    setCheckedShoppingItems((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   return (
     <div className="flex flex-col gap-4 border-t border-tanei-border pt-4">
@@ -107,6 +120,99 @@ export default function CadBuildGuide({ model, material, sheetLayout, sheetCount
         )}
       </div>
 
+      <div className="rounded-tanei-control border border-tanei-border bg-white overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setIsShoppingListOpen((prev) => !prev)}
+          className="w-full flex items-center justify-between px-3 py-2.5 text-left"
+        >
+          <span className="text-sm font-bold text-tanei-ink">🛒 買い物リスト</span>
+          <span className="text-xs text-tanei-ink-muted">{isShoppingListOpen ? '閉じる ▲' : '開く ▼'}</span>
+        </button>
+
+        {isShoppingListOpen && (
+          <div className="px-3 pb-3 flex flex-col gap-3 border-t border-tanei-border pt-3">
+            <div>
+              <h4 className="text-xs font-bold text-tanei-ink-muted mb-1">材料</h4>
+              <ul className="rounded-tanei-control border border-tanei-border divide-y divide-tanei-border overflow-hidden">
+                {(() => {
+                  const key = `material:${material}`;
+                  const isChecked = Boolean(checkedShoppingItems[key]);
+                  return (
+                    <li>
+                      <label
+                        className={`flex items-start gap-2.5 px-3 py-2 cursor-pointer transition-colors ${
+                          isChecked ? 'bg-tanei-brand-soft' : 'bg-white hover:bg-tanei-surface'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleShoppingItem(key)}
+                          className="mt-0.5 h-4 w-4 accent-tanei-brand flex-shrink-0"
+                        />
+                        <span className="flex-1 text-xs">
+                          <span className={`block font-bold ${isChecked ? 'text-tanei-ink line-through' : 'text-tanei-ink'}`}>
+                            {material}　×{sheetCount}枚
+                          </span>
+                          <span className="block text-tanei-ink-muted mt-0.5">
+                            サイズ：{sheetLayout.sheetWidthMm} × {sheetLayout.sheetHeightMm} mm
+                          </span>
+                          <span className="block text-tanei-ink-muted mt-0.5">
+                            {costEstimate
+                              ? `価格目安：${formatYenRange(costEstimate.totalLow, costEstimate.totalHigh)}`
+                              : '参考価格データなし'}
+                          </span>
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })()}
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="text-xs font-bold text-tanei-ink-muted mb-1">工具</h4>
+              <ul className="rounded-tanei-control border border-tanei-border divide-y divide-tanei-border overflow-hidden">
+                {FURNITURE_BUILD_TOOLS.map((tool) => {
+                  const key = `tool:${tool}`;
+                  const isChecked = Boolean(checkedShoppingItems[key]);
+                  return (
+                    <li key={tool}>
+                      <label
+                        className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors ${
+                          isChecked ? 'bg-tanei-brand-soft' : 'bg-white hover:bg-tanei-surface'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleShoppingItem(key)}
+                          className="h-4 w-4 accent-tanei-brand flex-shrink-0"
+                        />
+                        <span className={`text-xs font-bold ${isChecked ? 'text-tanei-ink line-through' : 'text-tanei-ink'}`}>
+                          {tool}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+              <a
+                href={`#${AMAZON_TOOLS_ANCHOR_ID}`}
+                className="inline-block mt-1.5 text-xs font-bold text-tanei-brand hover:text-tanei-brand-dark"
+              >
+                🛒 購入先を見る
+              </a>
+            </div>
+
+            <p className="text-[10px] text-tanei-ink-muted leading-relaxed">
+              ※チェック状態は保存されません。価格は参考値です。ビス・ボンド・塗料などの副資材や工具の価格は含みません。
+            </p>
+          </div>
+        )}
+      </div>
+
       <div>
         <h3 className="text-sm font-bold text-tanei-ink mb-1">作るパーツ</h3>
         <ul className="rounded-tanei-control border border-tanei-border divide-y divide-tanei-border overflow-hidden bg-white">
@@ -143,7 +249,7 @@ export default function CadBuildGuide({ model, material, sheetLayout, sheetCount
           ))}
         </ul>
 
-        <h3 className="text-xs font-bold text-tanei-ink-muted mt-3 mb-1">🛒 工具を購入する（とみしんチャンネルおすすめ）</h3>
+        <h3 id={AMAZON_TOOLS_ANCHOR_ID} className="text-xs font-bold text-tanei-ink-muted mt-3 mb-1">🛒 工具を購入する（とみしんチャンネルおすすめ）</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
           {AMAZON_TOOLS.map((tool) => (
             <a
