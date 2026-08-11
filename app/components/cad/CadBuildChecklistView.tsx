@@ -82,6 +82,18 @@ export default function CadBuildChecklistView({
   const isAllComplete = nextStep === null;
   const nextStepLabel = nextStep?.label ?? null;
 
+  // 「現在の作業」に対応する確認ポイント（Phase 3-13）。新しい対応表は作らず、
+  // Phase 3-10のCONFIRM_TARGETS（遷移先の正）と、Phase 3-12のBUILD_NAV_ITEMS
+  // （分かりやすい表示名）を突き合わせて1件だけ取り出すだけ。二重管理を避けている
+  const currentConfirmTarget = nextStep ? CONFIRM_TARGETS[nextStep.stepNumber - 1] : null;
+  const currentNavItem = currentConfirmTarget
+    ? BUILD_NAV_ITEMS.find(
+        (item) =>
+          item.target.viewMode === currentConfirmTarget.viewMode &&
+          item.target.anchorId === currentConfirmTarget.anchorId
+      ) ?? null
+    : null;
+
   return (
     <div className="flex h-full w-full flex-col overflow-y-auto">
       <div className="p-4 max-w-2xl mx-auto w-full flex flex-col gap-4">
@@ -120,6 +132,20 @@ export default function CadBuildChecklistView({
             <p className="text-[11px] font-black text-tanei-accent mt-1">STEP {nextStep.stepNumber}</p>
             <p className="text-base font-black text-tanei-ink mt-0.5">{nextStepLabel}</p>
             <p className="text-xs text-tanei-ink-muted mt-1">ここまで終わったら、チェックを入れて次へ進みましょう。</p>
+
+            {currentNavItem && (
+              <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
+                <p className="text-[11px] font-bold text-tanei-ink-muted">確認ポイント</p>
+                <p className="text-sm font-bold text-tanei-ink mt-0.5">→ {currentNavItem.label}</p>
+                <button
+                  type="button"
+                  onClick={() => onConfirmSection(currentNavItem.target)}
+                  className="mt-1.5 text-xs font-bold text-white bg-tanei-brand px-3 py-1.5 rounded-tanei-control hover:bg-tanei-brand-dark transition-colors"
+                >
+                  {currentNavItem.label}を確認
+                </button>
+              </div>
+            )}
           </div>
         )}
 
