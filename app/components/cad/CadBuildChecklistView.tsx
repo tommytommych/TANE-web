@@ -26,6 +26,19 @@ interface ConfirmTarget {
   label: string;
 }
 
+// 制作ナビ（Phase 3-12）。特定のチェック項目に紐付かない、いつでも使える一覧から
+// 必要な情報へ戻れるようにするための導線。遷移先はPhase 3-10のCONFIRM_TARGETSと
+// 同じ既存セクション・同じonConfirmSection（handleConfirmChecklistSection）を再利用し、
+// 新しい画面遷移の仕組みは作らない
+const BUILD_NAV_ITEMS: { target: { viewMode: 'cutlist' | 'cutMaterials'; anchorId?: string }; label: string }[] = [
+  { target: { viewMode: 'cutlist', anchorId: MATERIALS_ANCHOR_ID }, label: '必要な材料' },
+  { target: { viewMode: 'cutlist', anchorId: CUT_LAYOUT_ANCHOR_ID }, label: '木取り図' },
+  { target: { viewMode: 'cutMaterials' }, label: 'カットリスト' },
+  { target: { viewMode: 'cutlist', anchorId: PARTS_ANCHOR_ID }, label: '作るパーツ' },
+  { target: { viewMode: 'cutlist', anchorId: BUILD_STEPS_ANCHOR_ID }, label: '作り方' },
+  { target: { viewMode: 'cutlist', anchorId: SAFETY_NOTES_ANCHOR_ID }, label: '安全ポイント' },
+];
+
 // 各制作チェック項目（BUILD_CHECKLIST_STEPSと同じ順番）から、確認先として自然な
 // 既存セクションへの対応表。存在しない・不適切な確認先がある項目はnullにして
 // ボタン自体を出さない（無理なリンクを作らない）
@@ -109,6 +122,24 @@ export default function CadBuildChecklistView({
             <p className="text-xs text-tanei-ink-muted mt-1">ここまで終わったら、チェックを入れて次へ進みましょう。</p>
           </div>
         )}
+
+        {/* 制作ナビ（Phase 3-12）。「現在の作業」が主役であることを崩さないよう、
+            控えめなボタン行として、その直下に補助的に配置する */}
+        <div>
+          <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">制作ナビ</p>
+          <div className="flex flex-wrap gap-1.5">
+            {BUILD_NAV_ITEMS.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => onConfirmSection(item.target)}
+                className="text-xs font-bold text-tanei-ink bg-tanei-surface border border-tanei-border rounded-tanei-control px-2.5 py-1.5 hover:bg-tanei-brand-soft hover:border-tanei-brand transition-colors"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <p className="text-sm text-tanei-ink">
           制作進捗：<span className="font-black text-tanei-brand">{doneCount} / {BUILD_CHECKLIST_STEPS.length}</span> 完了
