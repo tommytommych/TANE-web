@@ -26,6 +26,14 @@ const formatYenRange = (low: number, high: number | null): string =>
 // 買い物リストの「購入先を見る」から、新しいリンクを作らずここへ誘導するだけに使う
 const AMAZON_TOOLS_ANCHOR_ID = 'cad-amazon-tools';
 
+// 「制作前チェック」（Phase 3-7）の各項目から、既存の詳細セクションへページ内スクロール
+// するためのid（Phase 3-8）。新しい画面・新しいviewModeは作らず、同じCadBuildGuide内の
+// 既存セクションへ移動するだけに使う
+const MATERIALS_ANCHOR_ID = 'cad-materials';
+const TOOLS_ANCHOR_ID = 'cad-tools';
+const PARTS_ANCHOR_ID = 'cad-parts';
+const BUILD_STEPS_ANCHOR_ID = 'cad-build-steps';
+
 interface CadBuildGuideProps {
   model: FurnitureModel;
   material: string;
@@ -87,6 +95,12 @@ export default function CadBuildGuide({
     setExpandedStepNumber((prev) => (prev === stepNumber ? null : stepNumber));
   };
 
+  // 「制作前チェック」から既存セクションへのページ内スクロール（Phase 3-8）。
+  // ブラウザ標準のscrollIntoViewのみを使い、新しい画面遷移は発生させない
+  const scrollToSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
     <div className="flex flex-col gap-4 border-t border-tanei-border pt-4">
       <div>
@@ -99,21 +113,49 @@ export default function CadBuildGuide({
       <div className="rounded-tanei-control border border-tanei-border bg-white p-3">
         <span className="text-xs font-bold text-tanei-ink-muted">制作前チェック</span>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
-          <div className="rounded-tanei-control bg-tanei-surface px-2.5 py-2 text-center">
-            <span className="block text-[11px] text-tanei-ink-muted">材料</span>
-            <span className="block text-base font-black text-tanei-brand">{sheetCount}枚</span>
+          <div className="rounded-tanei-control bg-tanei-surface px-2.5 py-2 flex flex-col items-center gap-1">
+            <span className="text-[11px] text-tanei-ink-muted">材料</span>
+            <span className="text-base font-black text-tanei-brand">{sheetCount}枚</span>
+            <button
+              type="button"
+              onClick={() => scrollToSection(MATERIALS_ANCHOR_ID)}
+              className="text-[10px] font-bold text-tanei-brand hover:text-tanei-brand-dark underline"
+            >
+              材料を見る
+            </button>
           </div>
-          <div className="rounded-tanei-control bg-tanei-surface px-2.5 py-2 text-center">
-            <span className="block text-[11px] text-tanei-ink-muted">工具</span>
-            <span className="block text-base font-black text-tanei-brand">{FURNITURE_BUILD_TOOLS.length}種類</span>
+          <div className="rounded-tanei-control bg-tanei-surface px-2.5 py-2 flex flex-col items-center gap-1">
+            <span className="text-[11px] text-tanei-ink-muted">工具</span>
+            <span className="text-base font-black text-tanei-brand">{FURNITURE_BUILD_TOOLS.length}種類</span>
+            <button
+              type="button"
+              onClick={() => scrollToSection(TOOLS_ANCHOR_ID)}
+              className="text-[10px] font-bold text-tanei-brand hover:text-tanei-brand-dark underline"
+            >
+              工具を見る
+            </button>
           </div>
-          <div className="rounded-tanei-control bg-tanei-surface px-2.5 py-2 text-center">
-            <span className="block text-[11px] text-tanei-ink-muted">パーツ</span>
-            <span className="block text-base font-black text-tanei-brand">{model.panels.length}個</span>
+          <div className="rounded-tanei-control bg-tanei-surface px-2.5 py-2 flex flex-col items-center gap-1">
+            <span className="text-[11px] text-tanei-ink-muted">パーツ</span>
+            <span className="text-base font-black text-tanei-brand">{model.panels.length}個</span>
+            <button
+              type="button"
+              onClick={() => scrollToSection(PARTS_ANCHOR_ID)}
+              className="text-[10px] font-bold text-tanei-brand hover:text-tanei-brand-dark underline"
+            >
+              パーツを見る
+            </button>
           </div>
-          <div className="rounded-tanei-control bg-tanei-surface px-2.5 py-2 text-center">
-            <span className="block text-[11px] text-tanei-ink-muted">作り方</span>
-            <span className="block text-base font-black text-tanei-brand">{steps.length}ステップ</span>
+          <div className="rounded-tanei-control bg-tanei-surface px-2.5 py-2 flex flex-col items-center gap-1">
+            <span className="text-[11px] text-tanei-ink-muted">作り方</span>
+            <span className="text-base font-black text-tanei-brand">{steps.length}ステップ</span>
+            <button
+              type="button"
+              onClick={() => scrollToSection(BUILD_STEPS_ANCHOR_ID)}
+              className="text-[10px] font-bold text-tanei-brand hover:text-tanei-brand-dark underline"
+            >
+              作り方を見る
+            </button>
           </div>
         </div>
       </div>
@@ -145,7 +187,7 @@ export default function CadBuildGuide({
       </div>
 
       <div>
-        <h3 className="text-sm font-bold text-tanei-ink mb-1">必要な材料</h3>
+        <h3 id={MATERIALS_ANCHOR_ID} className="text-sm font-bold text-tanei-ink mb-1 scroll-mt-4">必要な材料</h3>
         <div className="rounded-tanei-control border border-tanei-border bg-white px-3 py-2 text-sm text-tanei-ink flex flex-wrap gap-x-4 gap-y-1">
           <span className="font-bold">{material}</span>
           <span>{sheetLayout.sheetWidthMm} × {sheetLayout.sheetHeightMm} mm</span>
@@ -289,7 +331,7 @@ export default function CadBuildGuide({
       </div>
 
       <div>
-        <h3 className="text-sm font-bold text-tanei-ink mb-1">作るパーツ</h3>
+        <h3 id={PARTS_ANCHOR_ID} className="text-sm font-bold text-tanei-ink mb-1 scroll-mt-4">作るパーツ</h3>
         <ul className="rounded-tanei-control border border-tanei-border divide-y divide-tanei-border overflow-hidden bg-white">
           {model.panels.map((panel) => (
             <li key={panel.id} className="flex flex-col gap-1.5 px-3 py-2.5 text-sm">
@@ -312,7 +354,7 @@ export default function CadBuildGuide({
       </div>
 
       <div>
-        <h3 className="text-sm font-bold text-tanei-ink mb-1">必要な工具</h3>
+        <h3 id={TOOLS_ANCHOR_ID} className="text-sm font-bold text-tanei-ink mb-1 scroll-mt-4">必要な工具</h3>
         <ul className="flex flex-wrap gap-2">
           {FURNITURE_BUILD_TOOLS.map((tool) => (
             <li
@@ -344,7 +386,7 @@ export default function CadBuildGuide({
       </div>
 
       <div>
-        <h3 className="text-sm font-bold text-tanei-ink mb-2">作り方</h3>
+        <h3 id={BUILD_STEPS_ANCHOR_ID} className="text-sm font-bold text-tanei-ink mb-2 scroll-mt-4">作り方</h3>
         <ol className="flex flex-col gap-2">
           {steps.map((step) => {
             const isExpanded = expandedStepNumber === step.stepNumber;
