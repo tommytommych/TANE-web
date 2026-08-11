@@ -18,6 +18,12 @@ interface SavedItemsModalProps {
     content: string,
     file?: { dataUrl: string; mimeType: string }
   ) => void;
+  showToast?: (msg: string) => void;
+  /** ブラウザCAD（Phase 3-1）の「完成作品として保存する」から遷移してきた場合のみ指定。
+   * 新規保存フォームを自動的に開き、プロジェクト名をタイトルの初期値にする */
+  initialAddTitle?: string;
+  autoOpenAdd?: boolean;
+  onAutoOpenAddHandled?: () => void;
 }
 
 const MODAL_META: Record<SavedItemType, { icon: string; label: string }> = {
@@ -34,7 +40,18 @@ const MODAL_META: Record<SavedItemType, { icon: string; label: string }> = {
 // 手動で新規保存できるのは「画像」「完成作品」（他は会話中のボタンから保存される）
 const MANUAL_ADD_TYPES: SavedItemType[] = ['image', 'finished'];
 
-export default function SavedItemsModal({ activeModal, savedItems, onClose, onRemove, onUpdate, onAdd }: SavedItemsModalProps) {
+export default function SavedItemsModal({
+  activeModal,
+  savedItems,
+  onClose,
+  onRemove,
+  onUpdate,
+  onAdd,
+  showToast,
+  initialAddTitle,
+  autoOpenAdd,
+  onAutoOpenAddHandled,
+}: SavedItemsModalProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
@@ -64,6 +81,24 @@ export default function SavedItemsModal({ activeModal, savedItems, onClose, onRe
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeModal, onClose]);
+
+  // ブラウザCADの「完成作品として保存する」からの遷移時のみ、新規保存フォームを自動的に開き、
+  // プロジェクト名をタイトルの初期値にする。既存の新規保存フォーム自体（画像・メモ入力）は変更しない
+  const [prevAutoOpenAdd, setPrevAutoOpenAdd] = useState(false);
+  if (Boolean(autoOpenAdd) !== prevAutoOpenAdd) {
+    // レンダー中に直接調整する（他のプロパティ変化検知と同じ既存パターン）
+    setPrevAutoOpenAdd(Boolean(autoOpenAdd));
+    if (autoOpenAdd) {
+      setIsAdding(true);
+      setNewTitle(initialAddTitle ?? '');
+    }
+  }
+
+  // 親（呼び出し元）のstateを戻す通知だけは、レンダー中ではなくエフェクトから行う
+  useEffect(() => {
+    if (!autoOpenAdd) return;
+    onAutoOpenAddHandled?.();
+  }, [autoOpenAdd, onAutoOpenAddHandled]);
 
   if (!activeModal) return null;
 
@@ -111,6 +146,7 @@ export default function SavedItemsModal({ activeModal, savedItems, onClose, onRe
   const submitAdd = () => {
     if (!newTitle.trim() || !newFileDataUrl || !newFileMimeType) return;
     onAdd(activeModal, newTitle.trim(), newContent.trim(), { dataUrl: newFileDataUrl, mimeType: newFileMimeType });
+    showToast?.(activeModal === 'finished' ? '完成作品として保存しました🌱' : '画像を保存しました🌱');
     resetAddForm();
   };
 

@@ -3,12 +3,19 @@
 // 「制作チェック」画面（Phase 2-7）。カットリストの次に、家具作りの基本的な工程を
 // 順番にチェックしていける固定のチェックリストを表示する。AIによる自由生成は行わず、
 // あらかじめ決まった10ステップだけを使う。
+//
+// Phase 3-1: 全項目完了時のみ、既存の「完成作品」保存機能（AIチャット側の
+// SavedItemsModal.tsx、マイページの「完成作品」）へ、プロジェクト名をタイトル候補として
+// 渡しながら遷移するリンクを追加する。CAD側に新しい保存の仕組みは一切作らない。
+
+import Link from 'next/link';
 
 interface CadBuildChecklistViewProps {
   checked: Record<string, boolean>;
   onToggle: (step: number) => void;
   onBack: () => void;
   onNext: () => void;
+  projectName: string;
 }
 
 const BUILD_CHECKLIST_STEPS = [
@@ -24,7 +31,7 @@ const BUILD_CHECKLIST_STEPS = [
   '仕上げを行った',
 ];
 
-export default function CadBuildChecklistView({ checked, onToggle, onBack, onNext }: CadBuildChecklistViewProps) {
+export default function CadBuildChecklistView({ checked, onToggle, onBack, onNext, projectName }: CadBuildChecklistViewProps) {
   const doneCount = BUILD_CHECKLIST_STEPS.filter((_, i) => checked[String(i + 1)]).length;
   // 既存のbuildChecklistから、その場で「最初の未完了項目」を計算するだけ。
   // 新しい進捗データは作らない（保存もしない）
@@ -52,9 +59,17 @@ export default function CadBuildChecklistView({ checked, onToggle, onBack, onNex
         </div>
 
         {isAllComplete ? (
-          <div className="rounded-tanei-control border border-tanei-brand bg-tanei-brand-soft px-4 py-3">
-            <p className="text-sm font-black text-tanei-brand">✓ 制作完了</p>
-            <p className="text-xs text-tanei-ink mt-1">すべての制作チェックが完了しました。</p>
+          <div className="rounded-tanei-control border border-tanei-brand bg-tanei-brand-soft px-4 py-3 flex flex-col gap-3">
+            <div>
+              <p className="text-sm font-black text-tanei-brand">✓ 制作完了</p>
+              <p className="text-xs text-tanei-ink mt-1">すべての制作チェックが完了しました。</p>
+            </div>
+            <Link
+              href={`/app?openFinished=1&finishedTitle=${encodeURIComponent(projectName)}`}
+              className="self-start bg-tanei-brand text-white text-sm font-bold px-4 py-2.5 rounded-tanei-control hover:bg-tanei-brand-dark transition-colors"
+            >
+              🏆 完成作品として保存する
+            </Link>
           </div>
         ) : (
           <div className="rounded-tanei-control border border-tanei-accent bg-white px-4 py-3">

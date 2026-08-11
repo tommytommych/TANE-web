@@ -83,6 +83,11 @@ export default function Home() {
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [activeModal, setActiveModal] = useState<SavedItemType | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // ブラウザCAD（/app/cad）の「完成作品として保存する」から /app?openFinished=1&finishedTitle=...
+  // で来た場合のみ使う（Phase 3-1）。CAD側からこのページの関数を直接importするのではなく、
+  // URLのクエリパラメータだけを橋渡しに使うことで、ルート間の依存を増やさないようにしている
+  const [pendingFinishedTitle, setPendingFinishedTitle] = useState<string | undefined>(undefined);
+  const [autoOpenFinishedAdd, setAutoOpenFinishedAdd] = useState(false);
   // SSRとの整合性のため初期値はfalse（閉）にしておき、デスクトップ幅の場合だけ
   // マウント後に開く。true始まりだとモバイルで初回表示時に全画面ドロワーが
   // かぶさってしまうため（スマホ体験の改善）
@@ -147,6 +152,20 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    // ブラウザCADの「完成作品として保存する」からの遷移を検出し、既存の「完成作品」保存
+    // モーダルを自動的に開く（Phase 3-1）。history.replaceStateはCadStudio.tsxと同じ
+    // 既存パターンを踏襲し、URLを元に戻して再読み込み時に再トリガーしないようにする
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('openFinished') !== '1') return;
+    const title = params.get('finishedTitle') ?? undefined;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setActiveModal('finished');
+    setPendingFinishedTitle(title);
+    setAutoOpenFinishedAdd(true);
+    window.history.replaceState(null, '', '/app');
+  }, []);
+
+  useEffect(() => {
     // AI機能利用回数（カット申込書PDF・完成イメージ・写真AI空間診断・外部Gemini画像生成）は
     // サーバー側で管理していないため、localStorageの値のみでマウント時に同期する
     // （初期値5のままだとリロードで毎回リセットされてしまうため）。
@@ -196,6 +215,10 @@ export default function Home() {
     setTimeout(() => {
       setToastMessage(null);
     }, 4000);
+  }, []);
+
+  const handleAutoOpenFinishedAddHandled = useCallback(() => {
+    setAutoOpenFinishedAdd(false);
   }, []);
 
   useEffect(() => {
@@ -681,6 +704,10 @@ export default function Home() {
         onRemove={removeItem}
         onUpdate={updateItem}
         onAdd={addItem}
+        showToast={showToast}
+        initialAddTitle={pendingFinishedTitle}
+        autoOpenAdd={autoOpenFinishedAdd}
+        onAutoOpenAddHandled={handleAutoOpenFinishedAddHandled}
       />
     </div>
   );

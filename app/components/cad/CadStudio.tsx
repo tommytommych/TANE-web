@@ -267,6 +267,7 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
       <CadBuildChecklistView
         checked={buildChecklist}
         onToggle={handleToggleBuildStep}
+        projectName={projectName.trim() || DEFAULT_FURNITURE_PROJECT_NAME}
         onBack={() => setViewMode('cutMaterials')}
         onNext={() => {
           setScrollToBuildGuide(true);
