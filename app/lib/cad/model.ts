@@ -505,3 +505,68 @@ export function findMaterialPriceInfo(materialName: string): MaterialPriceInfo[]
     (wood) => wood.name.includes(materialName) || materialName.includes(wood.name)
   );
 }
+
+/** KOHNAN_WOOD_LISTの価格表記（「約1,200円〜」「約300〜500円」）を安全にパースする。
+ * 数値を1つだけ読み取れた場合は「その金額以上（上限なし）」、2つ読み取れた場合は
+ * 「下限〜上限」として扱う。想定外の表記は無理にパースせずnullを返す（推測しない） */
+function parseWoodPriceRangeYen(priceText: string): { low: number; high: number | null } | null {
+  const numbers = Array.from(priceText.matchAll(/[\d,]+/g))
+    .map((m) => Number(m[0].replace(/,/g, '')))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (numbers.length === 0) return null;
+  if (numbers.length === 1) return { low: numbers[0], high: null };
+  return { low: Math.min(...numbers), high: Math.max(...numbers) };
+}
+
+export interface MaterialCostBreakdownItem {
+  /** KOHNAN_WOOD_LIST側のエントリ名（例:「SPF材（1×4）」）。同じ選択材料に複数の
+   * 価格帯が対応する場合（SPF材の1×4/2×4等）、行が複数に分かれる */
+  name: string;
+  quantity: number;
+  unitLow: number;
+  unitHigh: number | null;
+  subtotalLow: number;
+  subtotalHigh: number | null;
+}
+
+export interface MaterialCostEstimate {
+  items: MaterialCostBreakdownItem[];
+  totalLow: number;
+  /** nullの場合は「合計〇〇円以上」という上限なしの目安 */
+  totalHigh: number | null;
+}
+
+/** 木取り図（既存app/lib/sheetLayout.ts）から求まる必要枚数と、既存のKOHNAN_WOOD_LISTの
+ * 価格目安だけを掛け合わせて、家具1台分の「材料費の目安」を計算する純粋関数。
+ * 新しい価格データ・新しい木取り計算は一切作らない。IndexedDB・AIへは一切アクセスしない。
+ * 価格情報が1件も見つからない場合はnullを返す（呼び出し側で「価格情報なし」を表示する）。
+ * ビス・ボンド・塗料等の副資材は対象外（価格データが存在しないため計算しない） */
+export function calculateMaterialCostEstimate(
+  material: string,
+  requiredSheetCount: number
+): MaterialCostEstimate | null {
+  const items: MaterialCostBreakdownItem[] = [];
+
+  findMaterialPriceInfo(material).forEach((wood) => {
+    const range = parseWoodPriceRangeYen(wood.price);
+    if (!range) return;
+    items.push({
+      name: wood.name,
+      quantity: requiredSheetCount,
+      unitLow: range.low,
+      unitHigh: range.high,
+      subtotalLow: range.low * requiredSheetCount,
+      subtotalHigh: range.high !== null ? range.high * requiredSheetCount : null,
+    });
+  });
+
+  if (items.length === 0) return null;
+
+  // 同じ選択材料に複数の価格帯が対応する場合（SPF材の1×4/2×4等）は、どちらを選ぶかで
+  // 金額が変わるため、最も安いケース〜最も高いケースの幅を「目安」として示す
+  const totalLow = Math.min(...items.map((i) => i.subtotalLow));
+  const anyOpenEnded = items.some((i) => i.subtotalHigh === null);
+  const totalHigh = anyOpenEnded ? null : Math.max(...items.map((i) => i.subtotalHigh as number));
+
+  return { items, totalLow, totalHigh };
+}

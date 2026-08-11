@@ -7,8 +7,17 @@
 
 import type { FurnitureModel } from '../../lib/cad/types';
 import type { SheetLayout } from '../../lib/sheetLayout';
-import { FURNITURE_BUILD_TOOLS, buildFurnitureSteps, findMaterialPriceInfo } from '../../lib/cad/model';
+import {
+  FURNITURE_BUILD_TOOLS,
+  buildFurnitureSteps,
+  calculateMaterialCostEstimate,
+  findMaterialPriceInfo,
+} from '../../lib/cad/model';
 import { AMAZON_TOOLS } from '../../lib/constants';
+
+// 「約1,200円〜」のような下限のみの表記と「約300〜500円」のような範囲表記の両方に対応する
+const formatYenRange = (low: number, high: number | null): string =>
+  high !== null ? `約${low.toLocaleString()}〜${high.toLocaleString()}円` : `約${low.toLocaleString()}円〜`;
 
 interface CadBuildGuideProps {
   model: FurnitureModel;
@@ -34,6 +43,9 @@ export default function CadBuildGuide({ model, material, sheetLayout, sheetCount
   // 既存のAIチャット用木材価格目安リスト（app/lib/constants.ts）から、現在選択中の材料と
   // 名前が一致するものだけを表示する。一致しなければ「価格情報なし」と正直に表示する
   const priceInfo = findMaterialPriceInfo(material);
+  // 木取り図（sheetLayout）が既にここまで生成できている＝木取り可能な状態でのみ
+  // CadBuildGuideが描画されるため、必要枚数（sheetCount）は常に既存の木取りデータそのまま
+  const costEstimate = calculateMaterialCostEstimate(material, sheetCount);
 
   return (
     <div className="flex flex-col gap-4 border-t border-tanei-border pt-4">
@@ -67,6 +79,31 @@ export default function CadBuildGuide({ model, material, sheetLayout, sheetCount
           </div>
         ) : (
           <p className="text-xs text-tanei-ink-muted">価格情報なし</p>
+        )}
+
+        <h3 className="text-xs font-bold text-tanei-ink-muted mt-3 mb-1">材料費の目安</h3>
+        {costEstimate ? (
+          <div className="rounded-tanei-control border border-tanei-border bg-white overflow-hidden">
+            <div className="divide-y divide-tanei-border">
+              {costEstimate.items.map((item) => (
+                <div key={item.name} className="px-3 py-2 text-xs text-tanei-ink flex items-center justify-between gap-2">
+                  <span className="text-tanei-ink-muted">{item.name}（{item.quantity}枚）</span>
+                  <span className="font-bold text-tanei-ink">{formatYenRange(item.subtotalLow, item.subtotalHigh)}</span>
+                </div>
+              ))}
+            </div>
+            <div className="px-3 py-2 bg-tanei-brand-soft flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-tanei-ink">材料費合計の目安</span>
+              <span className="text-sm font-black text-tanei-brand">
+                {formatYenRange(costEstimate.totalLow, costEstimate.totalHigh)}
+              </span>
+            </div>
+            <p className="px-3 py-2 text-[10px] text-tanei-ink-muted leading-relaxed">
+              ※価格は参考値です。実際の価格は店舗・サイズ・時期などにより異なります。ビス・ボンド・塗料などの副資材は含みません。
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-tanei-ink-muted">参考価格データがありません</p>
         )}
       </div>
 
