@@ -58,8 +58,10 @@ const parseOptionalBooleanRecord = (value: unknown): Record<string, boolean> | u
 
 // content（JSON文字列）は他バージョンのデータ・ブラウザ保存領域の破損等で壊れている
 // 可能性があるため、必ず構造を検証してから使う（不正な場合はnullを返し、呼び出し側で
-// 「読み込めませんでした」という初心者向けメッセージを出す。アプリを落とさない）
-const parseSavedItem = (item: SavedItem): SavedFurnitureProject | null => {
+// 「読み込めませんでした」という初心者向けメッセージを出す。アプリを落とさない）。
+// マイページ（SavedItemsModal.tsx）が制作進捗を計算する際にも、同じ検証済みパース処理を
+// 再利用できるようexportしている
+export const parseSavedItem = (item: SavedItem): SavedFurnitureProject | null => {
   if (item.type !== 'cadProject') return null;
   try {
     const parsed: unknown = JSON.parse(item.content);

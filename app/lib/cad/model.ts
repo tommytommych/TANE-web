@@ -15,6 +15,7 @@ import type { SheetLayout, SheetPart } from '../sheetLayout';
 import type { FurnitureDesign, FurnitureModel, FurniturePanel, FurniturePanelKind, ShelfEntry } from './types';
 import { buildFurniturePanels, clampShelfEntry, defaultShelfSize, panelToCutSizeMm } from './geometry';
 import { DEMO_ASSEMBLY_MANUAL } from '../assemblyManual';
+import { KOHNAN_WOOD_LIST } from '../constants';
 
 // systemPrompt.ts（tanei-studio-specブロック）・tanei-studio/freecad_scripts/generate_model.pyと
 // 語彙を揃えている（AIの提案・FreeCAD版・ブラウザCADのどれでも同じ材質名で扱えるようにするため）
@@ -427,4 +428,80 @@ export function buildCutListItems(model: FurnitureModel): CutListItem[] {
   });
 
   return Array.from(grouped.values());
+}
+
+/** マイページ（保存した設計一覧）で表示する、1プロジェクト分の制作進捗（Phase 2-8）。
+ * cutListChecked・buildChecklistという既存データ（Phase 2-7）から画面表示のたびに
+ * 計算するだけで、進捗率そのものを保存はしない */
+export interface FurnitureProjectProgress {
+  cutListDone: number;
+  cutListTotal: number;
+  /** falseの場合、現在の寸法ではどの定尺サイズにも収まらずカットリスト自体を作れない
+   * （furnitureModelToSheetLayoutがnullを返す状態）。cutListTotalは0のまま */
+  cutListAvailable: boolean;
+  buildDone: number;
+  buildTotal: number;
+  isComplete: boolean;
+}
+
+// CadBuildChecklistView.tsxの固定10ステップと揃えている（新しいチェック項目を増減する場合は
+// 両方を同時に見直す必要がある）
+const BUILD_CHECKLIST_TOTAL_STEPS = 10;
+
+export function computeFurnitureProjectProgress(
+  design: FurnitureDesign,
+  material: string,
+  cutListChecked: Record<string, boolean> | undefined,
+  buildChecklist: Record<string, boolean> | undefined
+): FurnitureProjectProgress {
+  let cutListTotal = 0;
+  let cutListDone = 0;
+  let cutListAvailable = false;
+
+  try {
+    const model = buildFurnitureModel(design, { material });
+    const sheetLayout = furnitureModelToSheetLayout(model);
+    if (sheetLayout) {
+      cutListAvailable = true;
+      const items = buildCutListItems(model);
+      cutListTotal = items.length;
+      const checked = cutListChecked ?? {};
+      // 保存されているキーの中に、寸法変更等で今は存在しないパーツのものが残っていても
+      // 数えないよう、現在のカットリスト項目と突き合わせてから数える
+      cutListDone = items.filter((item) => checked[item.id]).length;
+    }
+  } catch {
+    // 板厚に対して高さが小さすぎる等、寸法が壊れている保存データ。カットリストは
+    // 「利用不可」として扱い、マイページ自体はクラッシュさせない
+  }
+
+  const buildDoneRaw = Object.values(buildChecklist ?? {}).filter(Boolean).length;
+  const buildDone = Math.min(buildDoneRaw, BUILD_CHECKLIST_TOTAL_STEPS);
+
+  return {
+    cutListDone,
+    cutListTotal,
+    cutListAvailable,
+    buildDone,
+    buildTotal: BUILD_CHECKLIST_TOTAL_STEPS,
+    isComplete: buildDone >= BUILD_CHECKLIST_TOTAL_STEPS,
+  };
+}
+
+export interface MaterialPriceInfo {
+  name: string;
+  size: string;
+  length: string;
+  price: string;
+  feature: string;
+}
+
+/** ブラウザCADの材料選択肢（FURNITURE_MATERIALS）と、既存のAIチャット側の木材価格目安
+ * リスト（app/lib/constants.tsのKOHNAN_WOOD_LIST）を名前の一致だけで紐付ける。
+ * 新しい価格データは作らず、一致しない場合は空配列を返す（呼び出し側で「価格情報なし」と
+ * 表示し、存在しない価格を推測しない） */
+export function findMaterialPriceInfo(materialName: string): MaterialPriceInfo[] {
+  return KOHNAN_WOOD_LIST.filter(
+    (wood) => wood.name.includes(materialName) || materialName.includes(wood.name)
+  );
 }

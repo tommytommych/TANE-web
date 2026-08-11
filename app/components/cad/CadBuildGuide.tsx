@@ -7,7 +7,8 @@
 
 import type { FurnitureModel } from '../../lib/cad/types';
 import type { SheetLayout } from '../../lib/sheetLayout';
-import { FURNITURE_BUILD_TOOLS, buildFurnitureSteps } from '../../lib/cad/model';
+import { FURNITURE_BUILD_TOOLS, buildFurnitureSteps, findMaterialPriceInfo } from '../../lib/cad/model';
+import { AMAZON_TOOLS } from '../../lib/constants';
 
 interface CadBuildGuideProps {
   model: FurnitureModel;
@@ -27,6 +28,9 @@ const SAFETY_NOTES = [
 
 export default function CadBuildGuide({ model, material, sheetLayout, sheetCount }: CadBuildGuideProps) {
   const steps = buildFurnitureSteps(model.panels);
+  // 既存のAIチャット用木材価格目安リスト（app/lib/constants.ts）から、現在選択中の材料と
+  // 名前が一致するものだけを表示する。一致しなければ「価格情報なし」と正直に表示する
+  const priceInfo = findMaterialPriceInfo(material);
 
   return (
     <div className="flex flex-col gap-4 border-t border-tanei-border pt-4">
@@ -46,6 +50,21 @@ export default function CadBuildGuide({ model, material, sheetLayout, sheetCount
             必要枚数：<span className="font-black text-tanei-brand">{sheetCount}枚</span>
           </span>
         </div>
+
+        <h3 className="text-xs font-bold text-tanei-ink-muted mt-2 mb-1">価格目安（コーナン）</h3>
+        {priceInfo.length > 0 ? (
+          <div className="rounded-tanei-control border border-tanei-border bg-white divide-y divide-tanei-border overflow-hidden">
+            {priceInfo.map((wood) => (
+              <div key={wood.name} className="px-3 py-2 text-xs text-tanei-ink">
+                <span className="font-bold text-tanei-brand">{wood.name}</span>
+                <span className="text-tanei-ink-muted"> ／ {wood.size} ／ {wood.length}</span>
+                <div className="text-tanei-ink-muted mt-0.5">目安：{wood.price}（{wood.feature}）</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-tanei-ink-muted">価格情報なし</p>
+        )}
       </div>
 
       <div>
@@ -74,6 +93,24 @@ export default function CadBuildGuide({ model, material, sheetLayout, sheetCount
             </li>
           ))}
         </ul>
+
+        <h3 className="text-xs font-bold text-tanei-ink-muted mt-3 mb-1">🛒 工具を購入する（とみしんチャンネルおすすめ）</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+          {AMAZON_TOOLS.map((tool) => (
+            <a
+              key={tool.name}
+              href={tool.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between gap-2 bg-white p-2 rounded-tanei-control border border-tanei-border hover:border-[#FF9900] transition-all"
+            >
+              <span className="text-xs font-bold text-tanei-ink truncate">{tool.name}</span>
+              <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded flex-shrink-0 font-bold">
+                Amazon ＞
+              </span>
+            </a>
+          ))}
+        </div>
       </div>
 
       <div>

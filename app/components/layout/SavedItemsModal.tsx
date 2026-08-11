@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { SavedItem, SavedItemType } from '../../lib/types';
+import { parseSavedItem } from '../../lib/cad/projectStore';
+import { computeFurnitureProjectProgress } from '../../lib/cad/model';
 
 interface SavedItemsModalProps {
   activeModal: SavedItemType | null;
@@ -195,49 +197,106 @@ export default function SavedItemsModal({ activeModal, savedItems, onClose, onRe
             items.length === 0 ? (
               <p className="text-center text-gray-400 py-10 text-sm">保存した設計はまだありません。</p>
             ) : (
-              items.map((item) => (
-                <div key={item.id} className="border border-tanei-border p-4 rounded-tanei-card bg-tanei-bg flex flex-col gap-2">
-                  <div className="text-xs text-gray-500">最終更新：{item.date}</div>
-                  <div className="text-sm font-bold text-tanei-ink">{item.title}</div>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <Link
-                      href={`/app/cad?projectId=${item.id}`}
-                      onClick={onClose}
-                      className="text-xs font-bold bg-tanei-accent text-white px-3 py-1.5 rounded-tanei-control hover:bg-tanei-accent-dark transition-colors"
-                    >
-                      開く
-                    </Link>
+              items.map((item) => {
+                // Phase 2-7以前の保存データにはcutListChecked/buildChecklistが無いが、
+                // parseSavedItem・computeFurnitureProjectProgressはどちらもそれを前提に
+                // 安全に動作する（未着手として扱う。クラッシュしない）
+                const project = parseSavedItem(item);
+                const progress = project
+                  ? computeFurnitureProjectProgress(project.design, project.material, project.cutListChecked, project.buildChecklist)
+                  : null;
+                const hasStarted = progress ? progress.cutListDone > 0 || progress.buildDone > 0 : false;
+                const overallDone = progress ? progress.cutListDone + progress.buildDone : 0;
+                const overallTotal = progress ? progress.cutListTotal + progress.buildTotal : 0;
+                const overallPercent = overallTotal > 0 ? Math.round((overallDone / overallTotal) * 100) : 0;
+                const openLabel = progress?.isComplete ? '設計を見る' : hasStarted ? '制作を続ける' : '開く';
 
-                    {deleteConfirmId === item.id ? (
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-red-600">削除すると元に戻せません。</span>
-                        <button
-                          onClick={() => setDeleteConfirmId(null)}
-                          className="font-bold px-2 py-1 rounded-tanei-control bg-white border border-tanei-border text-tanei-ink-muted hover:bg-tanei-surface-muted"
-                        >
-                          キャンセル
-                        </button>
-                        <button
-                          onClick={() => {
-                            onRemove(item.id);
-                            setDeleteConfirmId(null);
-                          }}
-                          className="font-bold px-2 py-1 rounded-tanei-control bg-red-500 text-white hover:bg-red-600"
-                        >
-                          削除する
-                        </button>
+                return (
+                  <div key={item.id} className="border border-tanei-border p-4 rounded-tanei-card bg-tanei-bg flex flex-col gap-3">
+                    <div>
+                      <div className="text-xs text-gray-500">最終更新：{item.date}</div>
+                      <div className="text-sm font-bold text-tanei-ink">{item.title}</div>
+                    </div>
+
+                    {progress && (
+                      <div className="flex flex-col gap-2">
+                        {progress.isComplete ? (
+                          <span className="self-start text-xs font-bold text-tanei-brand bg-tanei-brand-soft rounded-tanei-control px-2.5 py-1.5">
+                            ✓ 制作完了
+                          </span>
+                        ) : hasStarted ? (
+                          <>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-bold text-tanei-ink-muted">制作進捗</span>
+                              <span className="font-black text-tanei-brand">{overallPercent}%</span>
+                            </div>
+                            <div className="w-full bg-tanei-border h-2 rounded-full overflow-hidden">
+                              <div
+                                className="bg-tanei-brand h-full transition-all duration-300"
+                                style={{ width: `${overallPercent}%` }}
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 mt-0.5">
+                              <div>
+                                <div className="text-[11px] text-tanei-ink-muted">カットリスト</div>
+                                <div className="text-xs font-bold text-tanei-ink">
+                                  {progress.cutListAvailable ? `${progress.cutListDone} / ${progress.cutListTotal}` : '－'}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-[11px] text-tanei-ink-muted">制作チェック</div>
+                                <div className="text-xs font-bold text-tanei-ink">
+                                  {progress.buildDone} / {progress.buildTotal}
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-xs text-tanei-ink-muted">制作進捗：未開始</span>
+                        )}
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => setDeleteConfirmId(item.id)}
-                        className="text-red-500 hover:underline text-xs"
-                      >
-                        削除
-                      </button>
                     )}
+
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <Link
+                        href={`/app/cad?projectId=${item.id}`}
+                        onClick={onClose}
+                        className="text-xs font-bold bg-tanei-accent text-white px-3 py-1.5 rounded-tanei-control hover:bg-tanei-accent-dark transition-colors"
+                      >
+                        {openLabel}
+                      </Link>
+
+                      {deleteConfirmId === item.id ? (
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-red-600">削除すると元に戻せません。</span>
+                          <button
+                            onClick={() => setDeleteConfirmId(null)}
+                            className="font-bold px-2 py-1 rounded-tanei-control bg-white border border-tanei-border text-tanei-ink-muted hover:bg-tanei-surface-muted"
+                          >
+                            キャンセル
+                          </button>
+                          <button
+                            onClick={() => {
+                              onRemove(item.id);
+                              setDeleteConfirmId(null);
+                            }}
+                            className="font-bold px-2 py-1 rounded-tanei-control bg-red-500 text-white hover:bg-red-600"
+                          >
+                            削除する
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setDeleteConfirmId(item.id)}
+                          className="text-red-500 hover:underline text-xs"
+                        >
+                          削除
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )
           ) : items.length === 0 ? (
             <p className="text-center text-gray-400 py-10 text-sm">まだ保存されているデータはありません。</p>
