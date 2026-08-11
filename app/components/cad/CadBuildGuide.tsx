@@ -79,6 +79,14 @@ export default function CadBuildGuide({
     setCheckedShoppingItems((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  // 「作り方」の開閉状態（Phase 3-6）。最初のステップだけ開いた状態で始める、
+  // 表示専用の一時的なUI状態（保存しない）。9ステップの内容・順序・生成ロジックは
+  // buildFurnitureSteps()から一切変更していない
+  const [expandedStepNumber, setExpandedStepNumber] = useState<number | null>(1);
+  const toggleStep = (stepNumber: number) => {
+    setExpandedStepNumber((prev) => (prev === stepNumber ? null : stepNumber));
+  };
+
   return (
     <div className="flex flex-col gap-4 border-t border-tanei-border pt-4">
       <div>
@@ -316,20 +324,40 @@ export default function CadBuildGuide({
       <div>
         <h3 className="text-sm font-bold text-tanei-ink mb-2">作り方</h3>
         <ol className="flex flex-col gap-2">
-          {steps.map((step) => (
-            <li
-              key={step.stepNumber}
-              className="rounded-tanei-control border border-tanei-border bg-white px-3 py-2.5"
-            >
-              <div className="flex items-center gap-2">
-                <span className="flex-shrink-0 bg-tanei-brand text-white text-xs font-black w-6 h-6 rounded-full flex items-center justify-center">
-                  {step.stepNumber}
-                </span>
-                <span className="font-bold text-sm text-tanei-ink">{step.title}</span>
-              </div>
-              <p className="text-xs text-tanei-ink-muted mt-1 ml-8">{step.description}</p>
-            </li>
-          ))}
+          {steps.map((step) => {
+            const isExpanded = expandedStepNumber === step.stepNumber;
+            const panelId = `cad-build-step-panel-${step.stepNumber}`;
+            return (
+              <li
+                key={step.stepNumber}
+                className="rounded-tanei-control border border-tanei-border bg-white overflow-hidden"
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleStep(step.stepNumber)}
+                  aria-expanded={isExpanded}
+                  aria-controls={panelId}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-tanei-brand"
+                >
+                  <span className="flex-shrink-0 bg-tanei-brand text-white text-xs font-black w-7 h-7 rounded-full flex items-center justify-center">
+                    {step.stepNumber}
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[10px] font-bold text-tanei-accent">STEP {step.stepNumber}</span>
+                    <span className="block font-bold text-sm text-tanei-ink break-words">{step.title}</span>
+                  </span>
+                  <span className="flex-shrink-0 text-xs text-tanei-ink-muted" aria-hidden="true">
+                    {isExpanded ? '▲' : '▼'}
+                  </span>
+                </button>
+                {isExpanded && (
+                  <p id={panelId} className="text-xs text-tanei-ink-muted px-3 pb-3 ml-10 leading-relaxed break-words">
+                    {step.description}
+                  </p>
+                )}
+              </li>
+            );
+          })}
         </ol>
       </div>
 
