@@ -96,6 +96,28 @@ export default function CadBuildGuide({
         </p>
       </div>
 
+      <div className="rounded-tanei-control border border-tanei-border bg-white p-3">
+        <span className="text-xs font-bold text-tanei-ink-muted">制作前チェック</span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+          <div className="rounded-tanei-control bg-tanei-surface px-2.5 py-2 text-center">
+            <span className="block text-[11px] text-tanei-ink-muted">材料</span>
+            <span className="block text-base font-black text-tanei-brand">{sheetCount}枚</span>
+          </div>
+          <div className="rounded-tanei-control bg-tanei-surface px-2.5 py-2 text-center">
+            <span className="block text-[11px] text-tanei-ink-muted">工具</span>
+            <span className="block text-base font-black text-tanei-brand">{FURNITURE_BUILD_TOOLS.length}種類</span>
+          </div>
+          <div className="rounded-tanei-control bg-tanei-surface px-2.5 py-2 text-center">
+            <span className="block text-[11px] text-tanei-ink-muted">パーツ</span>
+            <span className="block text-base font-black text-tanei-brand">{model.panels.length}個</span>
+          </div>
+          <div className="rounded-tanei-control bg-tanei-surface px-2.5 py-2 text-center">
+            <span className="block text-[11px] text-tanei-ink-muted">作り方</span>
+            <span className="block text-base font-black text-tanei-brand">{steps.length}ステップ</span>
+          </div>
+        </div>
+      </div>
+
       <div className="rounded-tanei-control border border-tanei-border bg-white p-3 flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-tanei-ink-muted">制作進捗</span>
