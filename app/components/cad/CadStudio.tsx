@@ -11,6 +11,8 @@ import CadControls from './CadControls';
 import CadPartsPanel from './CadPartsPanel';
 import CadSelectedPartPanel from './CadSelectedPartPanel';
 import CadCutlistView from './CadCutlistView';
+import CadCutMaterialsView from './CadCutMaterialsView';
+import CadBuildChecklistView from './CadBuildChecklistView';
 import {
   addShelfToDesign,
   buildFurnitureModel,
@@ -35,11 +37,13 @@ interface CadStudioProps {
   initialDesign?: FurnitureDesign;
 }
 
+type CadViewMode = 'design' | 'cutlist' | 'cutMaterials' | 'buildCheck';
+
 export default function CadStudio({ initialDesign }: CadStudioProps) {
   const [design, setDesign] = useState<FurnitureDesign>(initialDesign ?? createDefaultFurnitureDesign());
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
   const [material, setMaterial] = useState<string>(FURNITURE_MATERIALS[0]);
-  const [viewMode, setViewMode] = useState<'design' | 'cutlist'>('design');
+  const [viewMode, setViewMode] = useState<CadViewMode>('design');
 
   // 保存済みプロジェクトの管理状態。projectIdがnull＝まだ一度も保存していない新規設計
   // （「保存する」を押すと新規プロジェクトになる）、値がある＝既存プロジェクトの更新になる
@@ -49,6 +53,11 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
+
+  // カットリスト（Phase 2-7）のチェック状態。キーはCutListItem.id
+  const [cutListChecked, setCutListChecked] = useState<Record<string, boolean>>({});
+  // 制作チェック（Phase 2-7）のチェック状態。キーはステップ番号（1〜10）の文字列
+  const [buildChecklist, setBuildChecklist] = useState<Record<string, boolean>>({});
 
   // マイページ「保存した設計」の「開く」から /app/cad?projectId=... で来た場合、
   // 保存済みのFurnitureDesignを読み込んで復元する（木取り図・パーツ一覧・制作情報は
@@ -71,6 +80,8 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
         setProjectId(project.id);
         setProjectCreatedAt(project.createdAt);
         setProjectName(project.projectName);
+        setCutListChecked(project.cutListChecked ?? {});
+        setBuildChecklist(project.buildChecklist ?? {});
       } catch (error) {
         console.error(error);
         if (!cancelled) {
@@ -96,6 +107,8 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
       updatedAt: now,
       design,
       material,
+      cutListChecked,
+      buildChecklist,
     };
     try {
       await saveFurnitureProject(project);
@@ -103,6 +116,12 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
       setProjectCreatedAt(project.createdAt);
       setProjectName(project.projectName);
       setSaveMessage('設計を保存しました🌱');
+      // URLにprojectIdを反映しておく（history.replaceStateなので画面遷移は発生しない）。
+      // これが無いと、保存した直後にブラウザをリロードしただけで「今どのプロジェクトを
+      // 開いているか」の情報が失われ、新規の設計として扱われてしまう
+      const url = new URL(window.location.href);
+      url.searchParams.set('projectId', project.id);
+      window.history.replaceState(null, '', url.toString());
     } catch (error) {
       console.error(error);
       setSaveMessage('保存に失敗しました。時間をおいて再度お試しください。');
@@ -110,7 +129,54 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
       setIsSaving(false);
       setTimeout(() => setSaveMessage(null), 4000);
     }
-  }, [projectId, projectCreatedAt, projectName, design, material]);
+  }, [projectId, projectCreatedAt, projectName, design, material, cutListChecked, buildChecklist]);
+
+  // カットリスト・制作チェックのチェック状態は、既に保存済みのプロジェクト（projectIdがある）
+  // であれば、トグルのたびに既存のIndexedDB保存機構（saveFurnitureProject）へ自動保存する。
+  // まだ一度も保存していない設計は保存先が無いため、チェック状態はこのセッション内のみ有効
+  const persistChecklists = useCallback(
+    async (patch: { cutListChecked?: Record<string, boolean>; buildChecklist?: Record<string, boolean> }) => {
+      if (!projectId) return;
+      const now = new Date().toISOString();
+      const project: SavedFurnitureProject = {
+        id: projectId,
+        version: 1,
+        projectName: projectName.trim() || DEFAULT_FURNITURE_PROJECT_NAME,
+        createdAt: projectCreatedAt ?? now,
+        updatedAt: now,
+        design,
+        material,
+        cutListChecked: patch.cutListChecked ?? cutListChecked,
+        buildChecklist: patch.buildChecklist ?? buildChecklist,
+      };
+      try {
+        await saveFurnitureProject(project);
+        setProjectCreatedAt(project.createdAt);
+      } catch (error) {
+        console.error(error);
+      }
+    },
+    [projectId, projectCreatedAt, projectName, design, material, cutListChecked, buildChecklist]
+  );
+
+  const handleToggleCutListItem = useCallback(
+    (itemId: string) => {
+      const next = { ...cutListChecked, [itemId]: !cutListChecked[itemId] };
+      setCutListChecked(next);
+      void persistChecklists({ cutListChecked: next });
+    },
+    [cutListChecked, persistChecklists]
+  );
+
+  const handleToggleBuildStep = useCallback(
+    (step: number) => {
+      const key = String(step);
+      const next = { ...buildChecklist, [key]: !buildChecklist[key] };
+      setBuildChecklist(next);
+      void persistChecklists({ buildChecklist: next });
+    },
+    [buildChecklist, persistChecklists]
+  );
 
   const { model, errorMessage } = useMemo(() => {
     try {
@@ -174,6 +240,29 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
     setSelectedPanelId(panelId);
   }, []);
 
+  if (viewMode === 'cutMaterials') {
+    return (
+      <CadCutMaterialsView
+        model={lastValidModel}
+        checked={cutListChecked}
+        onToggle={handleToggleCutListItem}
+        onBack={() => setViewMode('cutlist')}
+        onNext={() => setViewMode('buildCheck')}
+      />
+    );
+  }
+
+  if (viewMode === 'buildCheck') {
+    return (
+      <CadBuildChecklistView
+        checked={buildChecklist}
+        onToggle={handleToggleBuildStep}
+        onBack={() => setViewMode('cutMaterials')}
+        onNext={() => setViewMode('cutlist')}
+      />
+    );
+  }
+
   if (viewMode === 'cutlist') {
     return (
       <CadCutlistView
@@ -181,6 +270,7 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
         material={material}
         onMaterialChange={setMaterial}
         onBack={() => setViewMode('design')}
+        onOpenCutList={() => setViewMode('cutMaterials')}
       />
     );
   }

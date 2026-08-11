@@ -12,7 +12,7 @@
 // panels（延いては3D表示）は毎回buildFurnitureModel()で再計算される。
 
 import type { SheetLayout, SheetPart } from '../sheetLayout';
-import type { FurnitureDesign, FurnitureModel, FurniturePanel, ShelfEntry } from './types';
+import type { FurnitureDesign, FurnitureModel, FurniturePanel, FurniturePanelKind, ShelfEntry } from './types';
 import { buildFurniturePanels, clampShelfEntry, defaultShelfSize, panelToCutSizeMm } from './geometry';
 import { DEMO_ASSEMBLY_MANUAL } from '../assemblyManual';
 
@@ -375,3 +375,56 @@ export function buildFurnitureSteps(panels: FurniturePanel[]): FurnitureBuildSte
 /** 「制作する」画面で表示する工具リスト。新しい工具データベースは作らず、
  * 既存のAssemblyManual（AIチャット側の組立説明書機能）が持つ工具リストをそのまま再利用する */
 export const FURNITURE_BUILD_TOOLS: string[] = DEMO_ASSEMBLY_MANUAL.tools;
+
+/** カットリストで使う、パーツの種類ごとの初心者向け名称。既存のFurniturePanelKindを
+ * そのまま使い、新しいパーツ分類は作らない（左右の側板は同じ「側板」としてまとめて表示） */
+const CUT_LIST_KIND_NAME: Partial<Record<FurniturePanelKind, string>> = {
+  top: '天板',
+  bottom: '底板',
+  left: '側板',
+  right: '側板',
+  back: '背板',
+  shelf: '棚板',
+  leg: '脚',
+};
+
+export interface CutListItem {
+  /** name・寸法から作る安定したキー。同じ寸法・同じ名称のパーツをまとめる際のグループキーにも、
+   * チェック状態を保存する際のキーにも使う */
+  id: string;
+  name: string;
+  widthMm: number;
+  heightMm: number;
+  thicknessMm: number;
+  qty: number;
+}
+
+/** Panel[]から「カットする材料」一覧を作る。同じ名称・同じ寸法のパーツは1行にまとめ、
+ * 枚数（qty）を積み上げる。新しい木取り計算は行わず、既存のPanel[]の寸法をそのまま集計するだけ */
+export function buildCutListItems(model: FurnitureModel): CutListItem[] {
+  const grouped = new Map<string, CutListItem>();
+  let unnamedCount = 0;
+
+  model.panels.forEach((panel) => {
+    const dims = [panel.size.x, panel.size.y, panel.size.z].sort((a, b) => a - b);
+    const thicknessMm = Math.round(dims[0]);
+    const heightMm = Math.round(dims[1]);
+    const widthMm = Math.round(dims[2]);
+
+    let name = CUT_LIST_KIND_NAME[panel.kind];
+    if (!name) {
+      unnamedCount += 1;
+      name = panel.label || `パーツ${unnamedCount}`;
+    }
+
+    const key = `${name}__${widthMm}x${heightMm}x${thicknessMm}`;
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.qty += 1;
+    } else {
+      grouped.set(key, { id: key, name, widthMm, heightMm, thicknessMm, qty: 1 });
+    }
+  });
+
+  return Array.from(grouped.values());
+}

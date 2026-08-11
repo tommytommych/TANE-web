@@ -1,0 +1,91 @@
+'use client';
+
+// 「制作チェック」画面（Phase 2-7）。カットリストの次に、家具作りの基本的な工程を
+// 順番にチェックしていける固定のチェックリストを表示する。AIによる自由生成は行わず、
+// あらかじめ決まった10ステップだけを使う。
+
+interface CadBuildChecklistViewProps {
+  checked: Record<string, boolean>;
+  onToggle: (step: number) => void;
+  onBack: () => void;
+  onNext: () => void;
+}
+
+const BUILD_CHECKLIST_STEPS = [
+  '材料を用意した',
+  '木取り図を確認した',
+  '材料に寸法を書いた',
+  'パーツをカットした',
+  'カット寸法を確認した',
+  '組み立て位置を確認した',
+  '下穴を確認した',
+  '組み立てた',
+  'ガタつきを確認した',
+  '仕上げを行った',
+];
+
+export default function CadBuildChecklistView({ checked, onToggle, onBack, onNext }: CadBuildChecklistViewProps) {
+  const doneCount = BUILD_CHECKLIST_STEPS.filter((_, i) => checked[String(i + 1)]).length;
+
+  return (
+    <div className="flex h-full w-full flex-col overflow-y-auto">
+      <div className="p-4 max-w-2xl mx-auto w-full flex flex-col gap-4">
+        <button
+          type="button"
+          onClick={onBack}
+          className="self-start text-sm font-bold text-tanei-ink-muted hover:text-tanei-brand"
+        >
+          ← カットリストに戻る
+        </button>
+
+        <div>
+          <p className="text-[11px] font-bold text-tanei-accent">STEP 5 / 6</p>
+          <h2 className="text-lg font-black text-tanei-ink">制作チェック</h2>
+          <p className="text-xs text-tanei-ink-muted mt-0.5">
+            今どこまで進んだかを確認しながら、順番に作業を進めましょう。
+          </p>
+        </div>
+
+        <p className="text-sm text-tanei-ink">
+          制作進捗：<span className="font-black text-tanei-brand">{doneCount} / {BUILD_CHECKLIST_STEPS.length}</span> 完了
+        </p>
+
+        <ol className="flex flex-col gap-2">
+          {BUILD_CHECKLIST_STEPS.map((label, i) => {
+            const stepNumber = i + 1;
+            const isChecked = Boolean(checked[String(stepNumber)]);
+            return (
+              <li key={stepNumber}>
+                <label
+                  className={`flex items-center gap-3 rounded-tanei-control border px-3 py-2.5 cursor-pointer transition-colors ${
+                    isChecked
+                      ? 'bg-tanei-brand-soft border-tanei-brand'
+                      : 'bg-white border-tanei-border hover:bg-tanei-surface'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => onToggle(stepNumber)}
+                    className="h-4 w-4 accent-tanei-brand flex-shrink-0"
+                  />
+                  <span className={`text-sm font-bold ${isChecked ? 'text-tanei-ink line-through' : 'text-tanei-ink'}`}>
+                    {stepNumber}. {label}
+                  </span>
+                </label>
+              </li>
+            );
+          })}
+        </ol>
+
+        <button
+          type="button"
+          onClick={onNext}
+          className="bg-tanei-brand text-white px-4 py-3 rounded-tanei-control text-sm font-bold hover:bg-tanei-brand-dark transition-colors"
+        >
+          制作へ進む →
+        </button>
+      </div>
+    </div>
+  );
+}

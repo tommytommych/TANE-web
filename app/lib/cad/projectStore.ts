@@ -22,6 +22,11 @@ export interface SavedFurnitureProject {
   updatedAt: string; // ISO 8601
   design: FurnitureDesign;
   material: string;
+  /** カットリスト（Phase 2-7）のチェック状態。キーはCutListItem.id。任意項目のため、
+   * Phase 2-6以前に保存されたプロジェクトには存在しない（undefinedのまま扱う） */
+  cutListChecked?: Record<string, boolean>;
+  /** 制作チェック（Phase 2-7）のチェック状態。キーはステップ番号（1〜10）を文字列化したもの */
+  buildChecklist?: Record<string, boolean>;
 }
 
 export const DEFAULT_FURNITURE_PROJECT_NAME = '新しい設計';
@@ -41,6 +46,15 @@ const toSavedItem = (project: SavedFurnitureProject): SavedItem => ({
   content: JSON.stringify(project),
   date: formatUpdatedAtForDisplay(project.updatedAt),
 });
+
+// Phase 2-6以前に保存されたプロジェクトには存在しない、または壊れている可能性がある任意項目。
+// 形が不正な場合は無視してundefinedとして扱う（プロジェクト全体は読み込み失敗にしない）
+const parseOptionalBooleanRecord = (value: unknown): Record<string, boolean> | undefined => {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (!entries.every(([, v]) => typeof v === 'boolean')) return undefined;
+  return Object.fromEntries(entries) as Record<string, boolean>;
+};
 
 // content（JSON文字列）は他バージョンのデータ・ブラウザ保存領域の破損等で壊れている
 // 可能性があるため、必ず構造を検証してから使う（不正な場合はnullを返し、呼び出し側で
@@ -69,6 +83,8 @@ const parseSavedItem = (item: SavedItem): SavedFurnitureProject | null => {
       updatedAt: p.updatedAt,
       design: p.design,
       material: p.material,
+      cutListChecked: parseOptionalBooleanRecord(p.cutListChecked),
+      buildChecklist: parseOptionalBooleanRecord(p.buildChecklist),
     };
   } catch {
     return null;

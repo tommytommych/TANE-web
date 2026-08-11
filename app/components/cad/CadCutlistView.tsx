@@ -22,9 +22,10 @@ interface CadCutlistViewProps {
   material: string;
   onMaterialChange: (material: string) => void;
   onBack: () => void;
+  onOpenCutList: () => void;
 }
 
-export default function CadCutlistView({ model, material, onMaterialChange, onBack }: CadCutlistViewProps) {
+export default function CadCutlistView({ model, material, onMaterialChange, onBack, onOpenCutList }: CadCutlistViewProps) {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -132,14 +133,23 @@ export default function CadCutlistView({ model, material, onMaterialChange, onBa
               </ul>
             </div>
 
-            <button
-              type="button"
-              onClick={handleDownloadPdf}
-              disabled={isGeneratingPdf}
-              className="bg-tanei-brand text-white px-4 py-3 rounded-tanei-control text-sm font-bold hover:bg-tanei-brand-dark transition-colors disabled:opacity-50"
-            >
-              {isGeneratingPdf ? 'PDFを作成中…' : '📄 PDFを保存'}
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={isGeneratingPdf}
+                className="flex-1 bg-tanei-brand text-white px-4 py-3 rounded-tanei-control text-sm font-bold hover:bg-tanei-brand-dark transition-colors disabled:opacity-50"
+              >
+                {isGeneratingPdf ? 'PDFを作成中…' : '📄 PDFを保存'}
+              </button>
+              <button
+                type="button"
+                onClick={onOpenCutList}
+                className="flex-1 bg-tanei-accent text-white px-4 py-3 rounded-tanei-control text-sm font-bold hover:bg-tanei-accent-dark transition-colors"
+              >
+                📋 カットリストを見る
+              </button>
+            </div>
 
             <CadBuildGuide model={model} material={material} sheetLayout={sheetLayout} sheetCount={sheets.length} />
           </>
