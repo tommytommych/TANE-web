@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { SavedItem, SavedItemType } from '../../lib/types';
-import { parseSavedItem } from '../../lib/cad/projectStore';
+import { parseSavedItem, duplicateFurnitureProject, saveFurnitureProject } from '../../lib/cad/projectStore';
 import { computeFurnitureProjectProgress } from '../../lib/cad/model';
 
 interface SavedItemsModalProps {
@@ -57,16 +58,22 @@ export default function SavedItemsModal({
   autoOpenAdd,
   onAutoOpenAddHandled,
 }: SavedItemsModalProps) {
+  const router = useRouter();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  // 「設計を複製」の確認状態（Phase 3-15）。削除確認と同じ、既存の1件だけ選択されている
+  // ローカルstateのパターンをそのまま再利用している
+  const [duplicateConfirmId, setDuplicateConfirmId] = useState<string | null>(null);
+  const [isDuplicating, setIsDuplicating] = useState(false);
   const [prevActiveModal, setPrevActiveModal] = useState(activeModal);
   if (activeModal !== prevActiveModal) {
     // モーダルの表示対象が切り替わったら、削除確認状態を持ち越さないようにリセットする
     // （Reactが公式に認めている「レンダー中に直接状態を調整する」パターン）
     setPrevActiveModal(activeModal);
     setDeleteConfirmId(null);
+    setDuplicateConfirmId(null);
   }
 
   const [isAdding, setIsAdding] = useState(false);
@@ -125,6 +132,31 @@ export default function SavedItemsModal({
     if (!editingId) return;
     onUpdate(editingId, { title: editTitle, content: editContent });
     setEditingId(null);
+  };
+
+  // 「設計を複製」（Phase 3-15）。design・materialだけを引き継いだ新規プロジェクトを
+  // 既存のsaveFurnitureProjectでそのまま保存し、既存のCAD起動導線（/app/cad?projectId=…）
+  // で開く。新しい保存の仕組み・新しいviewMode・新しいルートは一切作らない
+  const handleDuplicateProject = async (item: SavedItem) => {
+    const project = parseSavedItem(item);
+    if (!project) {
+      showToast?.('この設計は複製できませんでした。データを確認できません。');
+      setDuplicateConfirmId(null);
+      return;
+    }
+    setIsDuplicating(true);
+    try {
+      const duplicated = duplicateFurnitureProject(project);
+      await saveFurnitureProject(duplicated);
+      showToast?.('設計を複製しました🌱');
+      router.push(`/app/cad?projectId=${duplicated.id}`);
+    } catch (e) {
+      console.error(e);
+      showToast?.('複製に失敗しました。時間をおいて再度お試しください。');
+    } finally {
+      setIsDuplicating(false);
+      setDuplicateConfirmId(null);
+    }
   };
 
   const resetAddForm = () => {
@@ -311,6 +343,33 @@ export default function SavedItemsModal({
                       >
                         {openLabel}
                       </Link>
+
+                      {duplicateConfirmId === item.id ? (
+                        <div className="flex items-center gap-2 text-xs flex-wrap">
+                          <span className="text-tanei-ink-muted">この設計を複製しますか？元の設計はそのまま残ります。</span>
+                          <button
+                            onClick={() => setDuplicateConfirmId(null)}
+                            disabled={isDuplicating}
+                            className="font-bold px-2 py-1 rounded-tanei-control bg-white border border-tanei-border text-tanei-ink-muted hover:bg-tanei-surface-muted disabled:opacity-50"
+                          >
+                            キャンセル
+                          </button>
+                          <button
+                            onClick={() => handleDuplicateProject(item)}
+                            disabled={isDuplicating}
+                            className="font-bold px-2 py-1 rounded-tanei-control bg-tanei-brand text-white hover:bg-tanei-brand-dark disabled:opacity-50"
+                          >
+                            {isDuplicating ? '複製中…' : '設計を複製'}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setDuplicateConfirmId(item.id)}
+                          className="text-xs font-bold text-tanei-accent hover:underline"
+                        >
+                          設計を複製
+                        </button>
+                      )}
 
                       {deleteConfirmId === item.id ? (
                         <div className="flex items-center gap-2 text-xs">

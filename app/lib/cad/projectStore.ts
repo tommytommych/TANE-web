@@ -114,3 +114,23 @@ export const loadFurnitureProject = async (id: string): Promise<SavedFurniturePr
 export const deleteFurnitureProject = async (id: string): Promise<void> => {
   await deleteSavedItem(id);
 };
+
+// 「設計を複製」（Phase 3-15）。design・materialだけを引き継ぎ、新しいprojectId・
+// 新しい日時・末尾に「（コピー）」を付けたプロジェクト名を持つ、完全に独立した
+// 新規プロジェクトを作る純粋関数（この時点ではまだ保存しない。呼び出し側で
+// saveFurnitureProjectを呼ぶ）。
+// 【重要】buildChecklist・cutListCheckedは意図的に引き継がない（複製は常に未着手として
+// 扱う）。designはstructuredCloneで複製し、元プロジェクトのshelves配列などと参照を
+// 共有しない（後から複製側を編集しても元プロジェクトに影響しない）
+export const duplicateFurnitureProject = (project: SavedFurnitureProject): SavedFurnitureProject => {
+  const now = new Date().toISOString();
+  return {
+    id: createNewFurnitureProjectId(),
+    version: 1,
+    projectName: `${project.projectName}（コピー）`,
+    createdAt: now,
+    updatedAt: now,
+    design: structuredClone(project.design),
+    material: project.material,
+  };
+};
