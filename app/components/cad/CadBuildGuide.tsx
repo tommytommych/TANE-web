@@ -567,6 +567,64 @@ export default function CadBuildGuide({
               );
             })}
           </div>
+          {/* 「STEPの進捗」一覧（Phase 3-40）。既存のミニSTEPナビ（丸型9個、Phase 3-34）は
+              置き換えず維持したまま、STEP番号＋タイトル＋状態が分かるコンパクトな一覧を追加する。
+              状態判定はisBuildStepDone・currentBuildStepNumberのみを使い、新しいSTEP判定・
+              新しい保存データは一切作らない */}
+          <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
+            <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">STEPの進捗</p>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {steps.map((step) => {
+                const isListStepDone = isBuildStepDone(step.stepNumber);
+                const isListStepCurrent = !isListStepDone && step.stepNumber === currentBuildStepNumber;
+                return (
+                  <li key={step.stepNumber}>
+                    <button
+                      type="button"
+                      onClick={() => goToBuildStep(step.stepNumber)}
+                      className={`w-full flex items-center gap-2 rounded-tanei-control border px-2.5 py-1.5 text-left transition-colors ${
+                        isListStepCurrent
+                          ? 'bg-white border-tanei-accent'
+                          : isListStepDone
+                            ? 'bg-tanei-surface-muted border-tanei-border'
+                            : 'bg-white border-tanei-border hover:border-tanei-brand'
+                      }`}
+                    >
+                      <span
+                        className={`flex-shrink-0 text-[11px] font-black ${
+                          isListStepCurrent
+                            ? 'text-tanei-accent'
+                            : isListStepDone
+                              ? 'text-tanei-ink-muted'
+                              : 'text-tanei-brand'
+                        }`}
+                      >
+                        STEP {step.stepNumber}
+                      </span>
+                      <span
+                        className={`flex-1 min-w-0 text-[11px] font-bold truncate ${
+                          isListStepDone ? 'text-tanei-ink-muted' : 'text-tanei-ink'
+                        }`}
+                      >
+                        {step.title}
+                      </span>
+                      <span
+                        className={`flex-shrink-0 text-[10px] font-bold ${
+                          isListStepCurrent
+                            ? 'text-tanei-accent'
+                            : isListStepDone
+                              ? 'text-tanei-brand'
+                              : 'text-tanei-ink-muted'
+                        }`}
+                      >
+                        {isListStepDone ? '✓ 完了' : isListStepCurrent ? '▶ 現在' : '○ 未完了'}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </div>
 
         <ol className="flex flex-col gap-2">
