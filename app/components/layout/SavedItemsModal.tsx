@@ -116,6 +116,9 @@ export default function SavedItemsModal({
   // 「並び替え」（Phase 3-18）。初期状態は「最終更新が新しい順」。表示順だけを変える
   // ローカルstateで、リロードすれば初期状態に戻って構わない（保存もしない）
   const [sortOption, setSortOption] = useState<CadProjectSortOption>('updatedDesc');
+  // 「完成作品詳細」（Phase 3-19）。finished SavedItem.idを保持するだけの、読み取り専用の
+  // 表示state。ここでSavedItemを書き換えることは一切ない
+  const [viewingFinishedId, setViewingFinishedId] = useState<string | null>(null);
   const [prevActiveModal, setPrevActiveModal] = useState(activeModal);
   if (activeModal !== prevActiveModal) {
     // モーダルの表示対象が切り替わったら、削除確認状態を持ち越さないようにリセットする
@@ -127,6 +130,7 @@ export default function SavedItemsModal({
     setSearchQuery('');
     setProgressFilter('all');
     setSortOption('updatedDesc');
+    setViewingFinishedId(null);
   }
 
   const [isAdding, setIsAdding] = useState(false);
@@ -236,6 +240,18 @@ export default function SavedItemsModal({
           .sort((a, b) => (Number(b.item.id) || 0) - (Number(a.item.id) || 0))
       : [];
 
+  // 「完成作品詳細」（Phase 3-19）。viewingFinishedIdが指すfinished SavedItemを
+  // savedItemsからその場で探すだけ（複製・キャッシュしない）。削除済みならnullになり、
+  // 詳細モーダル自体を表示しない。関連する設計名も、制作履歴と同じく都度
+  // parseSavedItemで取得し、削除済み・不正・未設定のいずれでもクラッシュしない
+  const viewingFinishedItem = viewingFinishedId
+    ? (savedItems.find((si) => si.id === viewingFinishedId && si.type === 'finished') ?? null)
+    : null;
+  const viewingRelatedCadItem = viewingFinishedItem?.relatedProjectId
+    ? (savedItems.find((si) => si.type === 'cadProject' && si.id === viewingFinishedItem.relatedProjectId) ?? null)
+    : null;
+  const viewingRelatedProjectName = viewingRelatedCadItem ? (parseSavedItem(viewingRelatedCadItem)?.projectName ?? viewingRelatedCadItem.title) : null;
+
   const startEdit = (item: SavedItem) => {
     setEditingId(item.id);
     setEditTitle(item.title);
@@ -342,13 +358,14 @@ export default function SavedItemsModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="saved-items-modal-title"
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white w-full max-w-2xl max-h-[80vh] rounded-tanei-card shadow-xl flex flex-col overflow-hidden"
+    <>
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="saved-items-modal-title"
+          onClick={(e) => e.stopPropagation()}
+          className="bg-white w-full max-w-2xl max-h-[80vh] rounded-tanei-card shadow-xl flex flex-col overflow-hidden"
       >
         <div className="p-4 bg-tanei-surface-muted border-b border-tanei-border flex justify-between items-center">
           <h3 id="saved-items-modal-title" className="font-bold text-tanei-ink text-lg">
@@ -454,13 +471,22 @@ export default function SavedItemsModal({
                           <p className="text-xs text-tanei-ink-muted break-words">関連する設計：{projectName}</p>
                           <span className="inline-block text-[11px] font-bold text-tanei-brand mt-0.5">✓ 制作完了</span>
                           <p className="text-[11px] text-gray-500 mt-0.5">{item.date}</p>
-                          <Link
-                            href={`/app/cad?projectId=${item.relatedProjectId}`}
-                            onClick={onClose}
-                            className="inline-flex items-center gap-1.5 mt-1.5 text-xs font-bold bg-tanei-accent text-white px-3 py-1.5 rounded-tanei-control hover:bg-tanei-accent-dark transition-colors"
-                          >
-                            元の設計を開く
-                          </Link>
+                          <div className="flex gap-2 flex-wrap mt-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setViewingFinishedId(item.id)}
+                              className="text-xs font-bold bg-white border border-tanei-border text-tanei-ink px-3 py-1.5 rounded-tanei-control hover:bg-tanei-surface-muted transition-colors"
+                            >
+                              作品を見る
+                            </button>
+                            <Link
+                              href={`/app/cad?projectId=${item.relatedProjectId}`}
+                              onClick={onClose}
+                              className="inline-flex items-center gap-1.5 text-xs font-bold bg-tanei-accent text-white px-3 py-1.5 rounded-tanei-control hover:bg-tanei-accent-dark transition-colors"
+                            >
+                              元の設計を開く
+                            </Link>
+                          </div>
                         </div>
                       </div>
                     );
@@ -819,6 +845,19 @@ export default function SavedItemsModal({
                         </div>
                       )}
 
+                      {/* 完成作品詳細表示（Phase 3-19）。制作履歴に出てこない項目
+                          （relatedProjectIdが無い・関連設計が削除済み等）でも、
+                          既存のfinished一覧からは常に詳細を見られるようにする */}
+                      {activeModal === 'finished' && (
+                        <button
+                          type="button"
+                          onClick={() => setViewingFinishedId(item.id)}
+                          className="self-start text-xs font-bold bg-white border border-tanei-border text-tanei-ink px-3 py-1.5 rounded-tanei-control hover:bg-tanei-surface-muted transition-colors"
+                        >
+                          作品を見る
+                        </button>
+                      )}
+
                       {/* 完成作品から元の設計へ戻る導線（Phase 3-14）。ブラウザCADの「完成作品として
                           保存する」経由で保存されたitemだけがrelatedProjectIdを持つ。既存の
                           type='cadProject'一覧（savedItems）に該当する設計がまだ残っている場合のみ
@@ -843,7 +882,88 @@ export default function SavedItemsModal({
             })
           )}
         </div>
+        </div>
       </div>
-    </div>
+
+      {/* 完成作品詳細（Phase 3-19）。既存のSavedItemsModal自体と同じ、fixed inset-0の
+          バックドロップ＋role="dialog"という安全なモーダルパターンをそのまま踏襲し、
+          外側のモーダルの上に重ねて表示する。読み取り専用で、SavedItemは一切書き換えない */}
+      {viewingFinishedItem && (
+        <div
+          className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4"
+          onClick={() => setViewingFinishedId(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="finished-detail-title"
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white w-full max-w-md rounded-tanei-card shadow-xl flex flex-col overflow-hidden max-h-[85vh]"
+          >
+            <div className="p-4 bg-tanei-surface-muted border-b border-tanei-border flex justify-between items-center">
+              <h3 id="finished-detail-title" className="font-bold text-tanei-ink text-lg">
+                完成作品詳細
+              </h3>
+              <button
+                onClick={() => setViewingFinishedId(null)}
+                className="text-gray-500 hover:text-black font-bold px-3 py-1 rounded-tanei-control"
+              >
+                ✕ 閉じる
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-3">
+              {viewingFinishedItem.fileDataUrl && viewingFinishedItem.fileMimeType?.startsWith('image/') ? (
+                // base64のdata URL（IndexedDB保存の画像）のためnext/imageの最適化対象外。意図的にimgタグを使用
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={viewingFinishedItem.fileDataUrl}
+                  alt={viewingFinishedItem.title}
+                  className="w-full max-h-72 object-contain rounded-tanei-control border border-tanei-border bg-tanei-bg"
+                />
+              ) : (
+                <p className="text-center text-gray-400 py-8 text-sm bg-tanei-bg rounded-tanei-control border border-tanei-border">
+                  完成写真はありません
+                </p>
+              )}
+
+              <div>
+                <p className="text-[11px] font-bold text-tanei-ink-muted">作品名</p>
+                <p className="text-sm font-bold text-tanei-ink break-words">{viewingFinishedItem.title}</p>
+              </div>
+
+              {viewingFinishedItem.content && (
+                <div>
+                  <p className="text-[11px] font-bold text-tanei-ink-muted">メモ</p>
+                  <p className="text-sm text-tanei-ink whitespace-pre-wrap break-words">{viewingFinishedItem.content}</p>
+                </div>
+              )}
+
+              {viewingRelatedProjectName && (
+                <div>
+                  <p className="text-[11px] font-bold text-tanei-ink-muted">関連する設計</p>
+                  <p className="text-sm text-tanei-ink break-words">設計名：{viewingRelatedProjectName}</p>
+                </div>
+              )}
+
+              <div>
+                <p className="text-[11px] font-bold text-tanei-ink-muted">完成作品を保存した日時</p>
+                <p className="text-sm text-tanei-ink">{viewingFinishedItem.date}</p>
+              </div>
+
+              {viewingRelatedCadItem && (
+                <Link
+                  href={`/app/cad?projectId=${viewingRelatedCadItem.id}`}
+                  onClick={onClose}
+                  className="self-start inline-flex items-center gap-1.5 text-sm font-bold bg-tanei-accent text-white px-4 py-2 rounded-tanei-control hover:bg-tanei-accent-dark transition-colors"
+                >
+                  元の設計を開く
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
