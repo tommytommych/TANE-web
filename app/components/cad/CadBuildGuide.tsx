@@ -741,30 +741,37 @@ export default function CadBuildGuide({
                           <div className="flex flex-col gap-0.5">
                             <span className="text-[11px] font-bold text-tanei-brand">✓ 制作チェック済み</span>
                             <span className="text-[11px] text-tanei-brand">✓ この確認ポイントは完了しています</span>
+                            {/* Phase 3-39：完了時の締めくくりの補助表示。制作チェック側の状態は
+                                一切書き換えず、既存のrelatedChecklistDoneCount等から表示するだけ */}
+                            <span className="text-[10px] text-tanei-ink-muted">このSTEPの確認は完了しています</span>
                           </div>
                         ) : (
                           <div className="flex flex-col gap-1">
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                              {relatedChecklistDoneCount === 0 ? (
-                                <span className="text-[11px] font-bold text-tanei-ink-muted">制作チェック：未完了</span>
-                              ) : (
-                                <span className="text-[11px] font-bold text-tanei-ink-muted">
-                                  制作チェック：一部完了（{relatedChecklistDoneCount}/{relatedChecklistTotal}）
-                                </span>
-                              )}
-                              <button
-                                type="button"
-                                onClick={onViewBuildCheck}
-                                className="flex-shrink-0 text-[11px] font-bold text-tanei-brand border border-tanei-brand/40 hover:bg-tanei-brand-soft hover:border-tanei-brand rounded-full px-2.5 py-1 transition-colors"
-                              >
-                                制作チェックを見る →
-                              </button>
-                            </div>
+                            {relatedChecklistDoneCount === 0 ? (
+                              <span className="text-[11px] font-bold text-tanei-ink-muted">制作チェック：未完了</span>
+                            ) : (
+                              <span className="text-[11px] font-bold text-tanei-ink-muted">
+                                制作チェック：一部完了（{relatedChecklistDoneCount}/{relatedChecklistTotal}）
+                              </span>
+                            )}
                             {/* Phase 3-32：未完了の確認ポイントがあることを補助的に伝える文言。
                                 現在の作業STEPでは少し目立たせ、それ以外は控えめな表示にとどめる */}
                             <p className={isCurrent ? 'text-[11px] font-bold text-tanei-accent' : 'text-[10px] text-tanei-ink-muted'}>
                               まだ確認が必要です
                             </p>
+                            {/* Phase 3-39：制作チェック画面への導線を分かりやすくする補助文。
+                                実際のチェック更新はCadBuildChecklistView側にのみ任せ、
+                                ここでbuildChecklist・cutListCheckedを一切書き換えない */}
+                            <p className={isCurrent ? 'text-[11px] font-bold text-tanei-accent' : 'text-[10px] text-tanei-ink-muted'}>
+                              確認したら制作チェックを更新してください
+                            </p>
+                            <button
+                              type="button"
+                              onClick={onViewBuildCheck}
+                              className="self-start flex-shrink-0 text-[11px] font-bold text-tanei-brand border border-tanei-brand/40 hover:bg-tanei-brand-soft hover:border-tanei-brand rounded-full px-2.5 py-1 transition-colors"
+                            >
+                              制作チェックを見る →
+                            </button>
                           </div>
                         )}
                       </div>
