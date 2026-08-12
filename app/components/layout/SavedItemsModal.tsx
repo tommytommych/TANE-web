@@ -265,6 +265,11 @@ export default function SavedItemsModal({
         viewingRelatedProject.buildChecklist
       )
     : null;
+  // 「制作実績」（Phase 3-21）。保存設計カードと全く同じ、relatedProjectIdの完全一致
+  // だけで数える単純な集計をここでも再利用する（新しい集計ロジックを重複させない）
+  const viewingFinishedCount = viewingRelatedCadItem
+    ? savedItems.filter((si) => si.type === 'finished' && si.relatedProjectId === viewingRelatedCadItem.id).length
+    : 0;
 
   const startEdit = (item: SavedItem) => {
     setEditingId(item.id);
@@ -591,6 +596,10 @@ export default function SavedItemsModal({
                 // 「次にやること」（Phase 2-9で導入した既存の純粋関数をそのまま再利用）。
                 // 全10項目完了ならnullが返るため、下では制作中・未着手の場合だけ表示する
                 const nextStep = project ? getNextBuildStep(project.buildChecklist) : null;
+                // 「制作実績」（Phase 3-21）。既存のfinished SavedItem（savedItems）を
+                // relatedProjectId === item.id の完全一致だけで数える単純な集計。
+                // 新しいデータ構造・新しい保存処理は一切作らない
+                const finishedCount = savedItems.filter((si) => si.type === 'finished' && si.relatedProjectId === item.id).length;
                 const hasStarted = progress ? progress.cutListDone > 0 || progress.buildDone > 0 : false;
                 const overallDone = progress ? progress.cutListDone + progress.buildDone : 0;
                 const overallTotal = progress ? progress.cutListTotal + progress.buildTotal : 0;
@@ -705,6 +714,10 @@ export default function SavedItemsModal({
                         )}
                       </div>
                     )}
+
+                    <p className="text-[11px] text-tanei-ink-muted">
+                      制作実績：{finishedCount > 0 ? `${finishedCount}件` : 'まだありません'}
+                    </p>
 
                     <div className="flex items-center gap-3 flex-wrap">
                       <Link
@@ -1018,6 +1031,10 @@ export default function SavedItemsModal({
                       </p>
                     </div>
                   )}
+
+                  <p className="text-[11px] text-tanei-ink-muted">
+                    この設計の制作実績：{viewingFinishedCount > 0 ? `${viewingFinishedCount}件` : 'まだありません'}
+                  </p>
 
                   <Link
                     href={`/app/cad?projectId=${viewingRelatedCadItem.id}`}
