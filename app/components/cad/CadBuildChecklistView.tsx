@@ -168,13 +168,32 @@ export default function CadBuildChecklistView({
   return (
     <div ref={scrollContainerRef} className="flex h-full w-full flex-col overflow-y-auto">
       <div className="p-4 max-w-2xl mx-auto w-full flex flex-col gap-4">
-        <button
-          type="button"
-          onClick={onBack}
-          className="self-start text-sm font-bold text-tanei-ink-muted hover:text-tanei-brand"
-        >
-          ← カットリストに戻る
-        </button>
+        {/* Phase 4-01調査で判明：作り方へ戻るには、この「← カットリストに戻る」→
+            カットリスト画面の「← 木取り図に戻る」という2クリックの経路しかなく、
+            画面下部の「制作へ進む →」（onNext）が実際には既存のBUILD_GUIDE_ANCHOR_ID
+            （CadCutlistView.tsx）へ直接scrollIntoViewする、1クリックで作り方へ戻れる
+            処理であることも分かりにくかった。Phase 4-04では、既存のonNext（新しい
+            viewMode・新しいstateは一切追加していない、CadStudio.tsxの既存処理を
+            そのまま再利用）をこの最上部からも呼べるようにし、「← 作り方に戻る」を
+            「← カットリストに戻る」より前（優先度が高い側）に配置する。画面下部の
+            「制作へ進む →」・「← カットリストに戻る」・「← 木取り図に戻る」は
+            いずれも削除・変更しない */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <button
+            type="button"
+            onClick={onNext}
+            className="self-start text-sm font-bold text-tanei-brand hover:text-tanei-brand-dark"
+          >
+            ← 作り方に戻る
+          </button>
+          <button
+            type="button"
+            onClick={onBack}
+            className="self-start text-sm font-bold text-tanei-ink-muted hover:text-tanei-brand"
+          >
+            ← カットリストに戻る
+          </button>
+        </div>
 
         <div>
           <p className="text-[11px] font-bold text-tanei-accent">STEP 5 / 6</p>
