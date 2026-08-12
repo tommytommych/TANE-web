@@ -562,7 +562,9 @@ export default function CadBuildGuide({
                                   )}
                                 </span>
                                 <span className="block text-tanei-ink-muted mt-0.5">
-                                  サイズ：{group.widthMm} × {group.heightMm} × {group.thicknessMm} mm
+                                  幅 <span className="font-bold text-tanei-ink">{group.widthMm}</span> × 奥行{' '}
+                                  <span className="font-bold text-tanei-ink">{group.heightMm}</span> × 厚み{' '}
+                                  <span className="font-bold text-tanei-ink">{group.thicknessMm}</span> mm
                                 </span>
                               </span>
                               <button
