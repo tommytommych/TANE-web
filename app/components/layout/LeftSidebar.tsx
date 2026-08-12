@@ -17,15 +17,32 @@ interface LeftSidebarProps {
   onConsumeImageUsage: () => boolean;
 }
 
-const MY_PAGE_ITEMS: { icon: string; label: string; type: SavedItemType }[] = [
-  { icon: '⭐', label: 'お気に入り', type: 'favorite' },
-  { icon: '💾', label: '保存した設計・アイデア', type: 'design' },
-  { icon: '🧊', label: '保存した設計（ブラウザCAD）', type: 'cadProject' },
-  { icon: '📏', label: '木取り図', type: 'cutlist' },
-  { icon: '📄', label: '保存したPDF', type: 'pdf' },
-  { icon: '🖼️', label: '保存した画像', type: 'image' },
-  { icon: '🏆', label: '完成作品', type: 'finished' },
-  { icon: '🕒', label: '相談履歴', type: 'history' },
+// Phase 4-01調査で判明：マイページの8項目が単純な縦一列で並んでおり、
+// 「何をしたいか」からどの項目を選べばいいか判断しづらかった。Phase 4-05で、
+// 項目そのもの（icon・label・type、＝onOpenModal(type)の呼び出し先）は一切変更せず、
+// 「設計する」「制作・作品」「相談」という目的別の小見出しでグルーピングするだけにする
+const MY_PAGE_GROUPS: { title: string; items: { icon: string; label: string; type: SavedItemType }[] }[] = [
+  {
+    title: '設計する',
+    items: [
+      { icon: '⭐', label: 'お気に入り', type: 'favorite' },
+      { icon: '💾', label: '保存した設計・アイデア', type: 'design' },
+      { icon: '🧊', label: '保存した設計（ブラウザCAD）', type: 'cadProject' },
+    ],
+  },
+  {
+    title: '制作・作品',
+    items: [
+      { icon: '📏', label: '木取り図', type: 'cutlist' },
+      { icon: '📄', label: '保存したPDF', type: 'pdf' },
+      { icon: '🖼️', label: '保存した画像', type: 'image' },
+      { icon: '🏆', label: '完成作品', type: 'finished' },
+    ],
+  },
+  {
+    title: '相談',
+    items: [{ icon: '🕒', label: '相談履歴', type: 'history' }],
+  },
 ];
 
 const QUICK_START_ITEMS = [
@@ -245,14 +262,19 @@ export default function LeftSidebar({
               <SectionTitle icon="👤" className="px-3 mb-1 normal-case">
                 マイページ
               </SectionTitle>
-              {MY_PAGE_ITEMS.map((item) => (
-                <button
-                  key={item.type}
-                  onClick={() => onOpenModal(item.type)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-tanei-control text-sm bg-tanei-surface hover:bg-white border border-transparent hover:border-tanei-border text-tanei-ink transition-colors w-full text-left"
-                >
-                  <span>{item.icon}</span> {item.label}
-                </button>
+              {MY_PAGE_GROUPS.map((group) => (
+                <div key={group.title} className="flex flex-col gap-1.5">
+                  <p className="px-3 text-[11px] font-bold text-tanei-ink-muted">{group.title}</p>
+                  {group.items.map((item) => (
+                    <button
+                      key={item.type}
+                      onClick={() => onOpenModal(item.type)}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-tanei-control text-sm bg-tanei-surface hover:bg-white border border-transparent hover:border-tanei-border text-tanei-ink transition-colors w-full text-left"
+                    >
+                      <span>{item.icon}</span> {item.label}
+                    </button>
+                  ))}
+                </div>
               ))}
             </div>
           </div>
