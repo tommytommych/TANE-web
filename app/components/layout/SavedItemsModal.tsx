@@ -11,7 +11,12 @@ import {
   formatUpdatedAtForDisplay,
   type SavedFurnitureProject,
 } from '../../lib/cad/projectStore';
-import { computeFurnitureProjectProgress, getBuildProgressStatus, type BuildProgressStatus } from '../../lib/cad/model';
+import {
+  computeFurnitureProjectProgress,
+  getBuildProgressStatus,
+  getNextBuildStep,
+  type BuildProgressStatus,
+} from '../../lib/cad/model';
 
 interface SavedItemsModalProps {
   activeModal: SavedItemType | null;
@@ -473,6 +478,9 @@ export default function SavedItemsModal({
                 // 「✓ 制作完了」は既に下のprogressブロックで表示されるため、そちらとの
                 // 重複を避け、未着手・制作中の場合だけバッジを出す
                 const buildStatus = getBuildProgressStatus(project?.buildChecklist);
+                // 「次にやること」（Phase 2-9で導入した既存の純粋関数をそのまま再利用）。
+                // 全10項目完了ならnullが返るため、下では制作中・未着手の場合だけ表示する
+                const nextStep = project ? getNextBuildStep(project.buildChecklist) : null;
                 const hasStarted = progress ? progress.cutListDone > 0 || progress.buildDone > 0 : false;
                 const overallDone = progress ? progress.cutListDone + progress.buildDone : 0;
                 const overallTotal = progress ? progress.cutListTotal + progress.buildTotal : 0;
@@ -578,6 +586,12 @@ export default function SavedItemsModal({
                           </>
                         ) : (
                           <span className="text-xs text-tanei-ink-muted">制作進捗：未開始</span>
+                        )}
+
+                        {!progress.isComplete && nextStep && (
+                          <p className="text-xs text-tanei-ink">
+                            次にやること：<span className="font-bold text-tanei-brand">{nextStep.label}</span>
+                          </p>
                         )}
                       </div>
                     )}
