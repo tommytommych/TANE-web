@@ -668,6 +668,49 @@ export default function CadBuildGuide({
                         </ul>
                       </div>
                     )}
+                    {/* 「このSTEPで確認する数字」（Phase 3-38）。寸法の取得方法は一切変更せず、
+                        直前の「使用するパーツ」と全く同じpartGroups（findStepPartGroups()の
+                        結果）を再掲するだけの、見つけやすさのための補助ブロック。パーツが
+                        無いSTEPでは見出しごと表示しない */}
+                    {partGroups.length > 0 && (
+                      <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
+                        <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">このSTEPで確認する数字</p>
+                        <div
+                          className={`rounded-tanei-control px-2.5 py-2 flex flex-col gap-1 border ${
+                            isCurrent
+                              ? 'bg-white border-tanei-accent'
+                              : isDone
+                                ? 'bg-tanei-surface-muted border-tanei-border'
+                                : 'bg-tanei-surface border-tanei-border'
+                          }`}
+                        >
+                          {partGroups.map((group) => (
+                            <p
+                              key={group.key}
+                              className={`text-xs break-words ${isDone ? 'text-tanei-ink-muted' : 'text-tanei-ink'}`}
+                            >
+                              <span className="font-bold">
+                                {group.name}
+                                {group.count > 1 && ` × ${group.count}`}
+                              </span>
+                              ：幅{' '}
+                              <span className={`font-bold ${isCurrent ? 'text-tanei-accent' : 'text-tanei-ink'}`}>
+                                {group.widthMm}
+                              </span>{' '}
+                              × 奥行{' '}
+                              <span className={`font-bold ${isCurrent ? 'text-tanei-accent' : 'text-tanei-ink'}`}>
+                                {group.heightMm}
+                              </span>{' '}
+                              × 厚み{' '}
+                              <span className={`font-bold ${isCurrent ? 'text-tanei-accent' : 'text-tanei-ink'}`}>
+                                {group.thicknessMm}
+                              </span>{' '}
+                              mm
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {isChecklistRelationStep && (
                       <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
                         <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">このSTEPの確認ポイント</p>
