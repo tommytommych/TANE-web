@@ -582,7 +582,7 @@ export default function CadBuildGuide({
                     <button
                       type="button"
                       onClick={() => goToBuildStep(step.stepNumber)}
-                      className={`w-full flex items-center gap-2 rounded-tanei-control border px-2.5 py-1.5 text-left transition-colors ${
+                      className={`w-full flex flex-col gap-0.5 rounded-tanei-control border px-2.5 py-1.5 text-left transition-colors ${
                         isListStepCurrent
                           ? 'bg-white border-tanei-accent'
                           : isListStepDone
@@ -590,34 +590,45 @@ export default function CadBuildGuide({
                             : 'bg-white border-tanei-border hover:border-tanei-brand'
                       }`}
                     >
-                      <span
-                        className={`flex-shrink-0 text-[11px] font-black ${
-                          isListStepCurrent
-                            ? 'text-tanei-accent'
-                            : isListStepDone
-                              ? 'text-tanei-ink-muted'
-                              : 'text-tanei-brand'
-                        }`}
-                      >
-                        STEP {step.stepNumber}
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={`flex-shrink-0 text-[11px] font-black ${
+                            isListStepCurrent
+                              ? 'text-tanei-accent'
+                              : isListStepDone
+                                ? 'text-tanei-ink-muted'
+                                : 'text-tanei-brand'
+                          }`}
+                        >
+                          STEP {step.stepNumber}
+                        </span>
+                        <span
+                          className={`flex-1 min-w-0 text-[11px] font-bold truncate ${
+                            isListStepDone ? 'text-tanei-ink-muted' : 'text-tanei-ink'
+                          }`}
+                        >
+                          {step.title}
+                        </span>
+                        <span
+                          className={`flex-shrink-0 text-[10px] font-bold ${
+                            isListStepCurrent
+                              ? 'text-tanei-accent'
+                              : isListStepDone
+                                ? 'text-tanei-brand'
+                                : 'text-tanei-ink-muted'
+                          }`}
+                        >
+                          {isListStepDone ? '✓ 完了' : isListStepCurrent ? '▶ 現在' : '○ 未完了'}
+                        </span>
                       </span>
+                      {/* Phase 3-43：状態に応じた短い補助文。既存のisListStepDone・
+                          isListStepCurrentと同じ判定結果をそのまま使うだけで、新しい判定
+                          ロジックは追加しない。現在STEPだけ強調し、完了・未完了はどちらも
+                          控えめな表示にとどめる */}
                       <span
-                        className={`flex-1 min-w-0 text-[11px] font-bold truncate ${
-                          isListStepDone ? 'text-tanei-ink-muted' : 'text-tanei-ink'
-                        }`}
+                        className={`text-[10px] ${isListStepCurrent ? 'font-bold text-tanei-accent' : 'text-tanei-ink-muted'}`}
                       >
-                        {step.title}
-                      </span>
-                      <span
-                        className={`flex-shrink-0 text-[10px] font-bold ${
-                          isListStepCurrent
-                            ? 'text-tanei-accent'
-                            : isListStepDone
-                              ? 'text-tanei-brand'
-                              : 'text-tanei-ink-muted'
-                        }`}
-                      >
-                        {isListStepDone ? '✓ 完了' : isListStepCurrent ? '▶ 現在' : '○ 未完了'}
+                        {isListStepDone ? '完了しています' : isListStepCurrent ? 'ここから進めましょう' : 'これから進めます'}
                       </span>
                     </button>
                   </li>
