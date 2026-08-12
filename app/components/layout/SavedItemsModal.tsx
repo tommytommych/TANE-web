@@ -216,6 +216,26 @@ export default function SavedItemsModal({
     })
     .map(({ item }) => item);
 
+  // 「制作履歴」（Phase 3-18）。既存のfinished SavedItem（Phase 3-1で完成作品として
+  // 保存されたもの）のうち、Phase 3-14で付与されたrelatedProjectIdが今も存在する
+  // type='cadProject'アイテムを指しているものだけを対象にする。新しいtype・新しい
+  // 保存データは作らず、既存のsavedItemsをその場で読み取って組み合わせているだけ。
+  // 設計名は都度parseSavedItemで現在のprojectNameを取得するため、名前変更（Phase 3-15）
+  // にも自動的に追従する（finished SavedItem自体は書き換えない）。並び順は、
+  // finished SavedItemに保存されている実際の日時情報を新たに作らず、既存の
+  // id（Date.now().toString()、保存時刻そのもの）を使って新しい順に安定ソートする
+  const historyItems =
+    activeModal === 'finished'
+      ? items
+          .filter((item) => item.relatedProjectId && savedItems.some((si) => si.type === 'cadProject' && si.id === item.relatedProjectId))
+          .map((item) => {
+            const cadItem = savedItems.find((si) => si.type === 'cadProject' && si.id === item.relatedProjectId)!;
+            const project = parseSavedItem(cadItem);
+            return { item, projectName: project?.projectName ?? cadItem.title };
+          })
+          .sort((a, b) => (Number(b.item.id) || 0) - (Number(a.item.id) || 0))
+      : [];
+
   const startEdit = (item: SavedItem) => {
     setEditingId(item.id);
     setEditTitle(item.title);
@@ -397,6 +417,56 @@ export default function SavedItemsModal({
                   保存する
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* 制作履歴（Phase 3-18）。完成作品一覧（このモーダル）の中に、既存の
+              finished SavedItemのうち元の設計へたどれるものだけを、完成が新しい順に
+              並べて表示する。既存の「完成作品を見る」一覧（この下）とは別の切り口で
+              同じデータを見せているだけで、二重に保存するものは無い */}
+          {activeModal === 'finished' && (
+            <div>
+              <p className="text-xs font-bold text-tanei-ink-muted mb-1">🕰 制作履歴</p>
+              {historyItems.length === 0 ? (
+                <p className="text-center text-gray-400 py-6 text-sm bg-tanei-bg rounded-tanei-control border border-tanei-border">
+                  制作履歴はまだありません。
+                </p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {historyItems.map(({ item, projectName }) => {
+                    const isImage = item.fileDataUrl && item.fileMimeType?.startsWith('image/');
+                    return (
+                      <div
+                        key={item.id}
+                        className="border border-tanei-border rounded-tanei-control p-3 bg-tanei-bg flex gap-3 items-start"
+                      >
+                        {isImage && (
+                          // base64のdata URL（IndexedDB保存の画像）のためnext/imageの最適化対象外。意図的にimgタグを使用
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={item.fileDataUrl}
+                            alt={item.title}
+                            className="w-16 h-16 object-cover rounded-tanei-control border border-tanei-border flex-shrink-0"
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-tanei-ink break-words">{item.title}</p>
+                          <p className="text-xs text-tanei-ink-muted break-words">関連する設計：{projectName}</p>
+                          <span className="inline-block text-[11px] font-bold text-tanei-brand mt-0.5">✓ 制作完了</span>
+                          <p className="text-[11px] text-gray-500 mt-0.5">{item.date}</p>
+                          <Link
+                            href={`/app/cad?projectId=${item.relatedProjectId}`}
+                            onClick={onClose}
+                            className="inline-flex items-center gap-1.5 mt-1.5 text-xs font-bold bg-tanei-accent text-white px-3 py-1.5 rounded-tanei-control hover:bg-tanei-accent-dark transition-colors"
+                          >
+                            元の設計を開く
+                          </Link>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
