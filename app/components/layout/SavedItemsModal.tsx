@@ -85,6 +85,9 @@ export default function SavedItemsModal({
   const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [renameError, setRenameError] = useState<string | null>(null);
+  // 「設計を検索」の検索文字列（Phase 3-16）。どこにも保存せず、画面表示の絞り込みだけに
+  // 使う純粋なローカルstate
+  const [searchQuery, setSearchQuery] = useState('');
   const [prevActiveModal, setPrevActiveModal] = useState(activeModal);
   if (activeModal !== prevActiveModal) {
     // モーダルの表示対象が切り替わったら、削除確認状態を持ち越さないようにリセットする
@@ -93,6 +96,7 @@ export default function SavedItemsModal({
     setDeleteConfirmId(null);
     setDuplicateConfirmId(null);
     setRenamingProjectId(null);
+    setSearchQuery('');
   }
 
   const [isAdding, setIsAdding] = useState(false);
@@ -140,6 +144,15 @@ export default function SavedItemsModal({
   const meta = MODAL_META[activeModal];
   const items = savedItems.filter((item) => item.type === activeModal);
   const canManuallyAdd = MANUAL_ADD_TYPES.includes(activeModal);
+
+  // 「設計を検索」（Phase 3-16）。検索対象はSavedFurnitureProject.projectNameだが、
+  // 既存の保存・複製・名前変更処理は必ずitem.titleをprojectNameと同じ値に保っているため、
+  // item.title（常にstring）をそのままfilterするだけで安全に実現できる（不正な形式の
+  // 保存データでも、titleフィールド自体は既存のSavedItem型でstring必須のためクラッシュしない）
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const filteredCadProjectItems = normalizedSearchQuery
+    ? items.filter((item) => item.title.toLowerCase().includes(normalizedSearchQuery))
+    : items;
 
   const startEdit = (item: SavedItem) => {
     setEditingId(item.id);
@@ -325,11 +338,30 @@ export default function SavedItemsModal({
             </div>
           )}
 
+          {activeModal === 'cadProject' && items.length > 0 && (
+            <div>
+              <label htmlFor="cad-project-search" className="text-xs font-bold text-tanei-ink-muted mb-1 block">
+                🔍 設計を検索
+              </label>
+              <input
+                id="cad-project-search"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="設計名を検索…"
+                aria-label="設計を検索"
+                className="w-full border border-tanei-border rounded-tanei-control px-3 py-2 text-sm"
+              />
+            </div>
+          )}
+
           {activeModal === 'cadProject' ? (
             items.length === 0 ? (
               <p className="text-center text-gray-400 py-10 text-sm">保存した設計はまだありません。</p>
+            ) : filteredCadProjectItems.length === 0 ? (
+              <p className="text-center text-gray-400 py-10 text-sm">該当する設計がありません。</p>
             ) : (
-              items.map((item) => {
+              filteredCadProjectItems.map((item) => {
                 // Phase 2-7以前の保存データにはcutListChecked/buildChecklistが無いが、
                 // parseSavedItem・computeFurnitureProjectProgressはどちらもそれを前提に
                 // 安全に動作する（未着手として扱う。クラッシュしない）
