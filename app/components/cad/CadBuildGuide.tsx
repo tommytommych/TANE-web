@@ -726,6 +726,30 @@ export default function CadBuildGuide({
                         )}
                       </div>
                     )}
+                    {/* 「このSTEPのゴール」（Phase 3-37）。既存のFurnitureBuildStep
+                        （buildFurnitureSteps()）にはゴール・完了条件専用のフィールドが
+                        存在しないため、新しい文章生成は行わず固定の補助文を表示するだけにする。
+                        完了/現在/未完了の判定は既存のisDone・isCurrentをそのまま利用し、
+                        新しいSTEP↔チェック項目対応表は作らない */}
+                    <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
+                      <p className="text-[11px] font-bold text-tanei-ink-muted mb-1">このSTEPのゴール</p>
+                      <p className="text-[11px] text-tanei-ink-muted leading-relaxed">
+                        このSTEPの作業内容を確認し、完了したら次のSTEPへ進んでください。
+                      </p>
+                      {isDone ? (
+                        <p className="text-[11px] font-bold text-tanei-brand mt-1">✓ このSTEPは完了しています</p>
+                      ) : (
+                        <p
+                          className={
+                            isCurrent
+                              ? 'text-[11px] font-bold text-tanei-accent mt-1'
+                              : 'text-[11px] text-tanei-ink-muted mt-1'
+                          }
+                        >
+                          このSTEPを完了したら、次のSTEPへ進みましょう
+                        </p>
+                      )}
+                    </div>
                     {/* STEP間の前後ナビゲーション（Phase 3-29）。新しいSTEPデータは作らず、
                         既存のstepNumberとgoToBuildStep（scrollToSectionの再利用）だけで移動する。
                         buildChecklist・cutListCheckedへの書き込みは一切発生しない */}
