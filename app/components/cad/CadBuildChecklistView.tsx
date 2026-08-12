@@ -9,6 +9,7 @@
 // 渡しながら遷移するリンクを追加する。CAD側に新しい保存の仕組みは一切作らない。
 
 import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
 import {
   BUILD_CHECKLIST_STEPS,
   FURNITURE_BUILD_TOOLS,
@@ -18,6 +19,13 @@ import {
 } from '../../lib/cad/model';
 import { packSheetLayout } from '../../lib/sheetLayout';
 import type { FurnitureModel } from '../../lib/cad/types';
+
+// 制作ナビ（Phase 3-12）のsticky表示先・「制作ナビへ戻る」（Phase 3-24）の
+// scrollIntoView先として使うid。CadBuildGuide.tsxのscrollToSectionと同じ、
+// document.getElementById().scrollIntoView()だけの既存パターンを踏襲する
+const BUILD_NAV_ID = 'cad-build-nav';
+// 「↑ 制作ナビへ戻る」を表示し始める、制作チェック画面のスクロール量のしきい値（px）
+const BACK_TO_NAV_SCROLL_THRESHOLD = 400;
 
 // 「約1,200円〜」のような下限のみの表記と「約300〜500円」のような範囲表記の両方に対応する。
 // CadBuildGuide.tsxの同名関数と全く同じ表記ルール（値だけの再利用、importはしない）
@@ -137,8 +145,28 @@ export default function CadBuildChecklistView({
       ) ?? null
     : null;
 
+  // 「↑ 制作ナビへ戻る」（Phase 3-24）。制作前チェックカード等の追加で画面が長くなった分、
+  // 画面を下へスクロールした場合だけ、制作ナビへ戻るための導線を表示する。表示・非表示は
+  // このコンポーネント内だけの一時的なUI状態で、IndexedDB等には一切保存しない
+  const [showBackToNav, setShowBackToNav] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      setShowBackToNav(container.scrollTop > BACK_TO_NAV_SCROLL_THRESHOLD);
+    };
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToBuildNav = () => {
+    document.getElementById(BUILD_NAV_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   return (
-    <div className="flex h-full w-full flex-col overflow-y-auto">
+    <div ref={scrollContainerRef} className="flex h-full w-full flex-col overflow-y-auto">
       <div className="p-4 max-w-2xl mx-auto w-full flex flex-col gap-4">
         <button
           type="button"
@@ -254,16 +282,22 @@ export default function CadBuildChecklistView({
         )}
 
         {/* 制作ナビ（Phase 3-12）。「現在の作業」が主役であることを崩さないよう、
-            控えめなボタン行として、その直下に補助的に配置する */}
-        <div>
+            控えめなボタン行として、その直下に補助的に配置する。
+            Phase 3-24：制作前チェックカードの追加で画面が長くなったため、スクロールしても
+            見失わないようsticky化。スマホでは折り返さず横スクロール1行にして、
+            sticky時の高さが増えすぎないようにする */}
+        <div
+          id={BUILD_NAV_ID}
+          className="sticky top-0 z-10 -mx-4 bg-tanei-bg px-4 py-2 border-b border-tanei-border scroll-mt-4"
+        >
           <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">制作ナビ</p>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex gap-1.5 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
             {BUILD_NAV_ITEMS.map((item) => (
               <button
                 key={item.label}
                 type="button"
                 onClick={() => onConfirmSection(item.target)}
-                className="text-xs font-bold text-tanei-ink bg-tanei-surface border border-tanei-border rounded-tanei-control px-2.5 py-1.5 hover:bg-tanei-brand-soft hover:border-tanei-brand transition-colors"
+                className="flex-shrink-0 text-xs font-bold text-tanei-ink bg-tanei-surface border border-tanei-border rounded-tanei-control px-2.5 py-1.5 hover:bg-tanei-brand-soft hover:border-tanei-brand transition-colors"
               >
                 {item.label}
               </button>
@@ -336,6 +370,18 @@ export default function CadBuildChecklistView({
           制作へ進む →
         </button>
       </div>
+
+      {/* 「↑ 制作ナビへ戻る」（Phase 3-24）。一定量スクロールした場合だけ表示する、
+          純粋なUI操作用のボタン。buildChecklist等のデータは一切変更しない */}
+      {showBackToNav && (
+        <button
+          type="button"
+          onClick={scrollToBuildNav}
+          className="fixed bottom-4 right-4 z-20 bg-tanei-brand text-white text-xs font-bold px-3.5 py-2.5 rounded-full shadow-lg hover:bg-tanei-brand-dark transition-colors"
+        >
+          ↑ 制作ナビへ戻る
+        </button>
+      )}
     </div>
   );
 }
