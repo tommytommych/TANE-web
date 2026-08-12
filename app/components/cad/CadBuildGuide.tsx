@@ -76,6 +76,17 @@ export default function CadBuildGuide({
   const buildDoneCount = BUILD_CHECKLIST_STEPS.filter((_, i) => buildChecklist[String(i + 1)]).length;
   const buildPercent = Math.round((buildDoneCount / BUILD_CHECKLIST_STEPS.length) * 100);
   const nextBuildStep = getNextBuildStep(buildChecklist);
+
+  // 「作り方」9ステップの「現在の作業」表示（Phase 3-25）。制作チェックの10項目と
+  // 作り方の9ステップは完全には1対1対応しない（例：チェック項目3「材料に寸法を書いた」に
+  // 対応する作り方ステップは存在せず、逆にチェック項目6〜9は既存のCONFIRM_TARGETS
+  // （CadBuildChecklistView.tsx、Phase 3-10）でもまとめて「作り方を見る」の1セクションにしか
+  // 対応付けられていない）。そのため、特定のチェック項目IDと特定のステップ番号を新しく
+  // 対応付けるようなテーブルは作らず、既存のbuildDoneCount（完了したチェック項目の総数）を
+  // そのまま9ステップ側の「大まかな進み具合」として引き写すだけの、順序だけに基づく
+  // 安全な近似表示にとどめる
+  const currentBuildStepNumber = buildDoneCount < steps.length ? buildDoneCount + 1 : null;
+  const isBuildStepDone = (stepNumber: number) => stepNumber <= buildDoneCount;
   // 既存のAIチャット用木材価格目安リスト（app/lib/constants.ts）から、現在選択中の材料と
   // 名前が一致するものだけを表示する。一致しなければ「価格情報なし」と正直に表示する
   const priceInfo = findMaterialPriceInfo(material);
@@ -91,10 +102,14 @@ export default function CadBuildGuide({
     setCheckedShoppingItems((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // 「作り方」の開閉状態（Phase 3-6）。最初のステップだけ開いた状態で始める、
-  // 表示専用の一時的なUI状態（保存しない）。9ステップの内容・順序・生成ロジックは
-  // buildFurnitureSteps()から一切変更していない
-  const [expandedStepNumber, setExpandedStepNumber] = useState<number | null>(1);
+  // 「作り方」の開閉状態（Phase 3-6）。表示専用の一時的なUI状態（保存しない）。9ステップの
+  // 内容・順序・生成ロジックはbuildFurnitureSteps()から一切変更していない。
+  // Phase 3-25：初期表示は「現在の作業」に該当するステップを開いた状態にする
+  // （無ければステップ1）。マウント時の初期値だけに使い、その後チェックを付けても
+  // ユーザーが開閉した状態を勝手に変えないようにするため、依存配列は空のままにする
+  const [expandedStepNumber, setExpandedStepNumber] = useState<number | null>(
+    () => currentBuildStepNumber ?? 1
+  );
   const toggleStep = (stepNumber: number) => {
     setExpandedStepNumber((prev) => (prev === stepNumber ? null : stepNumber));
   };
@@ -408,12 +423,23 @@ export default function CadBuildGuide({
         <ol className="flex flex-col gap-2">
           {steps.map((step) => {
             const isExpanded = expandedStepNumber === step.stepNumber;
+            const isDone = isBuildStepDone(step.stepNumber);
+            const isCurrent = !isDone && step.stepNumber === currentBuildStepNumber;
             const panelId = `cad-build-step-panel-${step.stepNumber}`;
             return (
               <li
                 key={step.stepNumber}
-                className="rounded-tanei-control border border-tanei-border bg-white overflow-hidden"
+                className={`rounded-tanei-control border overflow-hidden transition-colors ${
+                  isDone
+                    ? 'bg-tanei-brand-soft border-tanei-brand'
+                    : isCurrent
+                      ? 'bg-white border-tanei-accent ring-1 ring-tanei-accent'
+                      : 'bg-white border-tanei-border'
+                }`}
               >
+                {isCurrent && (
+                  <p className="text-[10px] font-black text-tanei-accent px-3 pt-2">▶ 現在の作業</p>
+                )}
                 <button
                   type="button"
                   onClick={() => toggleStep(step.stepNumber)}
@@ -425,17 +451,26 @@ export default function CadBuildGuide({
                     {step.stepNumber}
                   </span>
                   <span className="flex-1 min-w-0">
-                    <span className="block text-[10px] font-bold text-tanei-accent">STEP {step.stepNumber}</span>
-                    <span className="block font-bold text-sm text-tanei-ink break-words">{step.title}</span>
+                    <span className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-bold text-tanei-accent">STEP {step.stepNumber}</span>
+                      {isDone && <span className="text-[10px] font-bold text-tanei-brand">✓ 完了</span>}
+                    </span>
+                    <span
+                      className={`block font-bold text-sm break-words ${isDone ? 'text-tanei-ink line-through' : 'text-tanei-ink'}`}
+                    >
+                      {step.title}
+                    </span>
                   </span>
                   <span className="flex-shrink-0 text-xs text-tanei-ink-muted" aria-hidden="true">
                     {isExpanded ? '▲' : '▼'}
                   </span>
                 </button>
                 {isExpanded && (
-                  <p id={panelId} className="text-xs text-tanei-ink-muted px-3 pb-3 ml-10 leading-relaxed break-words">
-                    {step.description}
-                  </p>
+                  <div id={panelId} className="pl-10 pr-3 pb-3">
+                    <p className="text-xs text-tanei-ink-muted leading-relaxed break-words border-l-2 border-tanei-border pl-3 py-0.5">
+                      {step.description}
+                    </p>
+                  </div>
                 )}
               </li>
             );
