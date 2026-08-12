@@ -124,6 +124,26 @@ export default function CadBuildGuide({
   // 安全な近似表示にとどめる
   const currentBuildStepNumber = buildDoneCount < steps.length ? buildDoneCount + 1 : null;
   const isBuildStepDone = (stepNumber: number) => stepNumber <= buildDoneCount;
+
+  // 「作り方」と制作チェックの関連表示（Phase 3-26）。既存のCONFIRM_TARGETS
+  // （CadBuildChecklistView.tsx、Phase 3-10）では、チェック項目6「組み立て位置を確認した」〜
+  // 9「ガタつきを確認した」の4件が、個別のステップ番号にではなく、まとめて「作り方を見る」
+  // （BUILD_STEPS_ANCHOR_ID）というセクション全体に対応付けられている。9ステップと10項目は
+  // 完全な1対1対応ではないため、この4件のどれが具体的にどのステップに対応するかという
+  // 新しい対応表は作らない。代わりに、この4件（既存コードで確認できる、作り方に関連する
+  // 範囲）の完了状況を集計するだけにとどめ、Phase 3-25の「現在の作業」ステップ
+  // （currentBuildStepNumber、全完了時は最後のステップ）が6〜9の範囲にある場合だけ、
+  // そのステップ1箇所にのみ表示する（情報が過密にならないよう、常に最大1箇所）
+  const BUILD_STEP_RELATED_CHECKLIST_ITEMS = [6, 7, 8, 9] as const;
+  const relatedChecklistDoneCount = BUILD_STEP_RELATED_CHECKLIST_ITEMS.filter(
+    (n) => buildChecklist[String(n)]
+  ).length;
+  const relatedChecklistTotal = BUILD_STEP_RELATED_CHECKLIST_ITEMS.length;
+  const checklistRelationStepNumber = currentBuildStepNumber ?? steps.length;
+  const showChecklistRelation = (BUILD_STEP_RELATED_CHECKLIST_ITEMS as readonly number[]).includes(
+    checklistRelationStepNumber
+  );
+
   // 既存のAIチャット用木材価格目安リスト（app/lib/constants.ts）から、現在選択中の材料と
   // 名前が一致するものだけを表示する。一致しなければ「価格情報なし」と正直に表示する
   const priceInfo = findMaterialPriceInfo(material);
@@ -464,6 +484,7 @@ export default function CadBuildGuide({
             const isCurrent = !isDone && step.stepNumber === currentBuildStepNumber;
             const panelId = `cad-build-step-panel-${step.stepNumber}`;
             const partGroups = findStepPartGroups(model.panels, step.description);
+            const isChecklistRelationStep = showChecklistRelation && step.stepNumber === checklistRelationStepNumber;
             return (
               <li
                 key={step.stepNumber}
@@ -538,6 +559,26 @@ export default function CadBuildGuide({
                             </li>
                           ))}
                         </ul>
+                      </div>
+                    )}
+                    {isChecklistRelationStep && (
+                      <div className="mt-2.5 pt-2.5 border-t border-tanei-border flex items-center justify-between gap-2 flex-wrap">
+                        {relatedChecklistDoneCount === relatedChecklistTotal ? (
+                          <span className="text-[11px] font-bold text-tanei-brand">✓ 制作チェック済み</span>
+                        ) : relatedChecklistDoneCount === 0 ? (
+                          <span className="text-[11px] font-bold text-tanei-ink-muted">制作チェック：未完了</span>
+                        ) : (
+                          <span className="text-[11px] font-bold text-tanei-ink-muted">
+                            制作チェック：一部完了（{relatedChecklistDoneCount}/{relatedChecklistTotal}）
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={onViewBuildCheck}
+                          className="text-[11px] font-bold text-tanei-brand hover:text-tanei-brand-dark underline"
+                        >
+                          制作チェックを見る
+                        </button>
                       </div>
                     )}
                   </div>
