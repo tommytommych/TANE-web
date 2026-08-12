@@ -542,6 +542,12 @@ export default function CadBuildGuide({
                 </button>
                 {isExpanded && (
                   <div id={panelId} className="pl-10 pr-3 pb-3">
+                    {/* 「STEP概要」（Phase 3-33）。新しい要約文章は作らず、既存のstep.title
+                        （ヘッダーの見出しと同じ、buildFurnitureSteps()から一切変更していない値）を
+                        そのまま短い概要として再掲するだけ。ヘッダーの見出しと隣接して重複して
+                        見えないよう、あえて控えめな文字サイズ・色にとどめている */}
+                    <p className="text-[11px] font-bold text-tanei-ink-muted mb-1">STEP概要</p>
+                    <p className="text-xs font-bold text-tanei-ink mb-2 break-words">{step.title}</p>
                     <p className="text-xs text-tanei-ink-muted leading-relaxed break-words border-l-2 border-tanei-border pl-3 py-0.5">
                       {step.description}
                     </p>
