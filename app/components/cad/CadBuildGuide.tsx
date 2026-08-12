@@ -518,21 +518,32 @@ export default function CadBuildGuide({
           )}
           {/* 「次にやるSTEP」（Phase 3-35）。新しいSTEP判定は作らず、「現在：STEP N」・
               ミニSTEPナビの強調と全く同じcurrentBuildStepNumberを唯一の判定元として使う */}
-          {currentBuildStepNumber && (
-            <div className="rounded-tanei-control bg-tanei-surface-muted border border-tanei-border px-2.5 py-2 mt-2">
-              <p className="text-[11px] font-bold text-tanei-ink-muted mb-1">次にやるSTEP</p>
-              <p className="text-xs font-bold text-tanei-ink break-words">
-                STEP {currentBuildStepNumber}　{steps.find((s) => s.stepNumber === currentBuildStepNumber)?.title}
-              </p>
-              <button
-                type="button"
-                onClick={() => goToBuildStep(currentBuildStepNumber)}
-                className="mt-1.5 text-[11px] font-bold text-white bg-tanei-brand px-2.5 py-1 rounded-tanei-control hover:bg-tanei-brand-dark transition-colors"
-              >
-                このSTEPから進めましょう →
-              </button>
-            </div>
-          )}
+          {currentBuildStepNumber && (() => {
+            // 既存のsteps配列から対象STEPを取得するだけ。新しいSTEPデータ構造は作らない（Phase 3-36）
+            const currentBuildStep = steps.find((s) => s.stepNumber === currentBuildStepNumber);
+            return (
+              <div className="rounded-tanei-control bg-tanei-surface-muted border border-tanei-border px-2.5 py-2 mt-2">
+                <p className="text-[11px] font-bold text-tanei-ink-muted mb-1">次にやるSTEP</p>
+                <p className="text-xs font-bold text-tanei-ink break-words">
+                  STEP {currentBuildStepNumber}　{currentBuildStep?.title}
+                </p>
+                {/* STEPカード側の説明文（step.description）と全く同じ文章をそのまま表示するだけ。
+                    AI要約・書き換え・独自生成は一切行わない（Phase 3-36） */}
+                {currentBuildStep && (
+                  <p className="text-[11px] text-tanei-ink-muted leading-relaxed break-words mt-1">
+                    {currentBuildStep.description}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => goToBuildStep(currentBuildStepNumber)}
+                  className="mt-1.5 text-[11px] font-bold text-white bg-tanei-brand px-2.5 py-1 rounded-tanei-control hover:bg-tanei-brand-dark transition-colors"
+                >
+                  このSTEPから進めましょう →
+                </button>
+              </div>
+            );
+          })()}
           <div className="flex flex-wrap gap-1.5 mt-2">
             {steps.map((step) => {
               const isNavStepDone = isBuildStepDone(step.stepNumber);
