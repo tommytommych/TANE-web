@@ -769,6 +769,41 @@ export default function CadBuildGuide({
                         </div>
                       </div>
                     )}
+                    {/* 「このSTEPのチェックポイント」（Phase 3-41）。新しい情報源は使わず、
+                        直前の「このSTEPで確認する数字」と全く同じpartGroups
+                        （findStepPartGroups()の結果）・既存のisBuildStepDone・isCurrentだけを
+                        箇条書きにまとめて再掲するだけの、表示専用の補助ブロック。新しいSTEP↔
+                        チェック項目対応表・新しい寸法計算・AIによる文章生成は一切行わない */}
+                    <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
+                      <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">このSTEPのチェックポイント</p>
+                      <ul className="flex flex-col gap-1 text-xs text-tanei-ink-muted list-disc pl-4">
+                        {partGroups.flatMap((group) => [
+                          <li key={`${group.key}-name`}>
+                            使用するパーツ：{group.name}
+                            {group.count > 1 && ` × ${group.count}`}
+                          </li>,
+                          <li key={`${group.key}-width`}>幅：{group.widthMm} mm</li>,
+                          <li key={`${group.key}-depth`}>奥行：{group.heightMm} mm</li>,
+                          <li key={`${group.key}-thickness`}>厚み：{group.thicknessMm} mm</li>,
+                        ])}
+                        <li>このSTEPの作業を確認する</li>
+                      </ul>
+                      {isDone ? (
+                        <p className="text-[11px] font-bold text-tanei-brand mt-1.5">
+                          ✓ このSTEPのチェックポイントを確認済み
+                        </p>
+                      ) : (
+                        <p
+                          className={
+                            isCurrent
+                              ? 'text-[11px] font-bold text-tanei-accent mt-1.5'
+                              : 'text-[11px] text-tanei-ink-muted mt-1.5'
+                          }
+                        >
+                          ○ このSTEPのチェックポイントを確認してください
+                        </p>
+                      )}
+                    </div>
                     {isChecklistRelationStep && (
                       <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
                         <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">このSTEPの確認ポイント</p>
