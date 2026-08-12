@@ -683,6 +683,28 @@ export default function CadBuildGuide({
                 </button>
                 {isExpanded && (
                   <div id={panelId} className="pl-10 pr-3 pb-3">
+                    {/* 「STEP状態」（Phase 3-42）。新しい判定ロジックは作らず、既存の
+                        isBuildStepDone・isCurrent・currentBuildStepNumberだけを使って
+                        「今どういう状態か・次に何をすればいいか」を一言でまとめるだけの
+                        表示専用ブロック。優先順位は既存の視覚的階層と同じ完了→現在→未完了 */}
+                    <div className="mb-2.5 pb-2.5 border-b border-tanei-border">
+                      <p className="text-[11px] font-bold text-tanei-ink-muted mb-1">STEP状態</p>
+                      {isDone ? (
+                        <>
+                          <p className="text-xs font-bold text-tanei-ink-muted">✓ 完了</p>
+                          <p className="text-[11px] text-tanei-ink-muted mt-0.5">このSTEPは完了しています</p>
+                        </>
+                      ) : isCurrent ? (
+                        <p className="text-xs font-bold text-tanei-accent">▶ 今ここから進めましょう</p>
+                      ) : (
+                        <>
+                          <p className="text-xs font-bold text-tanei-ink">○ 未完了</p>
+                          <p className="text-[11px] text-tanei-ink-muted mt-0.5">
+                            このSTEPを進めて、完了したら次のSTEPへ進みましょう
+                          </p>
+                        </>
+                      )}
+                    </div>
                     {/* 「STEP概要」（Phase 3-33）。新しい要約文章は作らず、既存のstep.title
                         （ヘッダーの見出しと同じ、buildFurnitureSteps()から一切変更していない値）を
                         そのまま短い概要として再掲するだけ。ヘッダーの見出しと隣接して重複して
