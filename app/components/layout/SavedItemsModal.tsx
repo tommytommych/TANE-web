@@ -66,6 +66,15 @@ const PROGRESS_FILTER_OPTIONS: { value: BuildProgressStatus | 'all'; label: stri
   { value: 'completed', label: '制作完了' },
 ];
 
+// 「並び替え」（Phase 3-18）の選択肢。既存のcreatedAt/updatedAt/projectNameを読み取って
+// 表示順だけを変えるもので、SavedFurnitureProjectには一切書き込まない
+type CadProjectSortOption = 'updatedDesc' | 'createdDesc' | 'nameAsc';
+const SORT_OPTIONS: { value: CadProjectSortOption; label: string }[] = [
+  { value: 'updatedDesc', label: '最終更新が新しい順' },
+  { value: 'createdDesc', label: '作成日が新しい順' },
+  { value: 'nameAsc', label: '名前順' },
+];
+
 export default function SavedItemsModal({
   activeModal,
   savedItems,
@@ -99,6 +108,9 @@ export default function SavedItemsModal({
   // 「制作進捗で絞り込む」（Phase 3-17）。同じく画面表示の絞り込みだけに使い、
   // SavedFurnitureProjectはもちろんどこにも保存しない
   const [progressFilter, setProgressFilter] = useState<BuildProgressStatus | 'all'>('all');
+  // 「並び替え」（Phase 3-18）。初期状態は「最終更新が新しい順」。表示順だけを変える
+  // ローカルstateで、リロードすれば初期状態に戻って構わない（保存もしない）
+  const [sortOption, setSortOption] = useState<CadProjectSortOption>('updatedDesc');
   const [prevActiveModal, setPrevActiveModal] = useState(activeModal);
   if (activeModal !== prevActiveModal) {
     // モーダルの表示対象が切り替わったら、削除確認状態を持ち越さないようにリセットする
@@ -109,6 +121,7 @@ export default function SavedItemsModal({
     setRenamingProjectId(null);
     setSearchQuery('');
     setProgressFilter('all');
+    setSortOption('updatedDesc');
   }
 
   const [isAdding, setIsAdding] = useState(false);
@@ -165,14 +178,38 @@ export default function SavedItemsModal({
   // 進捗判定はbuildChecklistだけを見る既存の純粋関数getBuildProgressStatusを再利用し、
   // ここで新しい判定ロジックを重複して書かない
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-  const filteredCadProjectItems = items.filter((item) => {
-    if (normalizedSearchQuery && !item.title.toLowerCase().includes(normalizedSearchQuery)) return false;
-    if (progressFilter !== 'all') {
-      const project = parseSavedItem(item);
-      if (getBuildProgressStatus(project?.buildChecklist) !== progressFilter) return false;
-    }
-    return true;
-  });
+  const filteredCadProjectItems = items
+    .filter((item) => {
+      if (normalizedSearchQuery && !item.title.toLowerCase().includes(normalizedSearchQuery)) return false;
+      if (progressFilter !== 'all') {
+        const project = parseSavedItem(item);
+        if (getBuildProgressStatus(project?.buildChecklist) !== progressFilter) return false;
+      }
+      return true;
+    })
+    // 「並び替え」（Phase 3-18）。SavedFurnitureProjectのcreatedAt/updatedAt/projectNameを
+    // 読み取って表示順を決めるだけで、書き込みは一切行わない。日時が欠損・不正な保存データは
+    // 0（最も古い扱い）にフォールバックし、クラッシュも一覧からの除外もしない
+    .map((item) => ({ item, project: parseSavedItem(item) }))
+    .sort((a, b) => {
+      const dateValue = (iso: string | undefined): number => {
+        if (!iso) return 0;
+        const t = new Date(iso).getTime();
+        return Number.isNaN(t) ? 0 : t;
+      };
+      const byUpdatedDesc = dateValue(b.project?.updatedAt) - dateValue(a.project?.updatedAt);
+      const byCreatedDesc = dateValue(b.project?.createdAt) - dateValue(a.project?.createdAt);
+      const byNameAsc = (a.project?.projectName ?? a.item.title).localeCompare(b.project?.projectName ?? b.item.title, 'ja');
+
+      // 選択中の並び順を最優先のキーにし、同値の場合はupdatedAt→createdAt→idの順で
+      // タイブレークして表示が不安定にならないようにする（新しいデータは追加しない）
+      const primary = sortOption === 'updatedDesc' ? byUpdatedDesc : sortOption === 'createdDesc' ? byCreatedDesc : byNameAsc;
+      if (primary !== 0) return primary;
+      if (byUpdatedDesc !== 0) return byUpdatedDesc;
+      if (byCreatedDesc !== 0) return byCreatedDesc;
+      return a.item.id.localeCompare(b.item.id);
+    })
+    .map(({ item }) => item);
 
   const startEdit = (item: SavedItem) => {
     setEditingId(item.id);
@@ -394,6 +431,24 @@ export default function SavedItemsModal({
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <label htmlFor="cad-project-sort" className="text-xs font-bold text-tanei-ink-muted mb-1 block">
+                  並び順
+                </label>
+                <select
+                  id="cad-project-sort"
+                  value={sortOption}
+                  onChange={(e) => setSortOption(e.target.value as CadProjectSortOption)}
+                  className="w-full border border-tanei-border rounded-tanei-control px-3 py-2 text-sm bg-white"
+                >
+                  {SORT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <p className="text-xs text-tanei-ink-muted">保存した設計　{filteredCadProjectItems.length}件</p>
