@@ -63,8 +63,11 @@ const MANUAL_ADD_TYPES: SavedItemType[] = ['image', 'finished'];
 // 上限が無いが、一覧UIが崩れないようにこの機能でのみ適用する
 const PROJECT_NAME_MAX_LENGTH = 60;
 
-// 制作メモ（Phase 3-22）の文字数上限
+// 完成作品の制作メモの文字数上限
 const FINISHED_MEMO_MAX_LENGTH = 1000;
+
+// 「設計・制作メモ」（Phase 3-22、SavedFurnitureProject.notes）の文字数上限
+const PROJECT_NOTES_MAX_LENGTH = 2000;
 
 // 「制作進捗で絞り込む」（Phase 3-17）の選択肢。値はgetBuildProgressStatusの戻り値と一致させる
 const PROGRESS_FILTER_OPTIONS: { value: BuildProgressStatus | 'all'; label: string }[] = [
@@ -122,11 +125,15 @@ export default function SavedItemsModal({
   // 「完成作品詳細」（Phase 3-19）。finished SavedItem.idを保持するだけの、読み取り専用の
   // 表示state。ここでSavedItemを書き換えることは一切ない
   const [viewingFinishedId, setViewingFinishedId] = useState<string | null>(null);
-  // 「制作メモ」の編集状態（Phase 3-22）。新しいフィールドは追加せず、既存の
+  // 「制作メモ」の編集状態（完成作品側）。新しいフィールドは追加せず、既存の
   // SavedItem.content（「テキスト内容・メモ」として既に定義済みのフィールド）を
   // finished専用の「制作メモ」として編集するためのローカルstate
   const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
   const [memoDraft, setMemoDraft] = useState('');
+  // 「設計・制作メモ」の編集状態（Phase 3-22、SavedFurnitureProject.notes）。削除確認・
+  // 複製確認・名前変更と同じ、1件だけ選択されているローカルstateのパターンを再利用している
+  const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
+  const [notesDraft, setNotesDraft] = useState('');
   const [prevActiveModal, setPrevActiveModal] = useState(activeModal);
   if (activeModal !== prevActiveModal) {
     // モーダルの表示対象が切り替わったら、削除確認状態を持ち越さないようにリセットする
@@ -140,6 +147,7 @@ export default function SavedItemsModal({
     setSortOption('updatedDesc');
     setViewingFinishedId(null);
     setEditingMemoId(null);
+    setEditingNotesId(null);
   }
 
   const [isAdding, setIsAdding] = useState(false);
@@ -352,7 +360,34 @@ export default function SavedItemsModal({
     setRenameError(null);
   };
 
-  // 「制作メモ」の保存（Phase 3-22）。新しいフィールドは追加せず、既存のSavedItem.content
+  // 「設計・制作メモ」の保存（Phase 3-22、SavedFurnitureProject.notes）。notesだけを
+  // 書き換え、id・createdAt・design・material・cutListChecked・buildChecklistは一切
+  // 変更しない。既存のonUpdate（updateItem）をそのまま再利用し、新しい保存関数は作らない。
+  // updatedAtは既存の名前変更（handleRenameProject）と同じ扱いで、メモ保存のたびに更新する
+  const handleSaveNotes = (item: SavedItem) => {
+    const trimmed = notesDraft.trim().slice(0, PROJECT_NOTES_MAX_LENGTH);
+    const project = parseSavedItem(item);
+    if (!project) {
+      showToast?.('この設計のメモを保存できませんでした。データを確認できません。');
+      setEditingNotesId(null);
+      return;
+    }
+    if (trimmed === (project.notes ?? '')) {
+      // 変更が無い場合は不要な更新を行わない
+      setEditingNotesId(null);
+      return;
+    }
+    const now = new Date().toISOString();
+    const updatedProject: SavedFurnitureProject = { ...project, notes: trimmed || undefined, updatedAt: now };
+    onUpdate(item.id, {
+      content: JSON.stringify(updatedProject),
+      date: formatUpdatedAtForDisplay(now),
+    });
+    showToast?.('メモを保存しました🌱');
+    setEditingNotesId(null);
+  };
+
+  // 「制作メモ」の保存（完成作品側）。新しいフィールドは追加せず、既存のSavedItem.content
   // （finished一覧・完成作品詳細で既に「メモ」として使っている既存フィールド）だけを更新する。
   // 既存のonUpdate（updateItem）をそのまま再利用し、title・fileDataUrl・relatedProjectIdは
   // 一切変更しない。SavedFurnitureProjectには一切触れないため、設計側の更新日時も変わらない
@@ -681,6 +716,11 @@ export default function SavedItemsModal({
                               {buildStatus === 'building' ? '制作中' : '未着手'}
                             </span>
                           )}
+                          {project?.notes && (
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 bg-tanei-surface-muted text-tanei-ink-muted">
+                              📝 メモあり
+                            </span>
+                          )}
                           <button
                             onClick={() => {
                               setRenamingProjectId(item.id);
@@ -691,6 +731,48 @@ export default function SavedItemsModal({
                           >
                             ✏️ 名前を変更
                           </button>
+                          <button
+                            onClick={() => {
+                              setEditingNotesId(item.id);
+                              setNotesDraft(project?.notes ?? '');
+                            }}
+                            className="text-[11px] font-bold text-tanei-accent hover:underline flex-shrink-0"
+                          >
+                            📝 メモ
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 「設計・制作メモ」のインライン編集（Phase 3-22）。Phase 3-15の
+                          名前変更と同じ、カード内で完結するインライン編集パターンを再利用する */}
+                      {editingNotesId === item.id && (
+                        <div className="flex flex-col gap-1.5 mt-2">
+                          <textarea
+                            value={notesDraft}
+                            onChange={(e) => setNotesDraft(e.target.value.slice(0, PROJECT_NOTES_MAX_LENGTH))}
+                            maxLength={PROJECT_NOTES_MAX_LENGTH}
+                            rows={4}
+                            placeholder="この設計についてのメモを入力"
+                            aria-label="設計メモを編集"
+                            className="w-full border border-tanei-border rounded-tanei-control px-2.5 py-1.5 text-sm resize-none"
+                          />
+                          <p className="text-[11px] text-tanei-ink-muted text-right">
+                            {notesDraft.length} / {PROJECT_NOTES_MAX_LENGTH}
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setEditingNotesId(null)}
+                              className="text-xs font-bold px-2.5 py-1 rounded-tanei-control bg-white border border-tanei-border text-tanei-ink-muted hover:bg-tanei-surface-muted"
+                            >
+                              キャンセル
+                            </button>
+                            <button
+                              onClick={() => handleSaveNotes(item)}
+                              className="text-xs font-bold px-2.5 py-1 rounded-tanei-control bg-tanei-accent text-white hover:bg-tanei-accent-dark"
+                            >
+                              保存
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>

@@ -27,6 +27,9 @@ export interface SavedFurnitureProject {
   cutListChecked?: Record<string, boolean>;
   /** 制作チェック（Phase 2-7）のチェック状態。キーはステップ番号（1〜10）を文字列化したもの */
   buildChecklist?: Record<string, boolean>;
+  /** 設計・制作メモ（Phase 3-22）。ユーザーが自由入力する任意項目。Phase 3-22より前の
+   * 保存データには存在しないため、undefinedのまま「メモなし」として扱う */
+  notes?: string;
 }
 
 export const DEFAULT_FURNITURE_PROJECT_NAME = '新しい設計';
@@ -89,6 +92,7 @@ export const parseSavedItem = (item: SavedItem): SavedFurnitureProject | null =>
       material: p.material,
       cutListChecked: parseOptionalBooleanRecord(p.cutListChecked),
       buildChecklist: parseOptionalBooleanRecord(p.buildChecklist),
+      notes: typeof p.notes === 'string' ? p.notes : undefined,
     };
   } catch {
     return null;
@@ -122,8 +126,9 @@ export const deleteFurnitureProject = async (id: string): Promise<void> => {
 // 新規プロジェクトを作る純粋関数（この時点ではまだ保存しない。呼び出し側で
 // saveFurnitureProjectを呼ぶ）。
 // 【重要】buildChecklist・cutListCheckedは意図的に引き継がない（複製は常に未着手として
-// 扱う）。designはstructuredCloneで複製し、元プロジェクトのshelves配列などと参照を
-// 共有しない（後から複製側を編集しても元プロジェクトに影響しない）
+// 扱う）。notes（設計・制作メモ、Phase 3-22）も同様に意図的に引き継がない（複製は
+// 「新しい制作計画」として扱うため）。designはstructuredCloneで複製し、元プロジェクトの
+// shelves配列などと参照を共有しない（後から複製側を編集しても元プロジェクトに影響しない）
 export const duplicateFurnitureProject = (project: SavedFurnitureProject): SavedFurnitureProject => {
   const now = new Date().toISOString();
   return {

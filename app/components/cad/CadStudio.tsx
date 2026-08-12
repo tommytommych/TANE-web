@@ -66,6 +66,11 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
   const [cutListChecked, setCutListChecked] = useState<Record<string, boolean>>({});
   // 制作チェック（Phase 2-7）のチェック状態。キーはステップ番号（1〜10）の文字列
   const [buildChecklist, setBuildChecklist] = useState<Record<string, boolean>>({});
+  // 設計・制作メモ（Phase 3-22）。マイページ（SavedItemsModal.tsx）で編集する読み取り専用の
+  // 表示用state。ここでは編集しないが、保存のたびに読み込んだ値をそのまま引き継がないと
+  // 「CADで保存する」を押しただけでマイページ側のメモが消えてしまうため、handleSave・
+  // persistChecklistsの両方に必ず含める
+  const [notes, setNotes] = useState('');
 
   // マイページ「保存した設計」の「開く」から /app/cad?projectId=... で来た場合、
   // 保存済みのFurnitureDesignを読み込んで復元する（木取り図・パーツ一覧・制作情報は
@@ -90,6 +95,7 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
         setProjectName(project.projectName);
         setCutListChecked(project.cutListChecked ?? {});
         setBuildChecklist(project.buildChecklist ?? {});
+        setNotes(project.notes ?? '');
       } catch (error) {
         console.error(error);
         if (!cancelled) {
@@ -117,6 +123,7 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
       material,
       cutListChecked,
       buildChecklist,
+      notes: notes || undefined,
     };
     try {
       await saveFurnitureProject(project);
@@ -137,7 +144,7 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
       setIsSaving(false);
       setTimeout(() => setSaveMessage(null), 4000);
     }
-  }, [projectId, projectCreatedAt, projectName, design, material, cutListChecked, buildChecklist]);
+  }, [projectId, projectCreatedAt, projectName, design, material, cutListChecked, buildChecklist, notes]);
 
   // カットリスト・制作チェックのチェック状態は、既に保存済みのプロジェクト（projectIdがある）
   // であれば、トグルのたびに既存のIndexedDB保存機構（saveFurnitureProject）へ自動保存する。
@@ -156,6 +163,7 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
         material,
         cutListChecked: patch.cutListChecked ?? cutListChecked,
         buildChecklist: patch.buildChecklist ?? buildChecklist,
+        notes: notes || undefined,
       };
       try {
         await saveFurnitureProject(project);
@@ -164,7 +172,7 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
         console.error(error);
       }
     },
-    [projectId, projectCreatedAt, projectName, design, material, cutListChecked, buildChecklist]
+    [projectId, projectCreatedAt, projectName, design, material, cutListChecked, buildChecklist, notes]
   );
 
   const handleToggleCutListItem = useCallback(
@@ -389,6 +397,16 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
             onRemoveShelf={handleRemoveShelf}
             onDeselect={() => handleSelectPanel(null)}
           />
+
+          {/* 設計メモ（Phase 3-22）。マイページ（SavedItemsModal.tsx）で編集したメモを
+              CAD側でも確認できるようにするための、読み取り専用の小さな表示。
+              CAD側に編集機能は追加しない（編集はマイページのみ） */}
+          {notes && (
+            <div className="p-3 border-t border-tanei-border">
+              <p className="text-xs font-bold text-tanei-ink-muted mb-1">📝 設計メモ</p>
+              <p className="text-sm text-tanei-ink whitespace-pre-wrap break-words">{notes}</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
