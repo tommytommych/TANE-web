@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import CadStudio from './CadStudio';
 import type { FurnitureDesign } from '../../lib/cad/types';
+import { FURNITURE_MATERIALS } from '../../lib/cad/model';
 import {
   CAD_INITIAL_DESIGN_SESSION_KEY,
   isSafeStudioSpecDimensions,
@@ -19,12 +20,17 @@ import {
 
 // AI提案から反映された寸法を、ユーザーへの確認表示にそのまま使うための最小限の型
 // （Phase 4-10）。FurnitureDesign変換後の値ではなく、StudioSpecの生の値（変換前）を
-// 保持するだけで、CadStudio側から逆算しない
+// 保持するだけで、CadStudio側から逆算しない。
+// projectName・materialはPhase 5-02で追加。CadStudioへ実際に渡す値（フォールバック後）と
+// 同じものを表示するため、undefinedの場合はバナーにも出さない（フォールバックしたことを
+// 積極的に説明はしない＝既存の「邪魔しすぎない」バナーの方針を踏襲）
 interface AiSpecSummary {
   width: number;
   depth: number;
   height: number;
   thickness: number;
+  projectName?: string;
+  material?: string;
 }
 
 // StudioSpec.thicknessが省略された場合の既定値。studioSpec.ts側のDEFAULT_THICKNESS_MMと
@@ -44,6 +50,12 @@ export default function CadPageShell() {
   // 差し替えても反映されない、CadStudio.tsx自体を変更せずに確実に反映させるための
   // 最小限の対応
   const [initialDesign, setInitialDesign] = useState<FurnitureDesign | undefined>(undefined);
+  // Phase 5-02：AI提案のitem（作品名）・material（材料）を、initialDesignと同じ仕組みで
+  // CadStudio.tsxの新規prop（initialProjectName・initialMaterial）へ渡すための状態。
+  // どちらも「安全と確認できた値のみ」を保持し、不正・空の場合はundefinedのまま
+  // （CadStudio.tsx側の既存デフォルト値へ自然にフォールバックする）
+  const [initialProjectName, setInitialProjectName] = useState<string | undefined>(undefined);
+  const [initialMaterial, setInitialMaterial] = useState<string | undefined>(undefined);
   const [cadInstanceKey, setCadInstanceKey] = useState(0);
   // Phase 4-09監査で判明：AI提案の寸法がCADへ反映されたことが画面上どこにも
   // 示されておらず、ユーザーが「自分で入力し直さなくてよい」と気づけなかった。
@@ -65,6 +77,20 @@ export default function CadPageShell() {
       // CadStudio.tsx側の保護されていない初期化処理でページ全体がクラッシュする
       // （Phase 4-08監査で発見）ため、isSafeStudioSpecDimensionsで追加確認する
       if (isValidStudioSpec(parsed) && isSafeStudioSpecDimensions(parsed)) {
+        // itemはisValidStudioSpecで型（string）までは保証済みだが、空文字・空白のみの
+        // 場合は「作品名なし」とみなし、CadStudio.tsx側の既存デフォルト（「新しい設計」）へ
+        // フォールバックする（Phase 5-02。寸法とは独立して判定するため、itemだけが不正でも
+        // 寸法・materialの反映は妨げない）
+        const trimmedItem = parsed.item.trim();
+        const safeProjectName = trimmedItem.length > 0 ? trimmedItem : undefined;
+        // materialはisValidStudioSpecで型（string）までは保証済みだが、値の中身までは
+        // 保証しないため、CAD側の既知の候補（FURNITURE_MATERIALS）と照合する。一致しない
+        // 場合はCadStudio.tsx側の既存デフォルト（FURNITURE_MATERIALS[0]）へフォールバックする
+        // （Phase 5-02。materialだけが不正でも寸法・itemの反映は妨げない）
+        const safeMaterial = (FURNITURE_MATERIALS as readonly string[]).includes(parsed.material)
+          ? parsed.material
+          : undefined;
+
         // sessionStorage（外部システム）から読み取った値をReact stateへ同期するだけの
         // 呼び出しのため、既存のapp/app/page.tsxと同様に明示的に抑制する
         // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -73,8 +99,12 @@ export default function CadPageShell() {
           depth: parsed.depth,
           height: parsed.height,
           thickness: parsed.thickness ?? DEFAULT_THICKNESS_MM,
+          projectName: safeProjectName,
+          material: safeMaterial,
         });
         setInitialDesign(studioSpecToFurnitureDesign(parsed));
+        setInitialProjectName(safeProjectName);
+        setInitialMaterial(safeMaterial);
         setCadInstanceKey((prev) => prev + 1);
       }
       // 不正な値だった場合はaiSpecSummaryを設定しないため、確認表示も出ないまま
@@ -110,12 +140,21 @@ export default function CadPageShell() {
           <span className="text-xs font-bold text-tanei-brand flex-shrink-0">🌿 AIの提案を反映しました</span>
           <span className="text-[11px] text-tanei-ink break-words">
             幅 {aiSpecSummary.width} mm　×　奥行 {aiSpecSummary.depth} mm　×　高さ {aiSpecSummary.height} mm　／　板厚 {aiSpecSummary.thickness} mm
+            {/* Phase 5-02：設計名・材料もAI提案から反映された場合のみ、既存の1本の帯に
+                追記する（優先順位は寸法→作品名→材料。フォールバックした場合は表示しない） */}
+            {aiSpecSummary.projectName && <>　／　設計名 {aiSpecSummary.projectName}</>}
+            {aiSpecSummary.material && <>　／　材料 {aiSpecSummary.material}</>}
           </span>
         </div>
       )}
 
       <div className="min-h-0 flex-1">
-        <CadStudio key={cadInstanceKey} initialDesign={initialDesign} />
+        <CadStudio
+          key={cadInstanceKey}
+          initialDesign={initialDesign}
+          initialProjectName={initialProjectName}
+          initialMaterial={initialMaterial}
+        />
       </div>
     </div>
   );

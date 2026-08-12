@@ -35,14 +35,20 @@ import {
 
 interface CadStudioProps {
   initialDesign?: FurnitureDesign;
+  // AI提案（tanei-studio-spec）からの遷移時のみ、CadPageShell.tsxが渡す初期値（Phase 5-02）。
+  // initialDesignと同じく、useStateの初期値として一度だけ使われる。通常の/app/cadでは
+  // undefinedのため、既存のデフォルト値（DEFAULT_FURNITURE_PROJECT_NAME・FURNITURE_MATERIALS[0]）
+  // がそのまま使われ、挙動は変わらない
+  initialProjectName?: string;
+  initialMaterial?: string;
 }
 
 type CadViewMode = 'design' | 'cutlist' | 'cutMaterials' | 'buildCheck';
 
-export default function CadStudio({ initialDesign }: CadStudioProps) {
+export default function CadStudio({ initialDesign, initialProjectName, initialMaterial }: CadStudioProps) {
   const [design, setDesign] = useState<FurnitureDesign>(initialDesign ?? createDefaultFurnitureDesign());
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
-  const [material, setMaterial] = useState<string>(FURNITURE_MATERIALS[0]);
+  const [material, setMaterial] = useState<string>(initialMaterial ?? FURNITURE_MATERIALS[0]);
   const [viewMode, setViewMode] = useState<CadViewMode>('design');
   // 制作チェック画面の「制作へ進む」から木取り図画面（cutlist）へ戻ったときだけ、
   // 「制作する」セクションまで自動スクロールするためのフラグ（Phase 2-9）。
@@ -57,7 +63,7 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
   // （「保存する」を押すと新規プロジェクトになる）、値がある＝既存プロジェクトの更新になる
   const [projectId, setProjectId] = useState<string | null>(null);
   const [projectCreatedAt, setProjectCreatedAt] = useState<string | null>(null);
-  const [projectName, setProjectName] = useState(DEFAULT_FURNITURE_PROJECT_NAME);
+  const [projectName, setProjectName] = useState(initialProjectName ?? DEFAULT_FURNITURE_PROJECT_NAME);
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
