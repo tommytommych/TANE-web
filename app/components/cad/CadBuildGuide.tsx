@@ -966,12 +966,6 @@ export default function CadBuildGuide({
                             >
                               制作チェックを見る →
                             </button>
-                            {/* Phase 3-51：現在STEPだけに付く短い補助文。「制作チェックを見る →」を
-                                クリックした後にすべきこと（確認して制作チェック画面側でチェックを
-                                更新する）を明確にするだけで、クリック処理・画面遷移は追加しない */}
-                            {isCurrent && (
-                              <p className="text-xs text-tanei-ink-muted">確認後にチェックを更新</p>
-                            )}
                           </div>
                         )}
                       </div>
