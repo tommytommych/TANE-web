@@ -63,6 +63,9 @@ const MANUAL_ADD_TYPES: SavedItemType[] = ['image', 'finished'];
 // 上限が無いが、一覧UIが崩れないようにこの機能でのみ適用する
 const PROJECT_NAME_MAX_LENGTH = 60;
 
+// 制作メモ（Phase 3-22）の文字数上限
+const FINISHED_MEMO_MAX_LENGTH = 1000;
+
 // 「制作進捗で絞り込む」（Phase 3-17）の選択肢。値はgetBuildProgressStatusの戻り値と一致させる
 const PROGRESS_FILTER_OPTIONS: { value: BuildProgressStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'すべて' },
@@ -119,6 +122,11 @@ export default function SavedItemsModal({
   // 「完成作品詳細」（Phase 3-19）。finished SavedItem.idを保持するだけの、読み取り専用の
   // 表示state。ここでSavedItemを書き換えることは一切ない
   const [viewingFinishedId, setViewingFinishedId] = useState<string | null>(null);
+  // 「制作メモ」の編集状態（Phase 3-22）。新しいフィールドは追加せず、既存の
+  // SavedItem.content（「テキスト内容・メモ」として既に定義済みのフィールド）を
+  // finished専用の「制作メモ」として編集するためのローカルstate
+  const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
+  const [memoDraft, setMemoDraft] = useState('');
   const [prevActiveModal, setPrevActiveModal] = useState(activeModal);
   if (activeModal !== prevActiveModal) {
     // モーダルの表示対象が切り替わったら、削除確認状態を持ち越さないようにリセットする
@@ -131,6 +139,7 @@ export default function SavedItemsModal({
     setProgressFilter('all');
     setSortOption('updatedDesc');
     setViewingFinishedId(null);
+    setEditingMemoId(null);
   }
 
   const [isAdding, setIsAdding] = useState(false);
@@ -343,6 +352,19 @@ export default function SavedItemsModal({
     setRenameError(null);
   };
 
+  // 「制作メモ」の保存（Phase 3-22）。新しいフィールドは追加せず、既存のSavedItem.content
+  // （finished一覧・完成作品詳細で既に「メモ」として使っている既存フィールド）だけを更新する。
+  // 既存のonUpdate（updateItem）をそのまま再利用し、title・fileDataUrl・relatedProjectIdは
+  // 一切変更しない。SavedFurnitureProjectには一切触れないため、設計側の更新日時も変わらない
+  const handleSaveMemo = (item: SavedItem) => {
+    const trimmed = memoDraft.trim().slice(0, FINISHED_MEMO_MAX_LENGTH);
+    if (trimmed !== (item.content ?? '').trim()) {
+      onUpdate(item.id, { content: trimmed });
+      showToast?.('制作メモを保存しました🌱');
+    }
+    setEditingMemoId(null);
+  };
+
   const resetAddForm = () => {
     setIsAdding(false);
     setNewTitle('');
@@ -493,7 +515,10 @@ export default function SavedItemsModal({
                           <div className="flex gap-2 flex-wrap mt-1.5">
                             <button
                               type="button"
-                              onClick={() => setViewingFinishedId(item.id)}
+                              onClick={() => {
+                                setViewingFinishedId(item.id);
+                                setEditingMemoId(null);
+                              }}
                               className="text-xs font-bold bg-white border border-tanei-border text-tanei-ink px-3 py-1.5 rounded-tanei-control hover:bg-tanei-surface-muted transition-colors"
                             >
                               作品を見る
@@ -878,7 +903,10 @@ export default function SavedItemsModal({
                       {activeModal === 'finished' && (
                         <button
                           type="button"
-                          onClick={() => setViewingFinishedId(item.id)}
+                          onClick={() => {
+                            setViewingFinishedId(item.id);
+                            setEditingMemoId(null);
+                          }}
                           className="self-start text-xs font-bold bg-white border border-tanei-border text-tanei-ink px-3 py-1.5 rounded-tanei-control hover:bg-tanei-surface-muted transition-colors"
                         >
                           作品を見る
@@ -918,7 +946,10 @@ export default function SavedItemsModal({
       {viewingFinishedItem && (
         <div
           className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4"
-          onClick={() => setViewingFinishedId(null)}
+          onClick={() => {
+            setViewingFinishedId(null);
+            setEditingMemoId(null);
+          }}
         >
           <div
             role="dialog"
@@ -932,7 +963,10 @@ export default function SavedItemsModal({
                 完成作品詳細
               </h3>
               <button
-                onClick={() => setViewingFinishedId(null)}
+                onClick={() => {
+            setViewingFinishedId(null);
+            setEditingMemoId(null);
+          }}
                 className="text-gray-500 hover:text-black font-bold px-3 py-1 rounded-tanei-control"
               >
                 ✕ 閉じる
@@ -959,12 +993,61 @@ export default function SavedItemsModal({
                 <p className="text-sm font-bold text-tanei-ink break-words">{viewingFinishedItem.title}</p>
               </div>
 
-              {viewingFinishedItem.content && (
-                <div>
-                  <p className="text-[11px] font-bold text-tanei-ink-muted">メモ</p>
-                  <p className="text-sm text-tanei-ink whitespace-pre-wrap break-words">{viewingFinishedItem.content}</p>
+              {/* 制作メモ（Phase 3-22）。新しいフィールドは追加せず、既存のSavedItem.content
+                  （finished一覧の新規保存フォーム・編集フォームと同じフィールド）をそのまま
+                  「制作メモ」として編集する。保存は既存のonUpdate（updateItem）のみを使い、
+                  title・fileDataUrl・relatedProjectIdは一切触れない */}
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-bold text-tanei-ink-muted">制作メモ</p>
+                  {editingMemoId !== viewingFinishedItem.id && (
+                    <button
+                      onClick={() => {
+                        setEditingMemoId(viewingFinishedItem.id);
+                        setMemoDraft(viewingFinishedItem.content ?? '');
+                      }}
+                      className="text-[11px] font-bold text-tanei-accent hover:underline"
+                    >
+                      ✏️ 制作メモを編集
+                    </button>
+                  )}
                 </div>
-              )}
+
+                {editingMemoId === viewingFinishedItem.id ? (
+                  <div className="flex flex-col gap-1.5 mt-1">
+                    <textarea
+                      value={memoDraft}
+                      onChange={(e) => setMemoDraft(e.target.value.slice(0, FINISHED_MEMO_MAX_LENGTH))}
+                      maxLength={FINISHED_MEMO_MAX_LENGTH}
+                      rows={4}
+                      placeholder="実際に作ってみて気づいたことを残しておけます。"
+                      aria-label="制作メモを編集"
+                      className="w-full border border-tanei-border rounded-tanei-control px-2.5 py-1.5 text-sm resize-none"
+                    />
+                    <p className="text-[11px] text-tanei-ink-muted text-right">
+                      {memoDraft.length} / {FINISHED_MEMO_MAX_LENGTH}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setEditingMemoId(null)}
+                        className="text-xs font-bold px-3 py-1.5 rounded-tanei-control bg-white border border-tanei-border text-tanei-ink-muted hover:bg-tanei-surface-muted"
+                      >
+                        キャンセル
+                      </button>
+                      <button
+                        onClick={() => handleSaveMemo(viewingFinishedItem)}
+                        className="text-xs font-bold px-3 py-1.5 rounded-tanei-control bg-tanei-accent text-white hover:bg-tanei-accent-dark"
+                      >
+                        保存
+                      </button>
+                    </div>
+                  </div>
+                ) : viewingFinishedItem.content ? (
+                  <p className="text-sm text-tanei-ink whitespace-pre-wrap break-words mt-1">{viewingFinishedItem.content}</p>
+                ) : (
+                  <p className="text-xs text-tanei-ink-muted mt-1">メモはまだありません</p>
+                )}
+              </div>
 
               {viewingRelatedProjectName && (
                 <div>
