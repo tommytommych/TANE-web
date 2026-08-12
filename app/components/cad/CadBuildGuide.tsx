@@ -605,6 +605,14 @@ export default function CadBuildGuide({
                             : 'bg-white border-tanei-border hover:border-tanei-brand hover:bg-tanei-brand-soft'
                       }`}
                     >
+                      {/* Phase 3-49：現在STEPだけに付く短い視覚ラベル。既存の「▶ 現在」
+                          （状態表示）・「ここから進めましょう」（補助文）とは役割を分け、
+                          一覧の中で今どのカードが現在STEPかを一目で見つけられるようにする
+                          だけで、判定はisListStepCurrent（＝currentBuildStepNumber）を
+                          そのまま使い、新しい判定ロジックは追加しない */}
+                      {isListStepCurrent && (
+                        <span className="text-[10px] font-black text-tanei-accent">▶ 今ここ</span>
+                      )}
                       <span className="flex items-center gap-2">
                         <span
                           className={`flex-shrink-0 text-[11px] font-black ${
