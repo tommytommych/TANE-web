@@ -1,6 +1,7 @@
 'use client';
 
 import type { RefObject } from 'react';
+import Link from 'next/link';
 
 interface ChatInputProps {
   input: string;
@@ -44,8 +45,18 @@ export default function ChatInput({
         </div>
       )}
 
+      {/* Phase 4-01調査で判明：この文言が「ブラウザCAD（/app/cad）までPC専用」という
+          誤解を招いていた。完成イメージ・設計スタジオ（FreeCAD+POV-Rayのローカルサーバー
+          連携、CadPageShell.tsx等で確認済み）が実際にPC専用である事実はそのまま伝えつつ、
+          サーバー不要でスマホからも使えるブラウザCADへの導線を併記する（Phase 4-02）。
+          onOpenCompletionImage（✨完成イメージボタン）自体はTANE:iのPOV-Rayレンダリング
+          専用の機能であり、CADへの遷移とは役割が異なるため変更しない */}
       <p className="text-[11px] text-tanei-ink-muted mb-1.5 sm:mb-2">
-        ⚠️ 完成イメージ・設計スタジオはパソコンでのご利用専用です（スマートフォンでは別途接続設定が必要です）
+        ⚠️ 完成イメージ・設計スタジオはパソコン専用です（スマートフォンでは別途接続設定が必要です）。スマホ・タブレットなら
+        <Link href="/app/cad" className="font-bold text-tanei-brand hover:text-tanei-brand-dark underline">
+          🌿ブラウザCAD
+        </Link>
+        もご利用いただけます。
       </p>
 
       <div className="w-full max-w-none flex gap-1.5 sm:gap-2 items-center">

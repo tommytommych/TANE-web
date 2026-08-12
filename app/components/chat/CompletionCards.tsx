@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useMemo } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   type Message,
@@ -107,10 +108,6 @@ function CompletionCards({
             disabled: isGeneratingPdf,
           },
         ]),
-    // 天板・底板・側板・背板からなる箱型の家具のみ、AIがtanei-studio-specブロックを出力する
-    ...(studioSpec
-      ? [{ icon: '🪚', label: '設計スタジオで見る', onClick: handleOpenInStudio, title: 'パソコン専用機能です' }]
-      : []),
     { icon: '💚', label: 'LINE送信', onClick: handleLineShare },
     { icon: '💾', label: '保存', onClick: handleSaveDesign },
     { icon: '🔗', label: '共有', onClick: handleShare },
@@ -123,6 +120,39 @@ function CompletionCards({
         <span className="text-lg">🎉</span>
         <span className="text-sm font-bold text-tanei-ink">完成しました！次のアクションを選んでください</span>
       </div>
+
+      {/* 天板・底板・側板・背板からなる箱型の家具のみ、AIがtanei-studio-specブロックを
+          出力する（Phase 4-01調査で判明：この時点まではブラウザCAD（/app/cad）への導線が
+          一切無く、設計スタジオ（要PCローカルサーバー）しか選べなかった）。Phase 4-02で、
+          設定不要でスマホからも使えるブラウザCADを選択肢として追加する。強制はせず、
+          先頭に置き控えめな強調色（tanei-brand-soft）にとどめることで自然に選びやすくする。
+          設計スタジオ側の導線（handleOpenInStudio・pushSpecToStudio）は変更しない */}
+      {studioSpec && (
+        <div className="flex flex-col gap-1.5 mb-2">
+          <Link
+            href="/app/cad"
+            className="flex items-center gap-2.5 px-3 py-2.5 rounded-tanei-card border border-tanei-brand bg-tanei-brand-soft text-tanei-ink hover:border-tanei-brand-dark transition-colors"
+          >
+            <span className="text-lg flex-shrink-0">🌿</span>
+            <span className="flex flex-col leading-tight min-w-0">
+              <span className="text-xs font-bold">ブラウザCADで設計する</span>
+              <span className="text-[10px] text-tanei-ink-muted">スマホ・PC対応／インストール不要ですぐ使えます</span>
+            </span>
+          </Link>
+          <button
+            type="button"
+            onClick={handleOpenInStudio}
+            title="パソコン専用機能です"
+            className="flex items-center gap-2.5 px-3 py-2.5 rounded-tanei-card border border-tanei-border bg-white text-tanei-ink hover:border-tanei-brand transition-colors text-left"
+          >
+            <span className="text-lg flex-shrink-0">🖥</span>
+            <span className="flex flex-col leading-tight min-w-0">
+              <span className="text-xs font-bold">設計スタジオで開く</span>
+              <span className="text-[10px] text-tanei-ink-muted">PC専用／より本格的な完成イメージ向け</span>
+            </span>
+          </button>
+        </div>
+      )}
 
       <div className={`grid gap-2 ${isCameoContent ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3 sm:grid-cols-5'}`}>
         {cards.map((card) => (
