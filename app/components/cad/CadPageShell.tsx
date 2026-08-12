@@ -17,6 +17,21 @@ import {
   studioSpecToFurnitureDesign,
 } from '../../lib/studioSpec';
 
+// AI提案から反映された寸法を、ユーザーへの確認表示にそのまま使うための最小限の型
+// （Phase 4-10）。FurnitureDesign変換後の値ではなく、StudioSpecの生の値（変換前）を
+// 保持するだけで、CadStudio側から逆算しない
+interface AiSpecSummary {
+  width: number;
+  depth: number;
+  height: number;
+  thickness: number;
+}
+
+// StudioSpec.thicknessが省略された場合の既定値。studioSpec.ts側のDEFAULT_THICKNESS_MMと
+// 同じ値（18mm）。studioSpec.tsは今回の変更対象外のためexportを追加せず、既存仕様として
+// 表示専用にここでも同じ値を使うだけにとどめる
+const DEFAULT_THICKNESS_MM = 18;
+
 export default function CadPageShell() {
   // AIチャットの「🌿 ブラウザCADで設計する」（CompletionCards.tsx）からの遷移時のみ、
   // sessionStorageに一時保存されたStudioSpecを読み込み、FurnitureDesignへ変換して
@@ -30,13 +45,18 @@ export default function CadPageShell() {
   // 最小限の対応
   const [initialDesign, setInitialDesign] = useState<FurnitureDesign | undefined>(undefined);
   const [cadInstanceKey, setCadInstanceKey] = useState(0);
+  // Phase 4-09監査で判明：AI提案の寸法がCADへ反映されたことが画面上どこにも
+  // 示されておらず、ユーザーが「自分で入力し直さなくてよい」と気づけなかった。
+  // Phase 4-10で、AI提案から到達した場合だけ軽量な確認表示を出すための状態を追加する
+  const [aiSpecSummary, setAiSpecSummary] = useState<AiSpecSummary | null>(null);
 
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem(CAD_INITIAL_DESIGN_SESSION_KEY);
       if (!raw) return;
       // JSON.parseやバリデーションの成否によらず、見つかった時点で必ず1回だけ削除する
-      // （不正なJSONでパースが例外を投げても、キーが残り続けて無限に再利用されることを防ぐ）
+      // （不正なJSONでパースが例外を投げても、キーが残り続けて無限に再利用されることを防ぐ）。
+      // Phase 4-08で確立したこの安全な削除順序はPhase 4-10でも変更しない
       sessionStorage.removeItem(CAD_INITIAL_DESIGN_SESSION_KEY);
       const parsed: unknown = JSON.parse(raw);
       // isValidStudioSpecは型（number/string）だけの検証のため、0以下・NaN・
@@ -48,9 +68,17 @@ export default function CadPageShell() {
         // sessionStorage（外部システム）から読み取った値をReact stateへ同期するだけの
         // 呼び出しのため、既存のapp/app/page.tsxと同様に明示的に抑制する
         // eslint-disable-next-line react-hooks/set-state-in-effect
+        setAiSpecSummary({
+          width: parsed.width,
+          depth: parsed.depth,
+          height: parsed.height,
+          thickness: parsed.thickness ?? DEFAULT_THICKNESS_MM,
+        });
         setInitialDesign(studioSpecToFurnitureDesign(parsed));
         setCadInstanceKey((prev) => prev + 1);
       }
+      // 不正な値だった場合はaiSpecSummaryを設定しないため、確認表示も出ないまま
+      // 既存どおり通常のデフォルト設計にフォールバックする
     } catch (e) {
       console.error(e);
       // JSON.parse失敗・sessionStorageが使えない環境などは、既存のデフォルト設計
@@ -72,6 +100,19 @@ export default function CadPageShell() {
           試験提供中
         </span>
       </div>
+
+      {/* Phase 4-10：AI提案から到達した場合だけ表示する軽量な確認表示。通常の新規CAD・
+          ?projectId=での保存済み設計読み込みでは表示しない（aiSpecSummaryはAI提案が
+          有効だった場合にしかセットされないため）。CAD操作を邪魔しないよう、ヘッダー
+          直下の細い1本の帯にとどめ、押せるボタンや新しいrole="button"は追加しない */}
+      {aiSpecSummary && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-4 py-2 bg-tanei-brand-soft border-b border-tanei-brand/30 flex-shrink-0">
+          <span className="text-xs font-bold text-tanei-brand flex-shrink-0">🌿 AIの提案を反映しました</span>
+          <span className="text-[11px] text-tanei-ink break-words">
+            幅 {aiSpecSummary.width} mm　×　奥行 {aiSpecSummary.depth} mm　×　高さ {aiSpecSummary.height} mm　／　板厚 {aiSpecSummary.thickness} mm
+          </span>
+        </div>
+      )}
 
       <div className="min-h-0 flex-1">
         <CadStudio key={cadInstanceKey} initialDesign={initialDesign} />

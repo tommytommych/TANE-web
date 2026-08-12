@@ -151,6 +151,12 @@ function CompletionCards({
             <span className="flex flex-col leading-tight min-w-0">
               <span className="text-xs font-bold">ブラウザCADで設計する</span>
               <span className="text-[10px] text-tanei-ink-muted">スマホ・PC対応／インストール不要ですぐ使えます</span>
+              {/* Phase 4-09監査で判明：この2択のどちらがAI提案の寸法を引き継ぐのか、
+                  説明文からは判断できなかった（設計スタジオ側もpushSpecToStudioで
+                  既存仕様を引き継ぐため、「寸法を引き継ぐこと」自体は差別化にならない）。
+                  Phase 4-07・4-08で実際に反映される幅・奥行・高さ・板厚の4項目だけを
+                  事実として記載する（品名・材料は現状反映されないため書かない） */}
+              <span className="text-[10px] text-tanei-ink-muted">AI提案の寸法（幅・奥行・高さ・板厚）をそのまま引き継ぎます</span>
             </span>
           </Link>
           <button
