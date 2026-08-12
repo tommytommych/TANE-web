@@ -577,12 +577,27 @@ export default function CadBuildGuide({
               {steps.map((step) => {
                 const isListStepDone = isBuildStepDone(step.stepNumber);
                 const isListStepCurrent = !isListStepDone && step.stepNumber === currentBuildStepNumber;
+                // このSTEPに確認ポイントが存在するかどうかは、既存のisChecklistRelationStepと
+                // 全く同じ条件（showChecklistRelation・checklistRelationStepNumber、Phase 3-26）を
+                // ここでも再利用するだけ。新しいSTEP↔チェック項目対応表は作らない（Phase 3-45）
+                const isListStepChecklistRelation =
+                  showChecklistRelation && step.stepNumber === checklistRelationStepNumber;
                 return (
                   <li key={step.stepNumber}>
-                    <button
-                      type="button"
+                    {/* ネストしたボタン（下の「確認ポイントを見る →」）を有効なHTMLとして
+                        持てるよう、カード全体はbuttonではなくrole="button"のdivにしている。
+                        クリック・キーボード操作の挙動はgoToBuildStepへそのまま委譲するだけ */}
+                    <div
+                      role="button"
+                      tabIndex={0}
                       onClick={() => goToBuildStep(step.stepNumber)}
-                      className={`w-full flex flex-col gap-0.5 rounded-tanei-control border px-2.5 py-1.5 text-left transition-colors ${
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          goToBuildStep(step.stepNumber);
+                        }
+                      }}
+                      className={`w-full flex flex-col gap-0.5 rounded-tanei-control border px-2.5 py-1.5 text-left transition-colors cursor-pointer ${
                         isListStepCurrent
                           ? 'bg-white border-tanei-accent ring-2 ring-tanei-accent/60 shadow-sm'
                           : isListStepDone
@@ -630,7 +645,35 @@ export default function CadBuildGuide({
                       >
                         {isListStepDone ? '完了しています' : isListStepCurrent ? 'ここから進めましょう' : 'これから進めます'}
                       </span>
-                    </button>
+                      {/* Phase 3-45：確認ポイントの状態・導線。既存のrelatedChecklistDoneCount・
+                          relatedChecklistTotalから毎回算出するだけで、buildChecklistへの
+                          書き込みは一切行わない。STEPカード本体のクリックと独立させるため、
+                          ボタン側でstopPropagationしてgoToBuildStepが誤発火しないようにする */}
+                      {isListStepChecklistRelation && (
+                        <span className="mt-1 pt-1 border-t border-tanei-border flex items-center justify-between gap-2 flex-wrap">
+                          <span className="text-[10px] text-tanei-ink-muted">
+                            確認ポイント{'　'}
+                            {relatedChecklistDoneCount === relatedChecklistTotal
+                              ? '✓ 確認済み'
+                              : relatedChecklistDoneCount === 0
+                                ? '○ 未確認'
+                                : '◐ 一部確認済み'}
+                          </span>
+                          {relatedChecklistDoneCount < relatedChecklistTotal && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onViewBuildCheck();
+                              }}
+                              className="text-[10px] font-bold text-tanei-accent hover:text-tanei-accent-dark"
+                            >
+                              確認ポイントを見る →
+                            </button>
+                          )}
+                        </span>
+                      )}
+                    </div>
                   </li>
                 );
               })}
