@@ -300,7 +300,7 @@ export default function Home() {
   );
 
   const updateItem = useCallback(
-    async (id: string, updates: { title?: string; content?: string }) => {
+    async (id: string, updates: { title?: string; content?: string; date?: string }) => {
       const existing = savedItems.find((item) => item.id === id);
       if (!existing) return;
       const updated: SavedItem = { ...existing, ...updates };

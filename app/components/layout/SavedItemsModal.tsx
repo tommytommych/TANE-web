@@ -4,7 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { SavedItem, SavedItemType } from '../../lib/types';
-import { parseSavedItem, duplicateFurnitureProject, saveFurnitureProject } from '../../lib/cad/projectStore';
+import {
+  parseSavedItem,
+  duplicateFurnitureProject,
+  saveFurnitureProject,
+  formatUpdatedAtForDisplay,
+  type SavedFurnitureProject,
+} from '../../lib/cad/projectStore';
 import { computeFurnitureProjectProgress } from '../../lib/cad/model';
 
 interface SavedItemsModalProps {
@@ -12,7 +18,10 @@ interface SavedItemsModalProps {
   savedItems: SavedItem[];
   onClose: () => void;
   onRemove: (id: string) => void;
-  onUpdate: (id: string, updates: { title?: string; content?: string }) => void;
+  /** 「date」は、CAD設計の名前変更（Phase 3-15）でupdatedAtが変わった際に、
+   * 一覧の「最終更新：」表示も既存のtoSavedItem相当のフォーマットで合わせて
+   * 更新できるようにするための任意項目。他のonUpdate呼び出し元には影響しない */
+  onUpdate: (id: string, updates: { title?: string; content?: string; date?: string }) => void;
   onAdd: (
     type: SavedItemType,
     title: string,
@@ -45,6 +54,10 @@ const MODAL_META: Record<SavedItemType, { icon: string; label: string }> = {
 // 手動で新規保存できるのは「画像」「完成作品」（他は会話中のボタンから保存される）
 const MANUAL_ADD_TYPES: SavedItemType[] = ['image', 'finished'];
 
+// 設計名を変更（Phase 3-15・名前変更）時の文字数上限。既存のCAD側「設計の名前」入力欄には
+// 上限が無いが、一覧UIが崩れないようにこの機能でのみ適用する
+const PROJECT_NAME_MAX_LENGTH = 60;
+
 export default function SavedItemsModal({
   activeModal,
   savedItems,
@@ -67,6 +80,11 @@ export default function SavedItemsModal({
   // ローカルstateのパターンをそのまま再利用している
   const [duplicateConfirmId, setDuplicateConfirmId] = useState<string | null>(null);
   const [isDuplicating, setIsDuplicating] = useState(false);
+  // 「設計名を変更」のインライン編集状態（Phase 3-15・名前変更）。削除確認・複製確認と
+  // 同じ、1件だけ選択されているローカルstateのパターンをそのまま再利用している
+  const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameError, setRenameError] = useState<string | null>(null);
   const [prevActiveModal, setPrevActiveModal] = useState(activeModal);
   if (activeModal !== prevActiveModal) {
     // モーダルの表示対象が切り替わったら、削除確認状態を持ち越さないようにリセットする
@@ -74,6 +92,7 @@ export default function SavedItemsModal({
     setPrevActiveModal(activeModal);
     setDeleteConfirmId(null);
     setDuplicateConfirmId(null);
+    setRenamingProjectId(null);
   }
 
   const [isAdding, setIsAdding] = useState(false);
@@ -157,6 +176,41 @@ export default function SavedItemsModal({
       setIsDuplicating(false);
       setDuplicateConfirmId(null);
     }
+  };
+
+  // 「設計名を変更」（Phase 3-15・名前変更）。SavedFurnitureProject.projectNameだけを
+  // 書き換え、id・createdAt・design・material・cutListChecked・buildChecklistは
+  // 一切変更しない。新しい保存関数は作らず、既存のonUpdate（updateItem、既存の
+  // 「編集」フォームと同じputSavedItem経由の更新処理）をそのまま再利用する
+  const handleRenameProject = (item: SavedItem) => {
+    const trimmed = renameValue.trim();
+    if (!trimmed) {
+      setRenameError('設計名を入力してください。');
+      return;
+    }
+    const project = parseSavedItem(item);
+    if (!project) {
+      showToast?.('この設計の名前を変更できませんでした。データを確認できません。');
+      setRenamingProjectId(null);
+      setRenameError(null);
+      return;
+    }
+    if (trimmed === project.projectName) {
+      // 変更が無い場合は不要な更新を行わない
+      setRenamingProjectId(null);
+      setRenameError(null);
+      return;
+    }
+    const now = new Date().toISOString();
+    const updatedProject: SavedFurnitureProject = { ...project, projectName: trimmed, updatedAt: now };
+    onUpdate(item.id, {
+      title: trimmed,
+      content: JSON.stringify(updatedProject),
+      date: formatUpdatedAtForDisplay(now),
+    });
+    showToast?.('設計名を変更しました🌱');
+    setRenamingProjectId(null);
+    setRenameError(null);
   };
 
   const resetAddForm = () => {
@@ -293,7 +347,53 @@ export default function SavedItemsModal({
                   <div key={item.id} className="border border-tanei-border p-4 rounded-tanei-card bg-tanei-bg flex flex-col gap-3">
                     <div>
                       <div className="text-xs text-gray-500">最終更新：{item.date}</div>
-                      <div className="text-sm font-bold text-tanei-ink">{item.title}</div>
+                      {renamingProjectId === item.id ? (
+                        <div className="flex flex-col gap-1.5 mt-1">
+                          <input
+                            type="text"
+                            value={renameValue}
+                            onChange={(e) => {
+                              setRenameValue(e.target.value);
+                              if (renameError) setRenameError(null);
+                            }}
+                            maxLength={PROJECT_NAME_MAX_LENGTH}
+                            aria-label="設計名を編集"
+                            className="w-full border border-tanei-border rounded-tanei-control px-2.5 py-1.5 text-sm font-bold"
+                          />
+                          {renameError && <p className="text-xs text-red-500">{renameError}</p>}
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setRenamingProjectId(null);
+                                setRenameError(null);
+                              }}
+                              className="text-xs font-bold px-2.5 py-1 rounded-tanei-control bg-white border border-tanei-border text-tanei-ink-muted hover:bg-tanei-surface-muted"
+                            >
+                              キャンセル
+                            </button>
+                            <button
+                              onClick={() => handleRenameProject(item)}
+                              className="text-xs font-bold px-2.5 py-1 rounded-tanei-control bg-tanei-accent text-white hover:bg-tanei-accent-dark"
+                            >
+                              保存
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <div className="text-sm font-bold text-tanei-ink break-words">{item.title}</div>
+                          <button
+                            onClick={() => {
+                              setRenamingProjectId(item.id);
+                              setRenameValue(item.title);
+                              setRenameError(null);
+                            }}
+                            className="text-[11px] font-bold text-tanei-accent hover:underline flex-shrink-0"
+                          >
+                            ✏️ 名前を変更
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {progress && (

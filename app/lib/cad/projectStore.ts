@@ -33,7 +33,9 @@ export const DEFAULT_FURNITURE_PROJECT_NAME = '新しい設計';
 
 export const createNewFurnitureProjectId = (): string => `cad-${Date.now()}`;
 
-const formatUpdatedAtForDisplay = (iso: string): string => {
+// マイページの「最終更新：」表示や、renameのようにupdatedAtを更新する操作から
+// 一貫した表示形式を再利用できるようexportしている（Phase 3-15：名前変更）
+export const formatUpdatedAtForDisplay = (iso: string): string => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString('ja-JP') + ' ' + d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
