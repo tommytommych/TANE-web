@@ -945,15 +945,19 @@ export default function CadBuildGuide({
                         )}
                       </div>
                     )}
-                    {/* 「このSTEPのゴール」（Phase 3-37、Phase 3-47で案内文を調整）。既存の
-                        FurnitureBuildStep（buildFurnitureSteps()）にはゴール・完了条件専用の
-                        フィールドが存在しないため、新しい文章生成は行わず固定の補助文を表示する
-                        だけにする。完了/現在/未完了の判定は既存のisDone・isCurrentをそのまま
+                    {/* 「このSTEPのゴール」（Phase 3-37、Phase 3-47で案内文を調整、Phase 3-48で
+                        完了STEP→次STEP導線を強化）。既存のFurnitureBuildStep
+                        （buildFurnitureSteps()）にはゴール・完了条件専用のフィールドが
+                        存在しないため、新しい文章生成は行わず固定の補助文を表示するだけに
+                        する。完了/現在/未完了の判定は既存のisDone・isCurrentをそのまま
                         利用し、新しいSTEP↔チェック項目対応表は作らない。未完了時は「このSTEPの
                         確認ポイント」ブロック（既存の制作チェックを見る →導線）と役割が
                         重複しないよう、案内文だけにとどめる。完了時は既存のgoToBuildStep
                         （Phase 3-29、STEP前後ナビゲーションと同じ関数）を使った「次のSTEPへ」
-                        導線を追加する（STEP9完了時は次のSTEPが無いため表示しない） */}
+                        導線を追加する。次STEP番号は必ずstep.stepNumber + 1から取得し、
+                        ハードコードしない。STEP9完了時は次のSTEPが無いため、代わりに
+                        9STEP進捗サマリー（上部）と同一の文言「✓ すべてのSTEPが完了して
+                        います」を表示し、矛盾のない表現にする */}
                     <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
                       <p className="text-[11px] font-bold text-tanei-ink-muted mb-1">このSTEPのゴール</p>
                       <p className="text-[11px] text-tanei-ink-muted leading-relaxed">
@@ -962,14 +966,21 @@ export default function CadBuildGuide({
                       {isDone ? (
                         <>
                           <p className="text-[11px] font-bold text-tanei-brand mt-1">✓ このSTEPは完了しています</p>
-                          {step.stepNumber < steps.length && (
-                            <button
-                              type="button"
-                              onClick={() => goToBuildStep(step.stepNumber + 1)}
-                              className="mt-1 text-[11px] font-bold text-tanei-brand hover:text-tanei-brand-dark underline"
-                            >
-                              次のSTEPへ進みましょう →
-                            </button>
+                          {step.stepNumber < steps.length ? (
+                            <>
+                              <p className="text-[11px] text-tanei-ink-muted mt-1">
+                                次は STEP {step.stepNumber + 1}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => goToBuildStep(step.stepNumber + 1)}
+                                className="mt-1 text-[11px] font-bold text-tanei-brand border border-tanei-brand/40 hover:bg-tanei-brand-soft hover:border-tanei-brand rounded-full px-2.5 py-1 transition-colors"
+                              >
+                                次のSTEPへ →
+                              </button>
+                            </>
+                          ) : (
+                            <p className="text-[11px] font-bold text-tanei-brand mt-1">✓ すべてのSTEPが完了しています</p>
                           )}
                         </>
                       ) : (
