@@ -177,6 +177,15 @@ export default function CadBuildGuide({
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  // 「作り方」STEPの前後ナビゲーション（Phase 3-29）。新しいSTEPデータ構造は作らず、
+  // 既存のstepNumberとscrollToSection（Phase 3-8と全く同じscrollIntoViewだけの仕組み）を
+  // 再利用するだけ。移動先のSTEPを開いた状態にして分かりやすくするが、buildChecklist・
+  // cutListChecked・currentBuildStepNumberの判定ロジックには一切触れない
+  const goToBuildStep = (stepNumber: number) => {
+    setExpandedStepNumber(stepNumber);
+    scrollToSection(`cad-build-step-${stepNumber}`);
+  };
+
   return (
     <div className="flex flex-col gap-4 border-t border-tanei-border pt-4">
       <div>
@@ -488,7 +497,8 @@ export default function CadBuildGuide({
             return (
               <li
                 key={step.stepNumber}
-                className={`rounded-tanei-control border overflow-hidden transition-colors ${
+                id={`cad-build-step-${step.stepNumber}`}
+                className={`rounded-tanei-control border overflow-hidden transition-colors scroll-mt-4 ${
                   isCurrent
                     ? 'bg-white border-tanei-accent ring-2 ring-tanei-accent/60 shadow-sm'
                     : isDone
@@ -593,6 +603,36 @@ export default function CadBuildGuide({
                         )}
                       </div>
                     )}
+                    {/* STEP間の前後ナビゲーション（Phase 3-29）。新しいSTEPデータは作らず、
+                        既存のstepNumberとgoToBuildStep（scrollToSectionの再利用）だけで移動する。
+                        buildChecklist・cutListCheckedへの書き込みは一切発生しない */}
+                    <div className="mt-2.5 pt-2.5 border-t border-tanei-border flex items-center justify-between gap-2">
+                      {step.stepNumber > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => goToBuildStep(step.stepNumber - 1)}
+                          className="text-[11px] font-bold text-tanei-brand hover:text-tanei-brand-dark"
+                        >
+                          ← STEP {step.stepNumber - 1}
+                        </button>
+                      ) : (
+                        <span />
+                      )}
+                      <span className="text-[11px] text-tanei-ink-muted">
+                        STEP {step.stepNumber} / {steps.length}
+                      </span>
+                      {step.stepNumber < steps.length ? (
+                        <button
+                          type="button"
+                          onClick={() => goToBuildStep(step.stepNumber + 1)}
+                          className="text-[11px] font-bold text-tanei-brand hover:text-tanei-brand-dark"
+                        >
+                          STEP {step.stepNumber + 1} →
+                        </button>
+                      ) : (
+                        <span />
+                      )}
+                    </div>
                   </div>
                 )}
               </li>
