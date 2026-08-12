@@ -570,24 +570,27 @@ export default function CadBuildGuide({
                     {isChecklistRelationStep && (
                       <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
                         <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">制作チェック</p>
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          {relatedChecklistDoneCount === relatedChecklistTotal ? (
-                            <span className="text-[11px] font-bold text-tanei-brand">✓ 制作チェック済み</span>
-                          ) : relatedChecklistDoneCount === 0 ? (
-                            <span className="text-[11px] font-bold text-tanei-ink-muted">制作チェック：未完了</span>
-                          ) : (
-                            <span className="text-[11px] font-bold text-tanei-ink-muted">
-                              制作チェック：一部完了（{relatedChecklistDoneCount}/{relatedChecklistTotal}）
-                            </span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={onViewBuildCheck}
-                            className="text-[11px] font-bold text-tanei-brand hover:text-tanei-brand-dark underline"
-                          >
-                            制作チェックを見る
-                          </button>
-                        </div>
+                        {relatedChecklistDoneCount === relatedChecklistTotal ? (
+                          // 完了しているチェック項目がもう無いため、誘導ボタンは表示しない（Phase 3-28）
+                          <span className="text-[11px] font-bold text-tanei-brand">✓ 制作チェック済み</span>
+                        ) : (
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            {relatedChecklistDoneCount === 0 ? (
+                              <span className="text-[11px] font-bold text-tanei-ink-muted">制作チェック：未完了</span>
+                            ) : (
+                              <span className="text-[11px] font-bold text-tanei-ink-muted">
+                                制作チェック：一部完了（{relatedChecklistDoneCount}/{relatedChecklistTotal}）
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={onViewBuildCheck}
+                              className="flex-shrink-0 text-[11px] font-bold text-tanei-brand border border-tanei-brand/40 hover:bg-tanei-brand-soft hover:border-tanei-brand rounded-full px-2.5 py-1 transition-colors"
+                            >
+                              制作チェックを見る →
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
