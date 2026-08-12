@@ -1038,6 +1038,56 @@ export default function SavedItemsModal({
                   元の設計を開く
                 </Link>
               )}
+
+              {/* 再制作導線（Phase 3-20）。元設計を直接上書きせず、既存のPhase 3-14複製処理
+                  （handleDuplicateProject・duplicateConfirmId、cadProjectカードの「設計を複製」
+                  と全く同じもの）をそのまま再利用する。新しい複製ロジックは作らない */}
+              {viewingRelatedCadItem ? (
+                <div className="border-t border-tanei-border pt-3">
+                  <p className="text-[11px] font-bold text-tanei-ink-muted mb-1">再制作</p>
+                  {duplicateConfirmId === viewingRelatedCadItem.id ? (
+                    <div className="flex flex-col gap-2">
+                      <p className="text-xs text-tanei-ink-muted">この設計を複製しますか？元の設計はそのまま残ります。</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setDuplicateConfirmId(null)}
+                          disabled={isDuplicating}
+                          className="text-xs font-bold px-3 py-1.5 rounded-tanei-control bg-white border border-tanei-border text-tanei-ink-muted hover:bg-tanei-surface-muted disabled:opacity-50"
+                        >
+                          キャンセル
+                        </button>
+                        <button
+                          onClick={() => handleDuplicateProject(viewingRelatedCadItem)}
+                          disabled={isDuplicating}
+                          className="text-xs font-bold px-3 py-1.5 rounded-tanei-control bg-tanei-brand text-white hover:bg-tanei-brand-dark disabled:opacity-50"
+                        >
+                          {isDuplicating ? '複製中…' : '設計を複製'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-xs text-tanei-ink-muted mb-1.5">
+                        この家具をもう一度作りたい場合は、元の設計を複製して新しい設計として作り直せます。
+                      </p>
+                      <button
+                        onClick={() => setDuplicateConfirmId(viewingRelatedCadItem.id)}
+                        className="self-start text-sm font-bold px-4 py-2 rounded-tanei-control bg-white border border-tanei-border text-tanei-ink hover:bg-tanei-surface-muted transition-colors"
+                      >
+                        🔁 この家具をもう一度作る
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : viewingFinishedItem.relatedProjectId ? (
+                <p className="text-xs text-tanei-ink-muted border-t border-tanei-border pt-3">
+                  この家具の元の設計は削除されています
+                </p>
+              ) : (
+                <p className="text-xs text-tanei-ink-muted border-t border-tanei-border pt-3">
+                  この作品には元の設計が保存されていません
+                </p>
+              )}
             </div>
           </div>
         </div>
