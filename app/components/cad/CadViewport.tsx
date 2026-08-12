@@ -86,7 +86,10 @@ export default function CadViewport({ model, className, selectedPanelId, onSelec
     if (!controls) return;
     const [cx, cy, cz] = center;
     if (mode === 'front') {
-      controls.object.position.set(cx, cy, cz + distance);
+      // モデルのZ座標は奥行方向（tanei-studio座標系のy）に対応し、Z=0側が手前＝正面、
+      // Zが大きいほど背板側＝背面になる（PanelMeshのposition変換を参照）。
+      // カメラを正面側（Zが小さい側）に置いてモデル中心を見ることで、正しく正面が映る
+      controls.object.position.set(cx, cy, cz - distance);
     } else {
       controls.object.position.set(cx + distance, cy + distance * 0.8, cz + distance);
     }
