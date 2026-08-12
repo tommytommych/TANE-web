@@ -476,6 +476,19 @@ export function getNextBuildStep(buildChecklist: Record<string, boolean> | undef
   return { stepNumber: index + 1, label: BUILD_CHECKLIST_STEPS[index] };
 }
 
+export type BuildProgressStatus = 'not_started' | 'building' | 'completed';
+
+/** マイページの保存済み設計一覧を進捗で絞り込む（Phase 3-17）ための3段階判定。
+ * buildChecklistだけを見る純粋関数で、design/materialに依存しない（木取り計算が
+ * 失敗するような壊れた保存データでも安全に呼び出せる）。buildChecklistが無い旧データ・
+ * 空・未知のキーが混ざっている場合もクラッシュせず「未着手」側に倒れる */
+export function getBuildProgressStatus(buildChecklist: Record<string, boolean> | undefined): BuildProgressStatus {
+  const doneCount = Object.values(buildChecklist ?? {}).filter(Boolean).length;
+  if (doneCount >= BUILD_CHECKLIST_TOTAL_STEPS) return 'completed';
+  if (doneCount > 0) return 'building';
+  return 'not_started';
+}
+
 export function computeFurnitureProjectProgress(
   design: FurnitureDesign,
   material: string,

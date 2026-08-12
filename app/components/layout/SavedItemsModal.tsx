@@ -11,7 +11,7 @@ import {
   formatUpdatedAtForDisplay,
   type SavedFurnitureProject,
 } from '../../lib/cad/projectStore';
-import { computeFurnitureProjectProgress } from '../../lib/cad/model';
+import { computeFurnitureProjectProgress, getBuildProgressStatus, type BuildProgressStatus } from '../../lib/cad/model';
 
 interface SavedItemsModalProps {
   activeModal: SavedItemType | null;
@@ -58,6 +58,14 @@ const MANUAL_ADD_TYPES: SavedItemType[] = ['image', 'finished'];
 // 上限が無いが、一覧UIが崩れないようにこの機能でのみ適用する
 const PROJECT_NAME_MAX_LENGTH = 60;
 
+// 「制作進捗で絞り込む」（Phase 3-17）の選択肢。値はgetBuildProgressStatusの戻り値と一致させる
+const PROGRESS_FILTER_OPTIONS: { value: BuildProgressStatus | 'all'; label: string }[] = [
+  { value: 'all', label: 'すべて' },
+  { value: 'not_started', label: '未着手' },
+  { value: 'building', label: '制作中' },
+  { value: 'completed', label: '制作完了' },
+];
+
 export default function SavedItemsModal({
   activeModal,
   savedItems,
@@ -88,6 +96,9 @@ export default function SavedItemsModal({
   // 「設計を検索」の検索文字列（Phase 3-16）。どこにも保存せず、画面表示の絞り込みだけに
   // 使う純粋なローカルstate
   const [searchQuery, setSearchQuery] = useState('');
+  // 「制作進捗で絞り込む」（Phase 3-17）。同じく画面表示の絞り込みだけに使い、
+  // SavedFurnitureProjectはもちろんどこにも保存しない
+  const [progressFilter, setProgressFilter] = useState<BuildProgressStatus | 'all'>('all');
   const [prevActiveModal, setPrevActiveModal] = useState(activeModal);
   if (activeModal !== prevActiveModal) {
     // モーダルの表示対象が切り替わったら、削除確認状態を持ち越さないようにリセットする
@@ -97,6 +108,7 @@ export default function SavedItemsModal({
     setDuplicateConfirmId(null);
     setRenamingProjectId(null);
     setSearchQuery('');
+    setProgressFilter('all');
   }
 
   const [isAdding, setIsAdding] = useState(false);
@@ -145,14 +157,22 @@ export default function SavedItemsModal({
   const items = savedItems.filter((item) => item.type === activeModal);
   const canManuallyAdd = MANUAL_ADD_TYPES.includes(activeModal);
 
-  // 「設計を検索」（Phase 3-16）。検索対象はSavedFurnitureProject.projectNameだが、
-  // 既存の保存・複製・名前変更処理は必ずitem.titleをprojectNameと同じ値に保っているため、
-  // item.title（常にstring）をそのままfilterするだけで安全に実現できる（不正な形式の
-  // 保存データでも、titleフィールド自体は既存のSavedItem型でstring必須のためクラッシュしない）
+  // 「設計を検索」（Phase 3-16）＋「制作進捗で絞り込む」（Phase 3-17）。検索対象は
+  // SavedFurnitureProject.projectNameだが、既存の保存・複製・名前変更処理は必ず
+  // item.titleをprojectNameと同じ値に保っているため、item.title（常にstring）を
+  // そのままfilterするだけで安全に実現できる（不正な形式の保存データでも、titleフィールド
+  // 自体は既存のSavedItem型でstring必須のためクラッシュしない）。両条件はAND。
+  // 進捗判定はbuildChecklistだけを見る既存の純粋関数getBuildProgressStatusを再利用し、
+  // ここで新しい判定ロジックを重複して書かない
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-  const filteredCadProjectItems = normalizedSearchQuery
-    ? items.filter((item) => item.title.toLowerCase().includes(normalizedSearchQuery))
-    : items;
+  const filteredCadProjectItems = items.filter((item) => {
+    if (normalizedSearchQuery && !item.title.toLowerCase().includes(normalizedSearchQuery)) return false;
+    if (progressFilter !== 'all') {
+      const project = parseSavedItem(item);
+      if (getBuildProgressStatus(project?.buildChecklist) !== progressFilter) return false;
+    }
+    return true;
+  });
 
   const startEdit = (item: SavedItem) => {
     setEditingId(item.id);
@@ -339,19 +359,44 @@ export default function SavedItemsModal({
           )}
 
           {activeModal === 'cadProject' && items.length > 0 && (
-            <div>
-              <label htmlFor="cad-project-search" className="text-xs font-bold text-tanei-ink-muted mb-1 block">
-                🔍 設計を検索
-              </label>
-              <input
-                id="cad-project-search"
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="設計名を検索…"
-                aria-label="設計を検索"
-                className="w-full border border-tanei-border rounded-tanei-control px-3 py-2 text-sm"
-              />
+            <div className="flex flex-col gap-2">
+              <div>
+                <label htmlFor="cad-project-search" className="text-xs font-bold text-tanei-ink-muted mb-1 block">
+                  🔍 設計を検索
+                </label>
+                <input
+                  id="cad-project-search"
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="設計名を検索…"
+                  aria-label="設計を検索"
+                  className="w-full border border-tanei-border rounded-tanei-control px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div>
+                <p className="text-xs font-bold text-tanei-ink-muted mb-1">制作進捗で絞り込む</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {PROGRESS_FILTER_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setProgressFilter(opt.value)}
+                      aria-pressed={progressFilter === opt.value}
+                      className={`text-xs font-bold px-3 py-1.5 rounded-tanei-control border transition-colors ${
+                        progressFilter === opt.value
+                          ? 'bg-tanei-brand text-white border-tanei-brand'
+                          : 'bg-white text-tanei-ink-muted border-tanei-border hover:bg-tanei-surface-muted'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <p className="text-xs text-tanei-ink-muted">保存した設計　{filteredCadProjectItems.length}件</p>
             </div>
           )}
 
@@ -369,6 +414,10 @@ export default function SavedItemsModal({
                 const progress = project
                   ? computeFurnitureProjectProgress(project.design, project.material, project.cutListChecked, project.buildChecklist)
                   : null;
+                // 制作進捗フィルター（Phase 3-17）と同じ判定をカード側にも表示する。
+                // 「✓ 制作完了」は既に下のprogressブロックで表示されるため、そちらとの
+                // 重複を避け、未着手・制作中の場合だけバッジを出す
+                const buildStatus = getBuildProgressStatus(project?.buildChecklist);
                 const hasStarted = progress ? progress.cutListDone > 0 || progress.buildDone > 0 : false;
                 const overallDone = progress ? progress.cutListDone + progress.buildDone : 0;
                 const overallTotal = progress ? progress.cutListTotal + progress.buildTotal : 0;
@@ -414,6 +463,17 @@ export default function SavedItemsModal({
                       ) : (
                         <div className="flex items-center gap-2 flex-wrap">
                           <div className="text-sm font-bold text-tanei-ink break-words">{item.title}</div>
+                          {buildStatus !== 'completed' && (
+                            <span
+                              className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                                buildStatus === 'building'
+                                  ? 'bg-tanei-accent/10 text-tanei-accent'
+                                  : 'bg-tanei-surface-muted text-tanei-ink-muted'
+                              }`}
+                            >
+                              {buildStatus === 'building' ? '制作中' : '未着手'}
+                            </span>
+                          )}
                           <button
                             onClick={() => {
                               setRenamingProjectId(item.id);
