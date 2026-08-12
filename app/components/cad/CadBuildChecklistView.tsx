@@ -9,7 +9,20 @@
 // 渡しながら遷移するリンクを追加する。CAD側に新しい保存の仕組みは一切作らない。
 
 import Link from 'next/link';
-import { BUILD_CHECKLIST_STEPS, getNextBuildStep } from '../../lib/cad/model';
+import {
+  BUILD_CHECKLIST_STEPS,
+  FURNITURE_BUILD_TOOLS,
+  calculateMaterialCostEstimate,
+  furnitureModelToSheetLayout,
+  getNextBuildStep,
+} from '../../lib/cad/model';
+import { packSheetLayout } from '../../lib/sheetLayout';
+import type { FurnitureModel } from '../../lib/cad/types';
+
+// 「約1,200円〜」のような下限のみの表記と「約300〜500円」のような範囲表記の両方に対応する。
+// CadBuildGuide.tsxの同名関数と全く同じ表記ルール（値だけの再利用、importはしない）
+const formatYenRange = (low: number, high: number | null): string =>
+  high !== null ? `約${low.toLocaleString()}〜${high.toLocaleString()}円` : `約${low.toLocaleString()}円〜`;
 
 // 制作画面（CadCutlistView.tsx／CadBuildGuide.tsx）内の各セクションと同じid文字列。
 // コンポーネントをまたいだimportで結合を強めるのではなく、既存のfreecad-integration/
@@ -72,6 +85,11 @@ interface CadBuildChecklistViewProps {
    * 設計の場合はnull。完成作品として保存する際、元の設計へ戻れるようにするための
    * 関連付けに使うだけで、それ以外の用途では一切使わない（Phase 3-14） */
   projectId: string | null;
+  /** 「制作前チェック」（Phase 3-24）用。CadCutlistView/CadBuildGuideと全く同じ
+   * FurnitureModel・材料名を受け取り、木取り枚数・材料費目安をその場で再計算するだけに使う。
+   * Panel[]や木取り計算そのものは一切変更しない */
+  model: FurnitureModel;
+  material: string;
 }
 
 export default function CadBuildChecklistView({
@@ -82,8 +100,24 @@ export default function CadBuildChecklistView({
   projectName,
   onConfirmSection,
   projectId,
+  model,
+  material,
 }: CadBuildChecklistViewProps) {
   const doneCount = BUILD_CHECKLIST_STEPS.filter((_, i) => checked[String(i + 1)]).length;
+
+  // 「制作前チェック」（Phase 3-24）。CadCutlistView.tsx／CadBuildGuide.tsxと全く同じ
+  // furnitureModelToSheetLayout→packSheetLayoutの手順で、その場で必要枚数を再計算するだけ。
+  // 新しい木取り計算・新しい保存は行わない。巨大サイズ等で木取り不能な場合はsheetLayoutが
+  // nullになり、必要枚数・材料費は「木取り不可のため表示できません」に切り替わる
+  const shoppingSheetLayout = furnitureModelToSheetLayout(model);
+  const shoppingSheets = shoppingSheetLayout ? packSheetLayout(shoppingSheetLayout) : [];
+  const shoppingSheetCount = shoppingSheets.length;
+  const shoppingCostEstimate =
+    shoppingSheetLayout && shoppingSheetCount > 0
+      ? calculateMaterialCostEstimate(material, shoppingSheetCount)
+      : null;
+  const canPack = Boolean(shoppingSheetLayout) && shoppingSheetCount > 0;
+
   // 既存のbuildChecklistから、その場で「最初の未完了項目」を計算するだけ。
   // 新しい進捗データは作らない（保存もしない）。CadBuildGuide.tsx（Phase 3-5）と
   // 完全に同じ関数を使うことで、進捗表示が食い違わないようにしている
@@ -120,6 +154,65 @@ export default function CadBuildChecklistView({
           <p className="text-xs text-tanei-ink-muted mt-0.5">
             今どこまで進んだかを確認しながら、順番に作業を進めましょう。
           </p>
+        </div>
+
+        {/* 制作前チェック（Phase 3-24）。作り始める前に「何を買うか・何枚必要か・
+            どんな工具が必要か」を一目で確認できるようにするための表示専用カード。
+            design・material・sheetLayout・calculateMaterialCostEstimate・
+            FURNITURE_BUILD_TOOLSなど既存データから毎回その場で組み立てるだけで、
+            新しい保存・新しいチェック状態は一切持たない */}
+        <div className="rounded-tanei-control border border-tanei-border bg-tanei-surface px-4 py-3 flex flex-col gap-2">
+          <p className="text-xs font-bold text-tanei-ink-muted">🔎 制作前チェック</p>
+          <p className="text-[11px] text-tanei-ink-muted -mt-1">作り始める前に、ここだけ確認しましょう。</p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+            <p className="text-tanei-ink">
+              材料：<span className="font-bold">{material}</span>
+            </p>
+            <p className="text-tanei-ink">
+              必要枚数：
+              <span className="font-bold">{canPack ? `${shoppingSheetCount}枚` : '木取り不可のため表示できません'}</span>
+            </p>
+            <p className="text-tanei-ink sm:col-span-2">
+              材料費の目安：
+              <span className="font-bold">
+                {!canPack
+                  ? '木取り不可のため表示できません'
+                  : shoppingCostEstimate
+                    ? formatYenRange(shoppingCostEstimate.totalLow, shoppingCostEstimate.totalHigh)
+                    : '参考価格データなし'}
+              </span>
+            </p>
+          </div>
+
+          <div>
+            <p className="text-sm text-tanei-ink">必要な工具：</p>
+            <p className="text-xs text-tanei-ink-muted mt-0.5">{FURNITURE_BUILD_TOOLS.join('・')}</p>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            <button
+              type="button"
+              onClick={() => onConfirmSection({ viewMode: 'cutlist', anchorId: SHOPPING_LIST_ANCHOR_ID })}
+              className="text-xs font-bold text-white bg-tanei-brand px-3 py-1.5 rounded-tanei-control hover:bg-tanei-brand-dark transition-colors"
+            >
+              🛒 買い物リストを見る
+            </button>
+            <button
+              type="button"
+              onClick={() => onConfirmSection({ viewMode: 'cutlist', anchorId: CUT_LAYOUT_ANCHOR_ID })}
+              className="text-xs font-bold text-tanei-ink bg-white border border-tanei-border px-3 py-1.5 rounded-tanei-control hover:bg-tanei-brand-soft hover:border-tanei-brand transition-colors"
+            >
+              木取り図を確認する
+            </button>
+            <button
+              type="button"
+              onClick={() => onConfirmSection({ viewMode: 'cutMaterials' })}
+              className="text-xs font-bold text-tanei-ink bg-white border border-tanei-border px-3 py-1.5 rounded-tanei-control hover:bg-tanei-brand-soft hover:border-tanei-brand transition-colors"
+            >
+              カットリストを確認する
+            </button>
+          </div>
         </div>
 
         {isAllComplete ? (

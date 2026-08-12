@@ -312,6 +312,8 @@ export default function CadStudio({ initialDesign }: CadStudioProps) {
         }}
         onConfirmSection={handleConfirmChecklistSection}
         projectId={projectId}
+        model={lastValidModel}
+        material={material}
       />
     );
   }
