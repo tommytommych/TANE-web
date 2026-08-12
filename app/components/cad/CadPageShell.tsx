@@ -126,9 +126,6 @@ export default function CadPageShell() {
           ← チャットに戻る
         </Link>
         <span className="text-sm font-black text-tanei-brand truncate">🌱 TANE:i ブラウザCAD</span>
-        <span className="text-[10px] font-bold text-tanei-accent bg-tanei-accent/10 px-1.5 py-0.5 rounded-full flex-shrink-0">
-          試験提供中
-        </span>
       </div>
 
       {/* Phase 4-10：AI提案から到達した場合だけ表示する軽量な確認表示。通常の新規CAD・
