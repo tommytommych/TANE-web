@@ -10,7 +10,12 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import CadStudio from './CadStudio';
 import type { FurnitureDesign } from '../../lib/cad/types';
-import { CAD_INITIAL_DESIGN_SESSION_KEY, isValidStudioSpec, studioSpecToFurnitureDesign } from '../../lib/studioSpec';
+import {
+  CAD_INITIAL_DESIGN_SESSION_KEY,
+  isSafeStudioSpecDimensions,
+  isValidStudioSpec,
+  studioSpecToFurnitureDesign,
+} from '../../lib/studioSpec';
 
 export default function CadPageShell() {
   // AIチャットの「🌿 ブラウザCADで設計する」（CompletionCards.tsx）からの遷移時のみ、
@@ -34,7 +39,12 @@ export default function CadPageShell() {
       // （不正なJSONでパースが例外を投げても、キーが残り続けて無限に再利用されることを防ぐ）
       sessionStorage.removeItem(CAD_INITIAL_DESIGN_SESSION_KEY);
       const parsed: unknown = JSON.parse(raw);
-      if (isValidStudioSpec(parsed)) {
+      // isValidStudioSpecは型（number/string）だけの検証のため、0以下・NaN・
+      // heightが板厚の2倍以下といった値も通過してしまう。そのような値は既存の
+      // パネル生成（app/lib/cad/geometry.ts、変更していない）が例外を投げ、
+      // CadStudio.tsx側の保護されていない初期化処理でページ全体がクラッシュする
+      // （Phase 4-08監査で発見）ため、isSafeStudioSpecDimensionsで追加確認する
+      if (isValidStudioSpec(parsed) && isSafeStudioSpecDimensions(parsed)) {
         // sessionStorage（外部システム）から読み取った値をReact stateへ同期するだけの
         // 呼び出しのため、既存のapp/app/page.tsxと同様に明示的に抑制する
         // eslint-disable-next-line react-hooks/set-state-in-effect

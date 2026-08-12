@@ -69,6 +69,26 @@ export const studioSpecToSheetLayout = (spec: StudioSpec): SheetLayout => {
   };
 };
 
+// StudioSpecの寸法が、ブラウザCADの初期設計として安全に使える正の数値かどうかを確認する
+// （Phase 4-08監査で発見：isValidStudioSpec()は型（number/string）だけを見ており符号までは
+// 検証していないため、AIの出力や壊れたsessionStorageの値にwidth/depth/height/thicknessが
+// 0以下・NaN・heightが板厚の2倍以下といった値が含まれていると、既存のパネル生成
+// （app/lib/cad/geometry.tsのbuildDefaultFurniturePanels、変更していない）が例外を投げ、
+// 通常のフォーム入力では既存のtry/catchで守られている一方、CadStudio.tsxのuseState初期値
+// （lastValidModel、変更禁止のため触れない）は保護されておらずページ全体がクラッシュして
+// いた。studioSpecToFurnitureDesign()へ渡す前に、この関数で安全性を確認する
+export const isSafeStudioSpecDimensions = (spec: StudioSpec): boolean => {
+  const isPositiveFinite = (n: number) => Number.isFinite(n) && n > 0;
+  const thickness = spec.thickness ?? DEFAULT_THICKNESS_MM;
+  return (
+    isPositiveFinite(spec.width) &&
+    isPositiveFinite(spec.depth) &&
+    isPositiveFinite(spec.height) &&
+    isPositiveFinite(thickness) &&
+    spec.height > thickness * 2
+  );
+};
+
 // AIチャット（「🌿 ブラウザCADで設計する」、CompletionCards.tsx）からTANE:iブラウザCAD
 // （/app/cad、CadPageShell.tsx）へ、確定仕様を一時的に受け渡すためのsessionStorageキー
 // （Phase 4-07）。localStorage・IndexedDB・URL query parameterはいずれも使わず、
