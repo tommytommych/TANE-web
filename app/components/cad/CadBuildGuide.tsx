@@ -125,6 +125,11 @@ export default function CadBuildGuide({
   const currentBuildStepNumber = buildDoneCount < steps.length ? buildDoneCount + 1 : null;
   const isBuildStepDone = (stepNumber: number) => stepNumber <= buildDoneCount;
 
+  // 「作り方の進捗」サマリー（Phase 3-34）。新しい保存データは作らず、既存の
+  // isBuildStepDone・steps.lengthから毎回算出するだけ
+  const completedStepCount = Math.min(buildDoneCount, steps.length);
+  const stepProgressPercent = Math.round((completedStepCount / steps.length) * 100);
+
   // 「作り方」と制作チェックの関連表示（Phase 3-26）。既存のCONFIRM_TARGETS
   // （CadBuildChecklistView.tsx、Phase 3-10）では、チェック項目6「組み立て位置を確認した」〜
   // 9「ガタつきを確認した」の4件が、個別のステップ番号にではなく、まとめて「作り方を見る」
@@ -486,6 +491,56 @@ export default function CadBuildGuide({
 
       <div>
         <h3 id={BUILD_STEPS_ANCHOR_ID} className="text-sm font-bold text-tanei-ink mb-2 scroll-mt-4">作り方</h3>
+
+        {/* 「作り方の進捗」サマリー（Phase 3-34）。既存のisBuildStepDone・
+            currentBuildStepNumberから毎回算出するだけの表示・ナビゲーション専用ブロック。
+            新しい保存データ・新しいSTEP↔チェック項目対応表は一切作らない */}
+        <div id="cad-build-steps-progress" className="rounded-tanei-control border border-tanei-border bg-white p-3 mb-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-bold text-tanei-ink-muted">作り方の進捗</span>
+            <span className="text-sm font-black text-tanei-brand">
+              {completedStepCount === steps.length && '✓ '}
+              {completedStepCount} / {steps.length} STEP完了
+            </span>
+          </div>
+          <div className="w-full bg-tanei-border h-2 rounded-full overflow-hidden mt-1.5">
+            <div
+              className="bg-tanei-brand h-full transition-all duration-300"
+              style={{ width: `${stepProgressPercent}%` }}
+            />
+          </div>
+          {currentBuildStepNumber ? (
+            <p className="text-xs text-tanei-ink mt-1.5">
+              現在：<span className="font-bold">STEP {currentBuildStepNumber}</span>
+            </p>
+          ) : (
+            <p className="text-xs font-bold text-tanei-brand mt-1.5">✓ すべてのSTEPが完了しています</p>
+          )}
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {steps.map((step) => {
+              const isNavStepDone = isBuildStepDone(step.stepNumber);
+              const isNavStepCurrent = !isNavStepDone && step.stepNumber === currentBuildStepNumber;
+              return (
+                <button
+                  key={step.stepNumber}
+                  type="button"
+                  onClick={() => goToBuildStep(step.stepNumber)}
+                  aria-label={`STEP ${step.stepNumber}${isNavStepDone ? '（完了）' : isNavStepCurrent ? '（現在の作業）' : ''}`}
+                  className={`w-7 h-7 flex-shrink-0 rounded-full border text-xs font-black flex items-center justify-center transition-colors ${
+                    isNavStepCurrent
+                      ? 'bg-white border-tanei-accent ring-2 ring-tanei-accent/60 text-tanei-accent'
+                      : isNavStepDone
+                        ? 'bg-tanei-brand border-tanei-brand text-white'
+                        : 'bg-tanei-surface border-tanei-border text-tanei-ink-muted hover:border-tanei-brand'
+                  }`}
+                >
+                  {isNavStepDone ? '✓' : step.stepNumber}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <ol className="flex flex-col gap-2">
           {steps.map((step) => {
             const isExpanded = expandedStepNumber === step.stepNumber;
