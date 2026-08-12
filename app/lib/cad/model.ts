@@ -378,8 +378,10 @@ export function buildFurnitureSteps(panels: FurniturePanel[]): FurnitureBuildSte
 export const FURNITURE_BUILD_TOOLS: string[] = DEMO_ASSEMBLY_MANUAL.tools;
 
 /** カットリストで使う、パーツの種類ごとの初心者向け名称。既存のFurniturePanelKindを
- * そのまま使い、新しいパーツ分類は作らない（左右の側板は同じ「側板」としてまとめて表示） */
-const CUT_LIST_KIND_NAME: Partial<Record<FurniturePanelKind, string>> = {
+ * そのまま使い、新しいパーツ分類は作らない（左右の側板は同じ「側板」としてまとめて表示）。
+ * 「作り方」の各ステップから「使用するパーツ」を特定する際（Phase 3-26）も、この既存の
+ * 名称対応表を唯一の情報源として再利用する（'custom'は対応する名称がないため対象外になる） */
+export const CUT_LIST_KIND_NAME: Partial<Record<FurniturePanelKind, string>> = {
   top: '天板',
   bottom: '底板',
   left: '側板',

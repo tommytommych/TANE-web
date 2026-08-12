@@ -6,10 +6,11 @@
 // 家具構造（背板・棚板・脚の有無）から機械的に判断できる範囲だけを文面に反映する。
 
 import { useState } from 'react';
-import type { FurnitureModel } from '../../lib/cad/types';
+import type { FurnitureModel, FurniturePanel } from '../../lib/cad/types';
 import type { SheetLayout } from '../../lib/sheetLayout';
 import {
   BUILD_CHECKLIST_STEPS,
+  CUT_LIST_KIND_NAME,
   FURNITURE_BUILD_TOOLS,
   buildFurnitureSteps,
   calculateMaterialCostEstimate,
@@ -17,6 +18,42 @@ import {
   getNextBuildStep,
 } from '../../lib/cad/model';
 import { AMAZON_TOOLS } from '../../lib/constants';
+
+/** 「作り方」の各ステップから「使用するパーツ」を特定する（Phase 3-26）。
+ * AIによる推測は行わず、既存のCUT_LIST_KIND_NAME（カットリストと共通の名称対応表）に
+ * 載っている部材名が、そのステップのdescription文にそのまま登場する場合だけを対象にする
+ * （'custom'種類のパーツは対応する名称が無いため、常に対象外＝安全側に倒れる）。
+ * サイズの求め方も既存のbuildCutListItems()と全く同じ「3辺をソートして幅・奥行・厚みとする」
+ * 方式を再利用し、新しい寸法計算は行わない */
+interface StepPartGroup {
+  key: string;
+  name: string;
+  count: number;
+  widthMm: number;
+  heightMm: number;
+  thicknessMm: number;
+  representativePanelId: string;
+}
+
+function findStepPartGroups(panels: FurniturePanel[], description: string): StepPartGroup[] {
+  const groups = new Map<string, StepPartGroup>();
+  panels.forEach((panel) => {
+    const name = CUT_LIST_KIND_NAME[panel.kind];
+    if (!name || !description.includes(name)) return;
+    const dims = [panel.size.x, panel.size.y, panel.size.z].sort((a, b) => a - b);
+    const thicknessMm = Math.round(dims[0]);
+    const heightMm = Math.round(dims[1]);
+    const widthMm = Math.round(dims[2]);
+    const key = `${name}__${widthMm}x${heightMm}x${thicknessMm}`;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      groups.set(key, { key, name, count: 1, widthMm, heightMm, thicknessMm, representativePanelId: panel.id });
+    }
+  });
+  return Array.from(groups.values());
+}
 
 // 「約1,200円〜」のような下限のみの表記と「約300〜500円」のような範囲表記の両方に対応する
 const formatYenRange = (low: number, high: number | null): string =>
@@ -426,6 +463,7 @@ export default function CadBuildGuide({
             const isDone = isBuildStepDone(step.stepNumber);
             const isCurrent = !isDone && step.stepNumber === currentBuildStepNumber;
             const panelId = `cad-build-step-panel-${step.stepNumber}`;
+            const partGroups = findStepPartGroups(model.panels, step.description);
             return (
               <li
                 key={step.stepNumber}
@@ -470,6 +508,38 @@ export default function CadBuildGuide({
                     <p className="text-xs text-tanei-ink-muted leading-relaxed break-words border-l-2 border-tanei-border pl-3 py-0.5">
                       {step.description}
                     </p>
+                    {partGroups.length > 0 && (
+                      <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
+                        <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">使用するパーツ</p>
+                        <ul className="flex flex-col gap-1.5">
+                          {partGroups.map((group) => (
+                            <li
+                              key={group.key}
+                              className="flex items-center justify-between gap-2 bg-tanei-surface rounded-tanei-control px-2.5 py-2"
+                            >
+                              <span className="text-xs text-tanei-ink min-w-0">
+                                <span className="font-bold">
+                                  {group.name}
+                                  {group.count > 1 && (
+                                    <span className="text-tanei-ink-muted font-normal"> × {group.count}</span>
+                                  )}
+                                </span>
+                                <span className="block text-tanei-ink-muted mt-0.5">
+                                  サイズ：{group.widthMm} × {group.heightMm} × {group.thicknessMm} mm
+                                </span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => onViewPanel(group.representativePanelId)}
+                                className="flex-shrink-0 text-[11px] font-bold text-tanei-brand border border-tanei-brand/40 hover:bg-tanei-brand-soft hover:border-tanei-brand rounded-full px-2.5 py-1 transition-colors"
+                              >
+                                👁 このパーツを見る
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 )}
               </li>
