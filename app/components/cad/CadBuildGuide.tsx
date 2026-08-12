@@ -584,10 +584,10 @@ export default function CadBuildGuide({
                       onClick={() => goToBuildStep(step.stepNumber)}
                       className={`w-full flex flex-col gap-0.5 rounded-tanei-control border px-2.5 py-1.5 text-left transition-colors ${
                         isListStepCurrent
-                          ? 'bg-white border-tanei-accent'
+                          ? 'bg-white border-tanei-accent ring-2 ring-tanei-accent/60 shadow-sm'
                           : isListStepDone
                             ? 'bg-tanei-surface-muted border-tanei-border'
-                            : 'bg-white border-tanei-border hover:border-tanei-brand'
+                            : 'bg-white border-tanei-border hover:border-tanei-brand hover:bg-tanei-brand-soft'
                       }`}
                     >
                       <span className="flex items-center gap-2">
