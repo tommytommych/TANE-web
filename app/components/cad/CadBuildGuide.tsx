@@ -516,6 +516,23 @@ export default function CadBuildGuide({
           ) : (
             <p className="text-xs font-bold text-tanei-brand mt-1.5">✓ すべてのSTEPが完了しています</p>
           )}
+          {/* 「次にやるSTEP」（Phase 3-35）。新しいSTEP判定は作らず、「現在：STEP N」・
+              ミニSTEPナビの強調と全く同じcurrentBuildStepNumberを唯一の判定元として使う */}
+          {currentBuildStepNumber && (
+            <div className="rounded-tanei-control bg-tanei-surface-muted border border-tanei-border px-2.5 py-2 mt-2">
+              <p className="text-[11px] font-bold text-tanei-ink-muted mb-1">次にやるSTEP</p>
+              <p className="text-xs font-bold text-tanei-ink break-words">
+                STEP {currentBuildStepNumber}　{steps.find((s) => s.stepNumber === currentBuildStepNumber)?.title}
+              </p>
+              <button
+                type="button"
+                onClick={() => goToBuildStep(currentBuildStepNumber)}
+                className="mt-1.5 text-[11px] font-bold text-white bg-tanei-brand px-2.5 py-1 rounded-tanei-control hover:bg-tanei-brand-dark transition-colors"
+              >
+                このSTEPから進めましょう →
+              </button>
+            </div>
+          )}
           <div className="flex flex-wrap gap-1.5 mt-2">
             {steps.map((step) => {
               const isNavStepDone = isBuildStepDone(step.stepNumber);
