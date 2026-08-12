@@ -19,6 +19,9 @@ const PARTS_ANCHOR_ID = 'cad-parts';
 const BUILD_STEPS_ANCHOR_ID = 'cad-build-steps';
 const CUT_LAYOUT_ANCHOR_ID = 'cad-cut-layout';
 const SAFETY_NOTES_ANCHOR_ID = 'cad-safety-notes';
+// 「🛒 買い物リスト」（Phase 3-4で追加済みのCadBuildGuide.tsx内セクション）への
+// スクロール先id（Phase 3-23）
+const SHOPPING_LIST_ANCHOR_ID = 'cad-shopping-list';
 
 interface ConfirmTarget {
   viewMode: 'cutlist' | 'cutMaterials';
@@ -34,6 +37,7 @@ const BUILD_NAV_ITEMS: { target: { viewMode: 'cutlist' | 'cutMaterials'; anchorI
   { target: { viewMode: 'cutlist', anchorId: MATERIALS_ANCHOR_ID }, label: '必要な材料' },
   { target: { viewMode: 'cutlist', anchorId: CUT_LAYOUT_ANCHOR_ID }, label: '木取り図' },
   { target: { viewMode: 'cutMaterials' }, label: 'カットリスト' },
+  { target: { viewMode: 'cutlist', anchorId: SHOPPING_LIST_ANCHOR_ID }, label: '買い物リスト' },
   { target: { viewMode: 'cutlist', anchorId: PARTS_ANCHOR_ID }, label: '作るパーツ' },
   { target: { viewMode: 'cutlist', anchorId: BUILD_STEPS_ANCHOR_ID }, label: '作り方' },
   { target: { viewMode: 'cutlist', anchorId: SAFETY_NOTES_ANCHOR_ID }, label: '安全ポイント' },

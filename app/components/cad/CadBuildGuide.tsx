@@ -35,6 +35,8 @@ const PARTS_ANCHOR_ID = 'cad-parts';
 const BUILD_STEPS_ANCHOR_ID = 'cad-build-steps';
 // 制作チェックの「仕上げを行った」からの確認導線（Phase 3-10）のスクロール先
 const SAFETY_NOTES_ANCHOR_ID = 'cad-safety-notes';
+// 制作チェックの制作ナビ（Phase 3-12）の「買い物リスト」からのスクロール先（Phase 3-23）
+const SHOPPING_LIST_ANCHOR_ID = 'cad-shopping-list';
 
 interface CadBuildGuideProps {
   model: FurnitureModel;
@@ -253,7 +255,7 @@ export default function CadBuildGuide({
         )}
       </div>
 
-      <div className="rounded-tanei-control border border-tanei-border bg-white overflow-hidden">
+      <div id={SHOPPING_LIST_ANCHOR_ID} className="rounded-tanei-control border border-tanei-border bg-white overflow-hidden scroll-mt-4">
         <button
           type="button"
           onClick={() => setIsShoppingListOpen((prev) => !prev)}
