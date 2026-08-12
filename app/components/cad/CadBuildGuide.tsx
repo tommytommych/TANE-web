@@ -653,6 +653,15 @@ export default function CadBuildGuide({
                       >
                         {isListStepDone ? '完了しています' : isListStepCurrent ? 'ここから進めましょう' : 'これから進めます'}
                       </span>
+                      {/* Phase 3-50：現在STEPだけに付く次アクションの案内。「▶ 今ここ」
+                          （Phase 3-49）・「ここから進めましょう」（Phase 3-43）と情報が
+                          重複しすぎないよう、クリック不要な視覚的な案内文だけにとどめる。
+                          カード自体が既にgoToBuildStepでクリック可能なため、ここではボタンを
+                          追加せず、新しいクリック処理・判定ロジックも作らない。優先度の低い
+                          表示として、他の現在STEP表示より控えめな色にする */}
+                      {isListStepCurrent && (
+                        <span className="text-[10px] text-tanei-ink-muted">→ このSTEPを進める</span>
+                      )}
                       {/* Phase 3-45：確認ポイントの状態・導線。既存のrelatedChecklistDoneCount・
                           relatedChecklistTotalから毎回算出するだけで、buildChecklistへの
                           書き込みは一切行わない。STEPカード本体のクリックと独立させるため、
