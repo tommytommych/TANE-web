@@ -250,7 +250,21 @@ export default function SavedItemsModal({
   const viewingRelatedCadItem = viewingFinishedItem?.relatedProjectId
     ? (savedItems.find((si) => si.type === 'cadProject' && si.id === viewingFinishedItem.relatedProjectId) ?? null)
     : null;
-  const viewingRelatedProjectName = viewingRelatedCadItem ? (parseSavedItem(viewingRelatedCadItem)?.projectName ?? viewingRelatedCadItem.title) : null;
+  // 「設計情報」「制作進捗」（Phase 3-20）。関連する設計が今も存在する場合だけ、
+  // parseSavedItemで一度だけ読み取り、既存のcomputeFurnitureProjectProgress・
+  // getBuildProgressStatus（マイページのカード表示と全く同じ関数）で進捗を求める。
+  // 新しい判定ロジック・新しい保存データは一切作らない
+  const viewingRelatedProject = viewingRelatedCadItem ? parseSavedItem(viewingRelatedCadItem) : null;
+  const viewingRelatedProjectName = viewingRelatedProject?.projectName ?? viewingRelatedCadItem?.title ?? null;
+  const viewingBuildStatus = viewingRelatedProject ? getBuildProgressStatus(viewingRelatedProject.buildChecklist) : null;
+  const viewingProgress = viewingRelatedProject
+    ? computeFurnitureProjectProgress(
+        viewingRelatedProject.design,
+        viewingRelatedProject.material,
+        viewingRelatedProject.cutListChecked,
+        viewingRelatedProject.buildChecklist
+      )
+    : null;
 
   const startEdit = (item: SavedItem) => {
     setEditingId(item.id);
@@ -950,6 +964,70 @@ export default function SavedItemsModal({
                 <p className="text-[11px] font-bold text-tanei-ink-muted">完成作品を保存した日時</p>
                 <p className="text-sm text-tanei-ink">{viewingFinishedItem.date}</p>
               </div>
+
+              {/* 設計情報・制作進捗（Phase 3-20）。関連する設計が今も存在する場合だけ表示し、
+                  design/material/buildChecklistは既存のSavedFurnitureProjectを読み取るだけ。
+                  ここで何かを書き換えることは一切ない */}
+              {viewingRelatedCadItem && viewingRelatedProject && (
+                <div className="border border-tanei-border rounded-tanei-control p-3 bg-tanei-bg flex flex-col gap-2">
+                  <p className="text-xs font-bold text-tanei-ink-muted">設計情報</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                    <div>
+                      <p className="text-tanei-ink-muted">幅</p>
+                      <p className="font-bold text-tanei-ink">{viewingRelatedProject.design.width} mm</p>
+                    </div>
+                    <div>
+                      <p className="text-tanei-ink-muted">奥行</p>
+                      <p className="font-bold text-tanei-ink">{viewingRelatedProject.design.depth} mm</p>
+                    </div>
+                    <div>
+                      <p className="text-tanei-ink-muted">高さ</p>
+                      <p className="font-bold text-tanei-ink">{viewingRelatedProject.design.height} mm</p>
+                    </div>
+                    <div>
+                      <p className="text-tanei-ink-muted">板厚</p>
+                      <p className="font-bold text-tanei-ink">{viewingRelatedProject.design.thickness} mm</p>
+                    </div>
+                    <div>
+                      <p className="text-tanei-ink-muted">材料</p>
+                      <p className="font-bold text-tanei-ink break-words">{viewingRelatedProject.material}</p>
+                    </div>
+                    <div>
+                      <p className="text-tanei-ink-muted">棚板</p>
+                      <p className="font-bold text-tanei-ink">{viewingRelatedProject.design.shelves.length} 枚</p>
+                    </div>
+                    <div>
+                      <p className="text-tanei-ink-muted">背板</p>
+                      <p className="font-bold text-tanei-ink">{viewingRelatedProject.design.backPanel ? 'あり' : 'なし'}</p>
+                    </div>
+                    <div>
+                      <p className="text-tanei-ink-muted">脚</p>
+                      <p className="font-bold text-tanei-ink">{viewingRelatedProject.design.legs ? 'あり' : 'なし'}</p>
+                    </div>
+                  </div>
+
+                  {viewingProgress && viewingBuildStatus && (
+                    <div className="pt-2 border-t border-tanei-border">
+                      <p className="text-[11px] font-bold text-tanei-ink-muted">制作進捗</p>
+                      <p className="text-sm font-bold text-tanei-brand mt-0.5">
+                        {viewingBuildStatus === 'completed'
+                          ? '✓ 制作完了'
+                          : viewingBuildStatus === 'building'
+                            ? `制作中 ${viewingProgress.buildDone} / ${viewingProgress.buildTotal}`
+                            : '未開始'}
+                      </p>
+                    </div>
+                  )}
+
+                  <Link
+                    href={`/app/cad?projectId=${viewingRelatedCadItem.id}`}
+                    onClick={onClose}
+                    className="self-start inline-flex items-center gap-1.5 text-xs font-bold bg-white border border-tanei-border text-tanei-ink px-3 py-1.5 rounded-tanei-control hover:bg-tanei-surface-muted transition-colors"
+                  >
+                    制作内容を見る
+                  </Link>
+                </div>
+              )}
 
               {viewingRelatedCadItem && (
                 <Link
