@@ -2,6 +2,7 @@
 // チャットとの双方向同期に使う、確定仕様（品名・寸法・材質・パーツごとの塗装）の型定義
 
 import type { SheetLayout } from './sheetLayout';
+import type { FurnitureDesign } from './cad/types';
 
 export type PanelFinish = 'clear' | 'walnut' | 'white' | 'black';
 
@@ -67,3 +68,27 @@ export const studioSpecToSheetLayout = (spec: StudioSpec): SheetLayout => {
     ],
   };
 };
+
+// AIチャット（「🌿 ブラウザCADで設計する」、CompletionCards.tsx）からTANE:iブラウザCAD
+// （/app/cad、CadPageShell.tsx）へ、確定仕様を一時的に受け渡すためのsessionStorageキー
+// （Phase 4-07）。localStorage・IndexedDB・URL query parameterはいずれも使わず、
+// タブを閉じるまでだけ保持される一時領域に留める。読み取り側（CadPageShell.tsx）が
+// 読み込み後すぐに削除するため、実質「1回限りの受け渡し」専用のキーとして扱う
+export const CAD_INITIAL_DESIGN_SESSION_KEY = 'tanei-cad-initial-design-v1';
+
+// StudioSpec（AIが提案した箱型家具の確定仕様）から、既存のFurnitureDesign
+// （ブラウザCADの唯一の編集状態、CadStudio.tsxのuseState<FurnitureDesign>初期値）へ
+// 変換する（Phase 4-07）。既存のstudioSpecToSheetLayout()と同じ「読み取り専用の変換」
+// という考え方を踏襲し、StudioSpec・FurnitureDesignどちらの型定義も変更しない。
+// backPanel・legs・shelvesはStudioSpec側に存在しない値のため、systemPrompt.tsが
+// 前提としている「天板・底板・側板・背板からなる棚なし箱型」という既存ルールに忠実な
+// 既定値（背板あり・脚なし・棚なし）で補うだけで、新しい推測ロジックは追加しない
+export const studioSpecToFurnitureDesign = (spec: StudioSpec): FurnitureDesign => ({
+  width: spec.width,
+  depth: spec.depth,
+  height: spec.height,
+  thickness: spec.thickness ?? DEFAULT_THICKNESS_MM,
+  backPanel: true,
+  legs: false,
+  shelves: [],
+});

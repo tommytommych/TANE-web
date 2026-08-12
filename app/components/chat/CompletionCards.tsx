@@ -15,6 +15,7 @@ import {
 } from '../../lib/cutlist';
 import type { SavedItemType } from '../../lib/types';
 import { pushSpecToStudio } from '../../lib/studioSync';
+import { CAD_INITIAL_DESIGN_SESSION_KEY } from '../../lib/studioSpec';
 
 interface CompletionCardsProps {
   msg: Message;
@@ -129,8 +130,21 @@ function CompletionCards({
           設計スタジオ側の導線（handleOpenInStudio・pushSpecToStudio）は変更しない */}
       {studioSpec && (
         <div className="flex flex-col gap-1.5 mb-2">
+          {/* Phase 4-07：クリック時、既存のstudioSpec（AIが提案した確定仕様、変更しない）を
+              一時的にsessionStorageへ書き込んでから/app/cadへ遷移する。CadPageShell.tsx側が
+              マウント時に読み取り、既存のinitialDesignプロパティ（CadStudio.tsxに元々ある、
+              新規propsの追加はしていない）へFurnitureDesignへ変換して渡す。書き込みに
+              失敗しても（プライベートブラウジング等）遷移自体は妨げず、CAD側は既存どおり
+              デフォルト設計にフォールバックするだけなので安全 */}
           <Link
             href="/app/cad"
+            onClick={() => {
+              try {
+                sessionStorage.setItem(CAD_INITIAL_DESIGN_SESSION_KEY, JSON.stringify(studioSpec));
+              } catch (e) {
+                console.error(e);
+              }
+            }}
             className="flex items-center gap-2.5 px-3 py-2.5 rounded-tanei-card border border-tanei-brand bg-tanei-brand-soft text-tanei-ink hover:border-tanei-brand-dark transition-colors"
           >
             <span className="text-lg flex-shrink-0">🌿</span>
