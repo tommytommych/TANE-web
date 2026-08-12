@@ -489,13 +489,15 @@ export default function CadBuildGuide({
               <li
                 key={step.stepNumber}
                 className={`rounded-tanei-control border overflow-hidden transition-colors ${
-                  isDone
-                    ? 'bg-tanei-brand-soft border-tanei-brand'
-                    : isCurrent
-                      ? 'bg-white border-tanei-accent ring-1 ring-tanei-accent'
+                  isCurrent
+                    ? 'bg-white border-tanei-accent ring-2 ring-tanei-accent/60 shadow-sm'
+                    : isDone
+                      ? 'bg-tanei-surface-muted border-tanei-border'
                       : 'bg-white border-tanei-border'
                 }`}
               >
+                {/* 「現在の作業」（Phase 3-24）はSTEPカードの最上部・最も目立つ位置に置き、
+                    判定ロジック・文言はCadBuildChecklistView.tsxと統一したまま変更しない（Phase 3-27） */}
                 {isCurrent && (
                   <p className="text-[10px] font-black text-tanei-accent px-3 pt-2">▶ 現在の作業</p>
                 )}
@@ -506,16 +508,20 @@ export default function CadBuildGuide({
                   aria-controls={panelId}
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-tanei-brand"
                 >
-                  <span className="flex-shrink-0 bg-tanei-brand text-white text-xs font-black w-7 h-7 rounded-full flex items-center justify-center">
+                  <span
+                    className={`flex-shrink-0 text-white text-xs font-black w-7 h-7 rounded-full flex items-center justify-center ${
+                      isDone ? 'bg-tanei-ink-muted' : 'bg-tanei-brand'
+                    }`}
+                  >
                     {step.stepNumber}
                   </span>
                   <span className="flex-1 min-w-0">
                     <span className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-[10px] font-bold text-tanei-accent">STEP {step.stepNumber}</span>
-                      {isDone && <span className="text-[10px] font-bold text-tanei-brand">✓ 完了</span>}
+                      {isDone && <span className="text-[10px] font-bold text-tanei-ink-muted">✓ 完了</span>}
                     </span>
                     <span
-                      className={`block font-bold text-sm break-words ${isDone ? 'text-tanei-ink line-through' : 'text-tanei-ink'}`}
+                      className={`block font-bold text-sm break-words ${isDone ? 'text-tanei-ink-muted line-through' : 'text-tanei-ink'}`}
                     >
                       {step.title}
                     </span>
@@ -562,23 +568,26 @@ export default function CadBuildGuide({
                       </div>
                     )}
                     {isChecklistRelationStep && (
-                      <div className="mt-2.5 pt-2.5 border-t border-tanei-border flex items-center justify-between gap-2 flex-wrap">
-                        {relatedChecklistDoneCount === relatedChecklistTotal ? (
-                          <span className="text-[11px] font-bold text-tanei-brand">✓ 制作チェック済み</span>
-                        ) : relatedChecklistDoneCount === 0 ? (
-                          <span className="text-[11px] font-bold text-tanei-ink-muted">制作チェック：未完了</span>
-                        ) : (
-                          <span className="text-[11px] font-bold text-tanei-ink-muted">
-                            制作チェック：一部完了（{relatedChecklistDoneCount}/{relatedChecklistTotal}）
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={onViewBuildCheck}
-                          className="text-[11px] font-bold text-tanei-brand hover:text-tanei-brand-dark underline"
-                        >
-                          制作チェックを見る
-                        </button>
+                      <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
+                        <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">制作チェック</p>
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          {relatedChecklistDoneCount === relatedChecklistTotal ? (
+                            <span className="text-[11px] font-bold text-tanei-brand">✓ 制作チェック済み</span>
+                          ) : relatedChecklistDoneCount === 0 ? (
+                            <span className="text-[11px] font-bold text-tanei-ink-muted">制作チェック：未完了</span>
+                          ) : (
+                            <span className="text-[11px] font-bold text-tanei-ink-muted">
+                              制作チェック：一部完了（{relatedChecklistDoneCount}/{relatedChecklistTotal}）
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={onViewBuildCheck}
+                            className="text-[11px] font-bold text-tanei-brand hover:text-tanei-brand-dark underline"
+                          >
+                            制作チェックを見る
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
