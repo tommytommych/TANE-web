@@ -951,13 +951,27 @@ export default function CadBuildGuide({
                             <p className={isCurrent ? 'text-[11px] font-bold text-tanei-accent' : 'text-[10px] text-tanei-ink-muted'}>
                               確認したら制作チェックを更新してください
                             </p>
+                            {/* Phase 3-51：現在STEP（isCurrent）だけ、既存のtanei-accent系トークン
+                                （ring-2・text-tanei-accent等で既に使っている強調色）に切り替えて
+                                ボタンを少しだけ目立たせる。非現在STEPは従来どおりtanei-brand系の
+                                まま変更しない。新しい色・新しいコンポーネントは追加しない */}
                             <button
                               type="button"
                               onClick={onViewBuildCheck}
-                              className="self-start flex-shrink-0 text-[11px] font-bold text-tanei-brand border border-tanei-brand/40 hover:bg-tanei-brand-soft hover:border-tanei-brand rounded-full px-2.5 py-1 transition-colors"
+                              className={
+                                isCurrent
+                                  ? 'self-start flex-shrink-0 text-[11px] font-bold text-tanei-accent border border-tanei-accent/40 hover:bg-tanei-accent/10 hover:border-tanei-accent rounded-full px-2.5 py-1 transition-colors'
+                                  : 'self-start flex-shrink-0 text-[11px] font-bold text-tanei-brand border border-tanei-brand/40 hover:bg-tanei-brand-soft hover:border-tanei-brand rounded-full px-2.5 py-1 transition-colors'
+                              }
                             >
                               制作チェックを見る →
                             </button>
+                            {/* Phase 3-51：現在STEPだけに付く短い補助文。「制作チェックを見る →」を
+                                クリックした後にすべきこと（確認して制作チェック画面側でチェックを
+                                更新する）を明確にするだけで、クリック処理・画面遷移は追加しない */}
+                            {isCurrent && (
+                              <p className="text-xs text-tanei-ink-muted">確認後にチェックを更新</p>
+                            )}
                           </div>
                         )}
                       </div>
