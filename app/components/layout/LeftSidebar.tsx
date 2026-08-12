@@ -180,6 +180,32 @@ export default function LeftSidebar({
                 </button>
               ))}
 
+              {/* Phase 4-01調査で判明：この2つが同じ見た目で並んでいると、初見ユーザーは
+                  何が違うのか・自分はどちらを使えばいいのか判断できなかった。Phase 4-03で、
+                  ①順番をブラウザCAD→設計スタジオに（設定不要ですぐ使える方を先に）、
+                  ②短い案内文を追加、③ブラウザCADだけ既存のtanei-brand系トークンで軽く
+                  強調、④それぞれの用途が一目で分かる説明を追加した。リンク先（/app/cad・
+                  /app/studio）・onConsumeImageUsageによる利用回数チェック・onCloseの
+                  挙動はいずれも変更していない */}
+              <p className="px-3 text-[11px] text-tanei-ink-muted">
+                どちらで設計する？　迷ったら<span className="font-bold text-tanei-brand">ブラウザCAD</span>がおすすめです
+              </p>
+
+              {/* ブラウザCAD（React Three Fiber）はPC不要でスマホからも使えるため、
+                  設計スタジオ（FreeCAD版）とは別枠のリンクにしている。サーバー負荷が
+                  ないため「本日のAI機能利用」の消費対象にもしていない */}
+              <Link
+                href="/app/cad"
+                onClick={onClose}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-tanei-control text-sm bg-tanei-brand-soft hover:bg-white border border-tanei-brand/40 hover:border-tanei-brand text-tanei-ink transition-colors w-full text-left"
+              >
+                <span>🌿</span>
+                <span className="flex flex-col leading-tight min-w-0">
+                  <span className="font-bold">ブラウザCAD</span>
+                  <span className="text-[10px] font-normal text-tanei-ink-muted">スマホ・PC対応／インストール不要・すぐ使える</span>
+                </span>
+              </Link>
+
               <Link
                 href="/app/studio"
                 onClick={(e) => {
@@ -194,25 +220,10 @@ export default function LeftSidebar({
                 title="パソコン専用機能です"
                 className="flex items-center gap-3 px-3 py-2.5 rounded-tanei-control text-sm bg-tanei-surface hover:bg-white border border-transparent hover:border-tanei-border text-tanei-ink transition-colors w-full text-left"
               >
-                <span>🪚</span>
-                <span className="flex flex-col leading-tight">
-                  <span>TANE:i 設計スタジオ</span>
-                  <span className="text-[10px] font-normal text-tanei-ink-muted">※パソコン専用機能です</span>
-                </span>
-              </Link>
-
-              {/* ブラウザCAD（React Three Fiber）はPC不要でスマホからも使えるため、
-                  設計スタジオ（FreeCAD版）とは別枠のリンクにしている。サーバー負荷が
-                  ないため「本日のAI機能利用」の消費対象にもしていない */}
-              <Link
-                href="/app/cad"
-                onClick={onClose}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-tanei-control text-sm bg-tanei-surface hover:bg-white border border-transparent hover:border-tanei-border text-tanei-ink transition-colors w-full text-left"
-              >
-                <span>🧊</span>
-                <span className="flex flex-col leading-tight">
-                  <span>TANE:i ブラウザCAD</span>
-                  <span className="text-[10px] font-normal text-tanei-ink-muted">※試験提供中</span>
+                <span>🖥</span>
+                <span className="flex flex-col leading-tight min-w-0">
+                  <span className="font-bold">設計スタジオ</span>
+                  <span className="text-[10px] font-normal text-tanei-ink-muted">PC専用／本格レンダリングで完成イメージを確認</span>
                 </span>
               </Link>
 
