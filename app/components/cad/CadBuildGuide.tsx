@@ -581,7 +581,29 @@ export default function CadBuildGuide({
                     )}
                     {isChecklistRelationStep && (
                       <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
-                        <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">制作チェック</p>
+                        <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">このSTEPの確認ポイント</p>
+                        {/* 制作チェック項目6〜9それぞれの完了状態（Phase 3-31）。既存の
+                            BUILD_CHECKLIST_STEPS・buildChecklistを読み取り専用で使うだけで、
+                            特定のチェック項目番号を特定のSTEP番号に対応付けるものではない
+                            （Phase 3-26と同じく、この4件は「作り方」セクション全体に対する
+                            確認ポイントとして扱う） */}
+                        <ul className="flex flex-col gap-1 mb-1.5">
+                          {BUILD_STEP_RELATED_CHECKLIST_ITEMS.map((itemNumber) => {
+                            const isItemDone = Boolean(buildChecklist[String(itemNumber)]);
+                            return (
+                              <li key={itemNumber} className="flex items-start gap-1.5 text-[11px]">
+                                <span
+                                  className={`flex-shrink-0 font-bold ${isItemDone ? 'text-tanei-brand' : 'text-tanei-ink-muted'}`}
+                                >
+                                  {isItemDone ? '✓ 確認済み' : '○ 未確認'}
+                                </span>
+                                <span className={isItemDone ? 'text-tanei-ink-muted line-through' : 'text-tanei-ink'}>
+                                  {BUILD_CHECKLIST_STEPS[itemNumber - 1]}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
                         {relatedChecklistDoneCount === relatedChecklistTotal ? (
                           // 完了しているチェック項目がもう無いため、誘導ボタンは表示しない（Phase 3-28）
                           <span className="text-[11px] font-bold text-tanei-brand">✓ 制作チェック済み</span>
