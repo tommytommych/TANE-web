@@ -115,7 +115,7 @@ export default function CadBuildGuide({
   onToggleBuildGuideStep,
   onViewBuildCheck,
 }: CadBuildGuideProps) {
-  const steps = buildFurnitureSteps(model.panels);
+  const steps = buildFurnitureSteps(model.panels, model.thickness);
   // 制作チェック（Phase 2-7）と全く同じ関数・同じデータを使い、進捗表示が食い違わないようにする。
   // この「制作進捗」カード自体は10項目の制作チェックの全体進捗を示すもので、
   // 下記のSTEPごとのチェック（buildGuideChecked）とは独立して維持する
@@ -782,37 +782,36 @@ export default function CadBuildGuide({
                 </div>
                 {isExpanded && (
                   <div id={panelId} className="pl-10 pr-3 pb-3">
-                    {/* 「STEP状態」（Phase 3-42）。新しい判定ロジックは作らず、既存の
-                        isBuildStepDone・isCurrent・currentBuildStepNumberだけを使って
-                        「今どういう状態か・次に何をすればいいか」を一言でまとめるだけの
-                        表示専用ブロック。優先順位は既存の視覚的階層と同じ完了→現在→未完了 */}
+                    {/* 「状態」と「次にすること」を1つにまとめたブロック。以前は「STEP状態」
+                        「STEP概要」「このSTEPのゴール」の3か所に分かれ、同じ完了/現在/未完了の
+                        情報や「次のSTEPへ」導線が重複して表示されていたため統合した。
+                        判定ロジック自体（isDone・isCurrent・goToBuildStep）は変更していない */}
                     <div className="mb-2.5 pb-2.5 border-b border-tanei-border">
-                      <p className="text-[11px] font-bold text-tanei-ink-muted mb-1">STEP状態</p>
                       {isDone ? (
                         <>
                           <p className="text-xs font-bold text-tanei-ink-muted">✓ 完了</p>
-                          <p className="text-[11px] text-tanei-ink-muted mt-0.5">このSTEPは完了しています</p>
+                          {step.stepNumber < steps.length ? (
+                            <button
+                              type="button"
+                              onClick={() => goToBuildStep(step.stepNumber + 1)}
+                              className="mt-1 text-[11px] font-bold text-tanei-brand border border-tanei-brand/40 hover:bg-tanei-brand-soft hover:border-tanei-brand rounded-full px-2.5 py-1 transition-colors"
+                            >
+                              次は STEP {step.stepNumber + 1} へ →
+                            </button>
+                          ) : (
+                            <p className="text-[11px] font-bold text-tanei-brand mt-1">✓ すべてのSTEPが完了しています</p>
+                          )}
                         </>
                       ) : isCurrent ? (
                         <p className="text-xs font-bold text-tanei-accent">▶ 今ここから進めましょう</p>
                       ) : (
-                        <>
-                          <p className="text-xs font-bold text-tanei-ink">○ 未完了</p>
-                          <p className="text-[11px] text-tanei-ink-muted mt-0.5">
-                            このSTEPを進めて、完了したら次のSTEPへ進みましょう
-                          </p>
-                        </>
+                        <p className="text-xs font-bold text-tanei-ink">○ 未完了（このSTEPを終えたら次へ進みましょう）</p>
                       )}
                     </div>
-                    {/* 「STEP概要」（Phase 3-33）。新しい要約文章は作らず、既存のstep.title
-                        （ヘッダーの見出しと同じ、buildFurnitureSteps()から一切変更していない値）を
-                        そのまま短い概要として再掲するだけ。ヘッダーの見出しと隣接して重複して
-                        見えないよう、あえて控えめな文字サイズ・色にとどめている */}
-                    <p className="text-[11px] font-bold text-tanei-ink-muted mb-1">STEP概要</p>
-                    <p className="text-xs font-bold text-tanei-ink mb-2 break-words">{step.title}</p>
-                    <p className="text-xs text-tanei-ink-muted leading-relaxed break-words border-l-2 border-tanei-border pl-3 py-0.5">
-                      {step.description}
-                    </p>
+                    {/* 作業内容。buildFurnitureSteps()が実際のパーツ位置・寸法・板厚から
+                        組み立てた具体的な説明文をそのまま表示する（組み立て位置・下穴の
+                        深さ・ビスの長さなど）。AI要約・書き換えは行わない */}
+                    <p className="text-xs text-tanei-ink leading-relaxed break-words">{step.description}</p>
                     {partGroups.length > 0 && (
                       <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
                         <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">使用するパーツ</p>
@@ -847,84 +846,6 @@ export default function CadBuildGuide({
                         </ul>
                       </div>
                     )}
-                    {/* 「このSTEPで確認する数字」（Phase 3-38）。寸法の取得方法は一切変更せず、
-                        直前の「使用するパーツ」と全く同じpartGroups（findStepPartGroups()の
-                        結果）を再掲するだけの、見つけやすさのための補助ブロック。パーツが
-                        無いSTEPでは見出しごと表示しない */}
-                    {partGroups.length > 0 && (
-                      <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
-                        <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">このSTEPで確認する数字</p>
-                        <div
-                          className={`rounded-tanei-control px-2.5 py-2 flex flex-col gap-1 border ${
-                            isCurrent
-                              ? 'bg-white border-tanei-accent'
-                              : isDone
-                                ? 'bg-tanei-surface-muted border-tanei-border'
-                                : 'bg-tanei-surface border-tanei-border'
-                          }`}
-                        >
-                          {partGroups.map((group) => (
-                            <p
-                              key={group.key}
-                              className={`text-xs break-words ${isDone ? 'text-tanei-ink-muted' : 'text-tanei-ink'}`}
-                            >
-                              <span className="font-bold">
-                                {group.name}
-                                {group.count > 1 && ` × ${group.count}`}
-                              </span>
-                              ：幅{' '}
-                              <span className={`font-bold ${isCurrent ? 'text-tanei-accent' : 'text-tanei-ink'}`}>
-                                {group.widthMm}
-                              </span>{' '}
-                              × 奥行{' '}
-                              <span className={`font-bold ${isCurrent ? 'text-tanei-accent' : 'text-tanei-ink'}`}>
-                                {group.heightMm}
-                              </span>{' '}
-                              × 厚み{' '}
-                              <span className={`font-bold ${isCurrent ? 'text-tanei-accent' : 'text-tanei-ink'}`}>
-                                {group.thicknessMm}
-                              </span>{' '}
-                              mm
-                            </p>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {/* 「このSTEPのチェックポイント」（Phase 3-41）。新しい情報源は使わず、
-                        直前の「このSTEPで確認する数字」と全く同じpartGroups
-                        （findStepPartGroups()の結果）・既存のisBuildStepDone・isCurrentだけを
-                        箇条書きにまとめて再掲するだけの、表示専用の補助ブロック。新しいSTEP↔
-                        チェック項目対応表・新しい寸法計算・AIによる文章生成は一切行わない */}
-                    <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
-                      <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">このSTEPのチェックポイント</p>
-                      <ul className="flex flex-col gap-1 text-xs text-tanei-ink-muted list-disc pl-4">
-                        {partGroups.flatMap((group) => [
-                          <li key={`${group.key}-name`}>
-                            使用するパーツ：{group.name}
-                            {group.count > 1 && ` × ${group.count}`}
-                          </li>,
-                          <li key={`${group.key}-width`}>幅：{group.widthMm} mm</li>,
-                          <li key={`${group.key}-depth`}>奥行：{group.heightMm} mm</li>,
-                          <li key={`${group.key}-thickness`}>厚み：{group.thicknessMm} mm</li>,
-                        ])}
-                        <li>このSTEPの作業を確認する</li>
-                      </ul>
-                      {isDone ? (
-                        <p className="text-[11px] font-bold text-tanei-brand mt-1.5">
-                          ✓ このSTEPのチェックポイントを確認済み
-                        </p>
-                      ) : (
-                        <p
-                          className={
-                            isCurrent
-                              ? 'text-[11px] font-bold text-tanei-accent mt-1.5'
-                              : 'text-[11px] text-tanei-ink-muted mt-1.5'
-                          }
-                        >
-                          ○ このSTEPのチェックポイントを確認してください
-                        </p>
-                      )}
-                    </div>
                     {isChecklistRelationStep && (
                       <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
                         <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">このSTEPの確認ポイント</p>
@@ -998,56 +919,6 @@ export default function CadBuildGuide({
                         )}
                       </div>
                     )}
-                    {/* 「このSTEPのゴール」（Phase 3-37、Phase 3-47で案内文を調整、Phase 3-48で
-                        完了STEP→次STEP導線を強化）。既存のFurnitureBuildStep
-                        （buildFurnitureSteps()）にはゴール・完了条件専用のフィールドが
-                        存在しないため、新しい文章生成は行わず固定の補助文を表示するだけに
-                        する。完了/現在/未完了の判定は既存のisDone・isCurrentをそのまま
-                        利用し、新しいSTEP↔チェック項目対応表は作らない。未完了時は「このSTEPの
-                        確認ポイント」ブロック（既存の制作チェックを見る →導線）と役割が
-                        重複しないよう、案内文だけにとどめる。完了時は既存のgoToBuildStep
-                        （Phase 3-29、STEP前後ナビゲーションと同じ関数）を使った「次のSTEPへ」
-                        導線を追加する。次STEP番号は必ずstep.stepNumber + 1から取得し、
-                        ハードコードしない。STEP9完了時は次のSTEPが無いため、代わりに
-                        9STEP進捗サマリー（上部）と同一の文言「✓ すべてのSTEPが完了して
-                        います」を表示し、矛盾のない表現にする */}
-                    <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
-                      <p className="text-[11px] font-bold text-tanei-ink-muted mb-1">このSTEPのゴール</p>
-                      <p className="text-[11px] text-tanei-ink-muted leading-relaxed">
-                        このSTEPの作業内容を確認し、完了したら次のSTEPへ進んでください。
-                      </p>
-                      {isDone ? (
-                        <>
-                          <p className="text-[11px] font-bold text-tanei-brand mt-1">✓ このSTEPは完了しています</p>
-                          {step.stepNumber < steps.length ? (
-                            <>
-                              <p className="text-[11px] text-tanei-ink-muted mt-1">
-                                次は STEP {step.stepNumber + 1}
-                              </p>
-                              <button
-                                type="button"
-                                onClick={() => goToBuildStep(step.stepNumber + 1)}
-                                className="mt-1 text-[11px] font-bold text-tanei-brand border border-tanei-brand/40 hover:bg-tanei-brand-soft hover:border-tanei-brand rounded-full px-2.5 py-1 transition-colors"
-                              >
-                                次のSTEPへ →
-                              </button>
-                            </>
-                          ) : (
-                            <p className="text-[11px] font-bold text-tanei-brand mt-1">✓ すべてのSTEPが完了しています</p>
-                          )}
-                        </>
-                      ) : (
-                        <p
-                          className={
-                            isCurrent
-                              ? 'text-[11px] font-bold text-tanei-accent mt-1'
-                              : 'text-[11px] text-tanei-ink-muted mt-1'
-                          }
-                        >
-                          このSTEPを終えたら、制作チェックで確認しましょう
-                        </p>
-                      )}
-                    </div>
                     {/* STEP間の前後ナビゲーション（Phase 3-29）。新しいSTEPデータは作らず、
                         既存のstepNumberとgoToBuildStep（scrollToSectionの再利用）だけで移動する。
                         buildChecklist・cutListCheckedへの書き込みは一切発生しない */}

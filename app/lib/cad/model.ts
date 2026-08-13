@@ -423,22 +423,30 @@ export function furnitureModelToViewerPanels(model: FurnitureModel): ViewerPanel
 
 /** 「制作する」画面（Phase 2-4の木取り図から続く制作情報）で使う、初心者向け作業手順。
  * AIによる自由生成は行わず、現在のPanel[]から機械的に判断できる範囲（背板・棚板・脚の
- * 有無）だけを文面に反映する、決まった手順のテンプレートを組み立てる */
+ * 有無、パネルの実際の位置・寸法）だけを文面に反映する、決まった手順のテンプレートを
+ * 組み立てる */
 export interface FurnitureBuildStep {
   stepNumber: number;
   title: string;
   description: string;
 }
 
-export function buildFurnitureSteps(panels: FurniturePanel[]): FurnitureBuildStep[] {
+// 板厚に対するビスの長さ・下穴の目安。「板を貫通させず、かつしっかり効かせる」という
+// 一般的な木工DIYの目安（板厚の1.5〜2倍程度）をそのまま数式にしただけで、パーツごとの
+// 強度計算等は行わない。5mm単位に丸めるのは「27mm」のような中途半端な値を避けるため
+const roundToNearest5 = (mm: number): number => Math.round(mm / 5) * 5;
+
+export function buildFurnitureSteps(panels: FurniturePanel[], thicknessMm: number): FurnitureBuildStep[] {
   // 'apron'（幕板）はテーブル（天板+脚+幕板）専用のパネル種類のため、これが含まれて
   // いれば箱型ではなくテーブルの手順文言を組み立てる。新しいSTEPタイトル・新しい
   // ステップ数は作らず、既存の9つのタイトル（材料を準備する〜仕上げを行う）はそのまま
-  // 使い、cutTargets/assembleTargets/positionTargetsの3箇所の文言だけを分岐させる
+  // 使い、各ステップの文言だけをPanel[]の実際の位置・寸法から具体的に組み立てる
   const isTable = panels.some((p) => p.kind === 'apron');
   const hasBackPanel = panels.some((p) => p.kind === 'back');
-  const hasLegs = panels.some((p) => p.kind === 'leg');
-  const shelfCount = panels.filter((p) => p.kind === 'shelf').length;
+  const legPanels = panels.filter((p) => p.kind === 'leg');
+  const hasLegs = legPanels.length > 0;
+  const shelves = panels.filter((p) => p.kind === 'shelf').sort((a, b) => a.position.z - b.position.z);
+  const shelfCount = shelves.length;
 
   const cutTargets = isTable
     ? '天板・脚・幕板'
@@ -457,11 +465,46 @@ export function buildFurnitureSteps(panels: FurniturePanel[]): FurnitureBuildSte
         .filter((v): v is string => Boolean(v))
         .join('、');
 
-  const positionTargets = isTable
-    ? '脚・幕板・天板'
-    : ['天板・底板・側板', hasBackPanel && '背板', shelfCount > 0 && `棚板（${shelfCount}枚）`, hasLegs && '脚']
-        .filter((v): v is string => Boolean(v))
-        .join('・');
+  // 「組み立て位置を確認する」の具体化。legPanels[0].position.x／.yは、geometry.tsの
+  // TABLE_LEG_INSET_MM（テーブル）・板厚t（箱型の飾り脚）がそのまま入っているため、
+  // 定数を別途importせず、実際に計算されたパネル位置から直接読み取る
+  let positionDescription: string;
+  if (isTable) {
+    const insetMm = legPanels[0] ? Math.round(legPanels[0].position.x) : null;
+    positionDescription =
+      insetMm !== null
+        ? `脚は、天板の角から${insetMm}mm内側の位置に、天板の下面にそろえて4本とも取り付けます。幕板は4本の脚の内側同士をつなぐように、天板のすぐ下に取り付けます。`
+        : '脚・幕板・天板の位置を仮に合わせ、向きや配置を確認します。';
+  } else {
+    const positionParts: string[] = ['天板・底板を、左右の側板の内側に挟み込むように仮組みします'];
+    if (shelfCount > 0) {
+      const shelfText = shelves
+        .map((s, i) => `棚板${shelfCount > 1 ? i + 1 : ''}は下から${Math.round(s.position.z)}mmの高さ`)
+        .join('、');
+      positionParts.push(`${shelfText}に、水平になるよう取り付けます`);
+    }
+    if (hasBackPanel) positionParts.push('背板は本体の背面全体を覆うように取り付けます');
+    if (hasLegs) {
+      const insetMm = legPanels[0] ? Math.round(legPanels[0].position.x) : null;
+      positionParts.push(
+        insetMm !== null
+          ? `脚は本体底面の四隅（端から${insetMm}mm内側）に取り付けます`
+          : '脚は本体底面の四隅に取り付けます'
+      );
+    }
+    positionDescription = `${positionParts.join('。')}。`;
+  }
+
+  // 「下穴を開ける」の具体化。板厚に対する下穴の深さの目安を数値で示す
+  // （割れ防止の下穴＝ビス径よりひとまわり細い穴、という一般的なDIYの考え方をそのまま文章にする）
+  const pilotHoleDepthMm = Math.max(1, Math.round(thicknessMm / 2));
+  const pilotHoleDescription = `ビスを打つ位置は、板の端から20mm以上離してください。次に、ビスより一回り細い下穴（目安：直径2〜3mm）を、板厚${thicknessMm}mmに対して深さ${pilotHoleDepthMm}mmほど、割れ防止のためにあけます。`;
+
+  // 「ビスで組み立てる」の具体化。板厚の1.5〜2倍程度を目安にビスの長さを提示する
+  // （板を貫通させない範囲で、かつしっかり効かせるための一般的な目安）
+  const screwLowMm = roundToNearest5(thicknessMm * 1.5);
+  const screwHighMm = roundToNearest5(thicknessMm * 2);
+  const assembleDescription = `${screwLowMm}〜${screwHighMm}mm程度の長さのビス（目安：板厚${thicknessMm}mmの1.5〜2倍）を使い、${assembleTargets}ます。1か所につき2本以上のビスで留めると、ねじれにくくなります。`;
 
   const steps: Omit<FurnitureBuildStep, 'stepNumber'>[] = [
     {
@@ -482,19 +525,20 @@ export function buildFurnitureSteps(panels: FurniturePanel[]): FurnitureBuildSte
     },
     {
       title: '組み立て位置を確認する',
-      description: `${positionTargets}の位置を仮に合わせ、向きや配置を確認します。`,
+      description: positionDescription,
     },
     {
       title: '下穴を開ける',
-      description: 'ビスを打つ位置に、割れ防止のための下穴を開けます。',
+      description: pilotHoleDescription,
     },
     {
       title: 'ビスで組み立てる',
-      description: `${assembleTargets}ます。`,
+      description: assembleDescription,
     },
     {
       title: 'ガタつきや寸法を確認する',
-      description: '全体がガタついていないか、直角や水平が保たれているかを確認します。',
+      description:
+        '全体がガタついていないか、直角や水平が保たれているかを確認します。対角線の長さを2方向で測り、同じ長さになっていれば歪みはありません（差があれば歪んでいるので、ゆるめて組み直します）。',
     },
     {
       title: '必要に応じて仕上げを行う',
