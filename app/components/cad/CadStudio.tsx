@@ -470,14 +470,17 @@ export default function CadStudio({
           </p>
         )}
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="text"
-            value={projectName}
-            onChange={(e) => setProjectName(e.target.value)}
-            placeholder={DEFAULT_FURNITURE_PROJECT_NAME}
-            aria-label="設計の名前"
-            className="min-w-0 flex-1 border border-tanei-border rounded-tanei-control px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-tanei-brand"
-          />
+          <label className="flex items-center gap-1.5 min-w-0 flex-1">
+            <span className="text-xs font-bold text-tanei-ink-muted flex-shrink-0">設計名</span>
+            <input
+              type="text"
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              placeholder={DEFAULT_FURNITURE_PROJECT_NAME}
+              aria-label="設計の名前"
+              className="min-w-0 flex-1 border border-tanei-border rounded-tanei-control px-2.5 py-1.5 text-sm text-tanei-ink font-bold bg-white focus:outline-none focus:ring-2 focus:ring-tanei-brand"
+            />
+          </label>
           <button
             type="button"
             onClick={handleSave}
