@@ -395,6 +395,9 @@ const sessionIdFromUrl = new URLSearchParams(location.search).get('sessionId');
 const sessionId = sessionIdFromUrl && SESSION_ID_PATTERN.test(sessionIdFromUrl) ? sessionIdFromUrl : crypto.randomUUID();
 
 const form = document.getElementById('render-form');
+// チャット/ブラウザCAD側から届いたStudioSpec.kindを記憶しておき、フォーム送信時に
+// /api/renderへそのまま含める（'box'|'table'。未指定・不正値は既存どおり'box'として扱う）
+let currentKind = 'box';
 const submitBtn = document.getElementById('submit-btn');
 const statusEl = document.getElementById('status');
 const imageArea = document.getElementById('image-area');
@@ -704,6 +707,7 @@ function collectPayloadFromForm() {
   return {
     sessionId,
     item: formData.get('item'),
+    kind: currentKind,
     width: Number(formData.get('width')),
     depth: Number(formData.get('depth')),
     height: Number(formData.get('height')),
@@ -717,6 +721,7 @@ function collectPayloadFromForm() {
 // チャット側から届いた仕様(spec)をフォームの各入力欄に反映する。
 // 未指定の項目（thickness/panelFinishes等、チャット側が省略した場合）は既存の値を保持する
 function applySpecToForm(spec) {
+  if (spec.kind === 'table' || spec.kind === 'box') currentKind = spec.kind;
   if (spec.item != null) form.item.value = spec.item;
   if (spec.width != null) form.width.value = spec.width;
   if (spec.depth != null) form.depth.value = spec.depth;

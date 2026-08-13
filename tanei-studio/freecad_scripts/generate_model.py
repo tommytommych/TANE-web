@@ -153,6 +153,86 @@ def compute_panels(width_mm, depth_mm, height_mm, thickness_mm, back_thickness_m
     ]
 
 
+## --- テーブル（天板+脚+幕板、箱体なし）---
+## 天板・底板・側板・背板からなる箱型とは構造そのものが異なる家具タイプ（TANE:iブラウザCAD
+## 側のFurnitureDesign.kind:'table'に対応）。既存のFOUNDATION_PART_DEFS（脚・幕板・
+## キャスター）は「常に存在する箱本体の下に取り付く飾り足」という構造（z=0＝箱の底板下面から
+## 下向き）のため再利用できない（脚が本体の主要な高さを構成するテーブルとは根本的に構造が
+## 異なる）。定数・計算式はブラウザCAD側（app/lib/cad/geometry.tsのbuildDefaultTablePanels、
+## TypeScript側の実装）と完全に一致させ、CADと完成イメージの寸法がズレないようにしている
+
+TABLE_LEG_SIZE_MM = 40
+TABLE_LEG_INSET_MM = 20
+TABLE_APRON_HEIGHT_MM = 80
+
+
+def compute_table_panels(width_mm, depth_mm, height_mm, thickness_mm, material, panel_finishes=None):
+    """テーブル（天板1枚+脚4本+幕板4枚）のパネル構成を計算する。compute_panels()と対になる
+    関数で、天板・底板・側板・背板といった箱型固有の語彙は一切使わない。
+
+    脚は床（z=0）から天板下面（legHeight=height_mm-thickness_mm）まで届くフルハイトで配置し、
+    幕板は天板のすぐ下で隣り合う脚同士をつなぐ枠として配置する（実際の仕口を厳密に再現する
+    ものではなく、木取り図・3D表示・完成イメージ向けの簡易的な構造表現）。
+    """
+    if width_mm <= 0 or depth_mm <= 0 or height_mm <= 0 or thickness_mm <= 0:
+        raise ValueError("width/depth/height/thicknessは正の数値で指定してください。")
+
+    leg_height = height_mm - thickness_mm
+    if leg_height <= TABLE_APRON_HEIGHT_MM:
+        raise ValueError(f"高さ({height_mm}mm)が天板の厚み・幕板の高さに対して小さすぎます。")
+
+    leg_x1 = TABLE_LEG_INSET_MM
+    leg_x2 = width_mm - TABLE_LEG_INSET_MM - TABLE_LEG_SIZE_MM
+    leg_y1 = TABLE_LEG_INSET_MM
+    leg_y2 = depth_mm - TABLE_LEG_INSET_MM - TABLE_LEG_SIZE_MM
+    if leg_x2 <= leg_x1 or leg_y2 <= leg_y1:
+        raise ValueError("widthまたはdepthが脚を配置するには小さすぎます。")
+
+    def _panel(label, pos, size):
+        return {
+            "label": label,
+            "material": material,
+            "finish": _finish_for(label, panel_finishes),
+            "size": size,
+            "pos": pos,
+            "cut_w": size[0],
+            "cut_d": size[1],
+            "cut_t": size[2],
+        }
+
+    panels = [
+        _panel("天板", (0, 0, height_mm - thickness_mm), (width_mm, depth_mm, thickness_mm)),
+        _panel("脚（前左）", (leg_x1, leg_y1, 0), (TABLE_LEG_SIZE_MM, TABLE_LEG_SIZE_MM, leg_height)),
+        _panel("脚（前右）", (leg_x2, leg_y1, 0), (TABLE_LEG_SIZE_MM, TABLE_LEG_SIZE_MM, leg_height)),
+        _panel("脚（奥左）", (leg_x1, leg_y2, 0), (TABLE_LEG_SIZE_MM, TABLE_LEG_SIZE_MM, leg_height)),
+        _panel("脚（奥右）", (leg_x2, leg_y2, 0), (TABLE_LEG_SIZE_MM, TABLE_LEG_SIZE_MM, leg_height)),
+    ]
+
+    apron_z = leg_height - TABLE_APRON_HEIGHT_MM
+    apron_span_x = leg_x2 - (leg_x1 + TABLE_LEG_SIZE_MM)
+    apron_span_y = leg_y2 - (leg_y1 + TABLE_LEG_SIZE_MM)
+    t = thickness_mm
+
+    panels.append(_panel(
+        "幕板（前）", (leg_x1 + TABLE_LEG_SIZE_MM, leg_y1, apron_z), (apron_span_x, t, TABLE_APRON_HEIGHT_MM)
+    ))
+    panels.append(_panel(
+        "幕板（奥）",
+        (leg_x1 + TABLE_LEG_SIZE_MM, leg_y2 + TABLE_LEG_SIZE_MM - t, apron_z),
+        (apron_span_x, t, TABLE_APRON_HEIGHT_MM),
+    ))
+    panels.append(_panel(
+        "幕板（左）", (leg_x1, leg_y1 + TABLE_LEG_SIZE_MM, apron_z), (t, apron_span_y, TABLE_APRON_HEIGHT_MM)
+    ))
+    panels.append(_panel(
+        "幕板（右）",
+        (leg_x2 + TABLE_LEG_SIZE_MM - t, leg_y1 + TABLE_LEG_SIZE_MM, apron_z),
+        (t, apron_span_y, TABLE_APRON_HEIGHT_MM),
+    ))
+
+    return panels
+
+
 ## --- 追加パーツ（オプションパーツ）---
 ## 基本の箱（天板・底板・側板・背板）に加えて、扉・脚・棚板などの追加パーツを
 ## 選択式で組み込めるようにする。各オプションパーツの生成関数は、compute_panels()と
@@ -1051,14 +1131,22 @@ def main():
     material = params.get("material", "パイン集成材")
     panel_finishes = params.get("panelFinishes") or {}
     options = params.get("options") or {}
+    # kind未指定・不正値は既存仕様どおり'box'として扱う（後方互換。TANE:iブラウザCAD側の
+    # FurnitureDesign.kindと同じ考え方）
+    kind = params.get("kind") if params.get("kind") in ("box", "table") else "box"
     output_dir = params["outputDir"]
 
     os.makedirs(output_dir, exist_ok=True)
 
-    panels = compute_panels(width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material, panel_finishes)
-    panels += compute_option_panels(
-        width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material, panel_finishes, options
-    )
+    if kind == "table":
+        # テーブルは箱本体を持たないため、天板+脚+幕板のみで構成する
+        # （既存のcompute_option_panelsによる脚・幕板追加は箱本体前提のため使わない）
+        panels = compute_table_panels(width, depth, height, thickness, material, panel_finishes)
+    else:
+        panels = compute_panels(width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material, panel_finishes)
+        panels += compute_option_panels(
+            width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material, panel_finishes, options
+        )
 
     fcstd_path = os.path.join(output_dir, "model.FCStd")
     csv_path = os.path.join(output_dir, "cutlist.csv")
