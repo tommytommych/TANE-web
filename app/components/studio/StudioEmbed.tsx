@@ -79,7 +79,7 @@ export default function StudioEmbed() {
 
   const handleDownloadCutSheet = useCallback(async () => {
     if (!latestSpec) {
-      showStatus('先に設計スタジオでレンダリングしてから、もう一度お試しください。');
+      showStatus('先に完成イメージを生成してから、もう一度お試しください。');
       return;
     }
 
@@ -125,14 +125,14 @@ export default function StudioEmbed() {
         >
           {cameFromCad ? '← CADに戻る' : '← チャットに戻る'}
         </Link>
-        <span className="text-sm font-black text-tanei-brand truncate">🌱 TANE:i 設計スタジオ（完成イメージ）</span>
+        <span className="text-sm font-black text-tanei-brand truncate">🌱 TANE:i 完成イメージ</span>
 
         <button
           type="button"
           onClick={() => setIsSettingsOpen((prev) => !prev)}
           className="ml-auto flex-shrink-0 text-sm text-tanei-ink-muted hover:text-tanei-brand px-2 py-2 rounded-tanei-control transition-colors"
-          title="設計スタジオの接続先を設定"
-          aria-label="設計スタジオの接続先を設定"
+          title="完成イメージの接続先を設定"
+          aria-label="完成イメージの接続先を設定"
         >
           ⚙️
         </button>
@@ -149,15 +149,15 @@ export default function StudioEmbed() {
       </div>
 
       <p className="px-4 py-1.5 border-b border-tanei-border bg-amber-50 text-amber-800 text-[11px] text-center flex-shrink-0">
-        ⚠️ 完成イメージ（設計スタジオ）はパソコン専用機能です。実際の寸法・構造はブラウザCADで調整してください。スマートフォンでご利用の場合は⚙️から接続先の設定が必要です。
+        AIが提案した家具を、完成したときのイメージで確認できます（パソコン専用機能）。寸法や構造の変更はブラウザCADで行えます。スマートフォンでご利用の場合は⚙️から接続先の設定が必要です。
       </p>
 
       {isSettingsOpen && (
         <div className="px-4 py-3 border-b border-tanei-border bg-tanei-brand-soft flex-shrink-0 text-sm">
-          <p className="font-bold text-tanei-ink mb-1">設計スタジオの接続先</p>
+          <p className="font-bold text-tanei-ink mb-1">完成イメージの接続先</p>
           <p className="text-tanei-ink-muted text-xs leading-relaxed mb-2">
-            設計スタジオはオペレーターのパソコン上でしか起動できません。そのパソコンのブラウザからは
-            そのまま使えますが、スマートフォン等の別端末から開く場合は、設計スタジオを起動している
+            完成イメージ機能はオペレーターのパソコン上でしか起動できません。そのパソコンのブラウザからは
+            そのまま使えますが、スマートフォン等の別端末から開く場合は、完成イメージ機能を起動している
             パソコンと同じWi-Fiに接続したうえで、そのパソコンのIPアドレス（例: 192.168.1.23:5002）を
             下に入力してください。
           </p>
@@ -191,7 +191,7 @@ export default function StudioEmbed() {
 
       <iframe
         src={sessionId ? `${studioBaseUrl}?sessionId=${encodeURIComponent(sessionId)}` : studioBaseUrl}
-        title="TANE:i 設計スタジオ"
+        title="TANE:i 完成イメージ"
         className="flex-1 w-full border-0"
       />
     </div>

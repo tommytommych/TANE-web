@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import StudioEmbed from '../../components/studio/StudioEmbed';
 
 export const metadata: Metadata = {
-  title: 'TANE:i 設計スタジオ',
+  title: 'TANE:i 完成イメージ',
 };
 
 export default function StudioPage() {

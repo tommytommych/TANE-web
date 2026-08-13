@@ -198,19 +198,14 @@ export default function LeftSidebar({
               ))}
 
               {/* Phase 4-01調査で判明：この2つが同じ見た目で並んでいると、初見ユーザーは
-                  何が違うのか・自分はどちらを使えばいいのか判断できなかった。Phase 4-03で、
-                  ①順番をブラウザCAD→設計スタジオに（設定不要ですぐ使える方を先に）、
-                  ②短い案内文を追加、③ブラウザCADだけ既存のtanei-brand系トークンで軽く
-                  強調、④それぞれの用途が一目で分かる説明を追加した。リンク先（/app/cad・
+                  何が違うのか・自分はどちらを使えばいいのか判断できなかった。TANE:iの
+                  設計画面はブラウザCADのみで、完成イメージ（旧「設計スタジオ」表記）は
+                  完成した姿を見るための補助機能という位置づけのため、「どちらで設計する？」
+                  という2択前提の文言をやめ、マイページの「設計する」「制作・作品」と同じ
+                  役割別の小見出しスタイルで「設計」「確認」に分ける。リンク先（/app/cad・
                   /app/studio）・onConsumeImageUsageによる利用回数チェック・onCloseの
                   挙動はいずれも変更していない */}
-              <p className="px-3 text-[11px] text-tanei-ink-muted">
-                どちらで設計する？　迷ったら<span className="font-bold text-tanei-brand">ブラウザCAD</span>がおすすめです
-              </p>
-
-              {/* ブラウザCAD（React Three Fiber）はPC不要でスマホからも使えるため、
-                  設計スタジオ（FreeCAD版）とは別枠のリンクにしている。サーバー負荷が
-                  ないため「本日のAI機能利用」の消費対象にもしていない */}
+              <p className="px-3 text-[11px] font-bold text-tanei-ink-muted">設計</p>
               <Link
                 href="/app/cad"
                 onClick={onClose}
@@ -223,6 +218,7 @@ export default function LeftSidebar({
                 </span>
               </Link>
 
+              <p className="px-3 text-[11px] font-bold text-tanei-ink-muted mt-1.5">確認</p>
               <Link
                 href="/app/studio"
                 onClick={(e) => {
@@ -237,9 +233,9 @@ export default function LeftSidebar({
                 title="パソコン専用機能です"
                 className="flex items-center gap-3 px-3 py-2.5 rounded-tanei-control text-sm bg-tanei-surface hover:bg-white border border-transparent hover:border-tanei-border text-tanei-ink transition-colors w-full text-left"
               >
-                <span>🖥</span>
+                <span>✨</span>
                 <span className="flex flex-col leading-tight min-w-0">
-                  <span className="font-bold">設計スタジオ</span>
+                  <span className="font-bold">完成イメージ</span>
                   <span className="text-[10px] font-normal text-tanei-ink-muted">PC専用／写真のようなリアルな完成イメージを見る</span>
                 </span>
               </Link>

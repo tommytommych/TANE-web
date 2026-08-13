@@ -125,11 +125,26 @@ function CompletionCards({
       {/* 天板・底板・側板・背板からなる箱型の家具のみ、AIがtanei-studio-specブロックを
           出力する（Phase 4-01調査で判明：この時点まではブラウザCAD（/app/cad）への導線が
           一切無く、設計スタジオ（要PCローカルサーバー）しか選べなかった）。Phase 4-02で、
-          設定不要でスマホからも使えるブラウザCADを選択肢として追加する。強制はせず、
-          先頭に置き控えめな強調色（tanei-brand-soft）にとどめることで自然に選びやすくする。
-          設計スタジオ側の導線（handleOpenInStudio・pushSpecToStudio）は変更しない */}
+          設定不要でスマホからも使えるブラウザCADを選択肢として追加する。TANE:iの設計画面は
+          ブラウザCADのみで、完成イメージは「見る」ための補助機能という位置づけのため、
+          表示順は基本導線（AI提案→完成イメージを見る→ブラウザCADで設計する）に合わせて
+          完成イメージを先に置くが、強調色（tanei-brand-soft）は引き続き実際の設計画面である
+          ブラウザCAD側に付ける。完成イメージ側の導線（handleOpenInStudio・pushSpecToStudio）
+          は変更しない */}
       {studioSpec && (
         <div className="flex flex-col gap-1.5 mb-2">
+          <button
+            type="button"
+            onClick={handleOpenInStudio}
+            title="パソコン専用機能です"
+            className="flex items-center gap-2.5 px-3 py-2.5 rounded-tanei-card border border-tanei-border bg-white text-tanei-ink hover:border-tanei-brand transition-colors text-left"
+          >
+            <span className="text-lg flex-shrink-0">✨</span>
+            <span className="flex flex-col leading-tight min-w-0">
+              <span className="text-xs font-bold">完成イメージを見る</span>
+              <span className="text-[10px] text-tanei-ink-muted">PC専用／写真のようなリアルな完成イメージを見る</span>
+            </span>
+          </button>
           {/* Phase 4-07：クリック時、既存のstudioSpec（AIが提案した確定仕様、変更しない）を
               一時的にsessionStorageへ書き込んでから/app/cadへ遷移する。CadPageShell.tsx側が
               マウント時に読み取り、既存のinitialDesignプロパティ（CadStudio.tsxに元々ある、
@@ -152,25 +167,13 @@ function CompletionCards({
               <span className="text-xs font-bold">ブラウザCADで設計する</span>
               <span className="text-[10px] text-tanei-ink-muted">スマホ・PC対応／インストール不要ですぐ使えます</span>
               {/* Phase 4-09監査で判明：この2択のどちらがAI提案の寸法を引き継ぐのか、
-                  説明文からは判断できなかった（設計スタジオ側もpushSpecToStudioで
+                  説明文からは判断できなかった（完成イメージ側もpushSpecToStudioで
                   既存仕様を引き継ぐため、「寸法を引き継ぐこと」自体は差別化にならない）。
                   Phase 4-07・4-08で実際に反映される幅・奥行・高さ・板厚の4項目だけを
                   事実として記載する（品名・材料は現状反映されないため書かない） */}
               <span className="text-[10px] text-tanei-ink-muted">AI提案の寸法（幅・奥行・高さ・板厚）をそのまま引き継ぎます</span>
             </span>
           </Link>
-          <button
-            type="button"
-            onClick={handleOpenInStudio}
-            title="パソコン専用機能です"
-            className="flex items-center gap-2.5 px-3 py-2.5 rounded-tanei-card border border-tanei-border bg-white text-tanei-ink hover:border-tanei-brand transition-colors text-left"
-          >
-            <span className="text-lg flex-shrink-0">🖥</span>
-            <span className="flex flex-col leading-tight min-w-0">
-              <span className="text-xs font-bold">設計スタジオで開く</span>
-              <span className="text-[10px] text-tanei-ink-muted">PC専用／写真のようなリアルな完成イメージを見る</span>
-            </span>
-          </button>
         </div>
       )}
 
