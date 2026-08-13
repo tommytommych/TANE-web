@@ -10,6 +10,9 @@ interface CadPartsPanelProps {
   model: FurnitureModel;
   backPanel: boolean;
   legs: boolean;
+  /** 家具の構造の種類。'table'のときは棚板・背板・脚の切り替えUIを表示しない
+   * （テーブルは天板+脚+幕板という固定構成のため）。省略時は既存どおり箱型として扱う */
+  kind?: 'box' | 'table';
   selectedPanelId: string | null;
   onAddShelf: () => void;
   onToggleBackPanel: () => void;
@@ -21,6 +24,7 @@ export default function CadPartsPanel({
   model,
   backPanel,
   legs,
+  kind,
   selectedPanelId,
   onAddShelf,
   onToggleBackPanel,
@@ -28,6 +32,7 @@ export default function CadPartsPanel({
   onSelectPanel,
 }: CadPartsPanelProps) {
   const shelves = model.panels.filter((p) => p.kind === 'shelf');
+  const isTable = kind === 'table';
 
   return (
     <div className="flex flex-col gap-3 p-4 pt-0 text-sm">
@@ -35,25 +40,33 @@ export default function CadPartsPanel({
         <span className="font-bold text-tanei-ink">パーツ</span>
       </div>
 
-      <button
-        type="button"
-        onClick={onAddShelf}
-        className="w-full bg-tanei-brand text-white px-4 py-2.5 rounded-tanei-control text-sm font-bold hover:bg-tanei-brand-dark transition-colors"
-      >
-        ＋ 棚板を追加
-      </button>
+      {isTable ? (
+        <p className="text-xs text-tanei-ink-muted">
+          テーブルは天板・脚・幕板で構成されています。
+        </p>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={onAddShelf}
+            className="w-full bg-tanei-brand text-white px-4 py-2.5 rounded-tanei-control text-sm font-bold hover:bg-tanei-brand-dark transition-colors"
+          >
+            ＋ 棚板を追加
+          </button>
 
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" checked={backPanel} onChange={onToggleBackPanel} className="h-4 w-4 accent-tanei-brand" />
-        <span className="text-tanei-ink">背板あり</span>
-      </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={backPanel} onChange={onToggleBackPanel} className="h-4 w-4 accent-tanei-brand" />
+            <span className="text-tanei-ink">背板あり</span>
+          </label>
 
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" checked={legs} onChange={onToggleLegs} className="h-4 w-4 accent-tanei-brand" />
-        <span className="text-tanei-ink">脚あり</span>
-      </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={legs} onChange={onToggleLegs} className="h-4 w-4 accent-tanei-brand" />
+            <span className="text-tanei-ink">脚あり</span>
+          </label>
+        </>
+      )}
 
-      {shelves.length > 0 && (
+      {!isTable && shelves.length > 0 && (
         <ul className="flex flex-col gap-1.5">
           {shelves.map((shelf) => (
             <li key={shelf.id}>

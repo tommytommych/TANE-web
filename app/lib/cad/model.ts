@@ -85,6 +85,23 @@ export function createDefaultFurnitureDesign(): FurnitureDesign {
   return design;
 }
 
+/** テーブル（天板+脚+幕板）の初期状態。幅1200×奥行700×高さ700mm、板厚25mmが既定値。
+ * backPanel/legs/shelvesは既存のFurnitureDesign型との互換のため残すだけの未使用値
+ * （テーブルの脚・幕板の有無はkind:'table'自体が表しており、geometry.tsの
+ * buildDefaultTablePanelsはこれらのフィールドを一切参照しない） */
+export function createDefaultTableDesign(): FurnitureDesign {
+  return {
+    kind: 'table',
+    width: 1200,
+    depth: 700,
+    height: 700,
+    thickness: 25,
+    backPanel: false,
+    legs: true,
+    shelves: [],
+  };
+}
+
 /** 全ての棚板を、現在の家具寸法（側板・天板・底板・背板の内側）へ収まるよう再クランプする。
  * 家具全体の寸法変更・背板ON/OFFなど、棚板の許容範囲が変わりうる操作の後に必ず通す */
 export function withClampedShelves(design: FurnitureDesign): FurnitureDesign {
@@ -310,26 +327,37 @@ export interface FurnitureBuildStep {
 }
 
 export function buildFurnitureSteps(panels: FurniturePanel[]): FurnitureBuildStep[] {
+  // 'apron'（幕板）はテーブル（天板+脚+幕板）専用のパネル種類のため、これが含まれて
+  // いれば箱型ではなくテーブルの手順文言を組み立てる。新しいSTEPタイトル・新しい
+  // ステップ数は作らず、既存の9つのタイトル（材料を準備する〜仕上げを行う）はそのまま
+  // 使い、cutTargets/assembleTargets/positionTargetsの3箇所の文言だけを分岐させる
+  const isTable = panels.some((p) => p.kind === 'apron');
   const hasBackPanel = panels.some((p) => p.kind === 'back');
   const hasLegs = panels.some((p) => p.kind === 'leg');
   const shelfCount = panels.filter((p) => p.kind === 'shelf').length;
 
-  const cutTargets = ['天板・底板・側板', hasBackPanel && '背板', shelfCount > 0 && '棚板']
-    .filter((v): v is string => Boolean(v))
-    .join('・');
+  const cutTargets = isTable
+    ? '天板・脚・幕板'
+    : ['天板・底板・側板', hasBackPanel && '背板', shelfCount > 0 && '棚板']
+        .filter((v): v is string => Boolean(v))
+        .join('・');
 
-  const assembleTargets = [
-    '側板に底板・天板を固定',
-    shelfCount > 0 && '棚板を取り付け',
-    hasBackPanel && '背板を取り付け',
-    hasLegs && '脚を取り付け',
-  ]
-    .filter((v): v is string => Boolean(v))
-    .join('、');
+  const assembleTargets = isTable
+    ? '脚に幕板を固定して脚組みを作り、天板を取り付け'
+    : [
+        '側板に底板・天板を固定',
+        shelfCount > 0 && '棚板を取り付け',
+        hasBackPanel && '背板を取り付け',
+        hasLegs && '脚を取り付け',
+      ]
+        .filter((v): v is string => Boolean(v))
+        .join('、');
 
-  const positionTargets = ['天板・底板・側板', hasBackPanel && '背板', shelfCount > 0 && `棚板（${shelfCount}枚）`, hasLegs && '脚']
-    .filter((v): v is string => Boolean(v))
-    .join('・');
+  const positionTargets = isTable
+    ? '脚・幕板・天板'
+    : ['天板・底板・側板', hasBackPanel && '背板', shelfCount > 0 && `棚板（${shelfCount}枚）`, hasLegs && '脚']
+        .filter((v): v is string => Boolean(v))
+        .join('・');
 
   const steps: Omit<FurnitureBuildStep, 'stepNumber'>[] = [
     {
@@ -389,6 +417,7 @@ export const CUT_LIST_KIND_NAME: Partial<Record<FurniturePanelKind, string>> = {
   back: '背板',
   shelf: '棚板',
   leg: '脚',
+  apron: '幕板',
 };
 
 export interface CutListItem {

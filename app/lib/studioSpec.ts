@@ -8,6 +8,8 @@ export type PanelFinish = 'clear' | 'walnut' | 'white' | 'black';
 
 export interface StudioSpec {
   item: string;
+  /** 家具の構造の種類。省略時は既存仕様どおり箱型（'box'）として扱う（後方互換） */
+  kind?: 'box' | 'table';
   width: number;
   depth: number;
   height: number;
@@ -32,6 +34,7 @@ export const isValidStudioSpec = (value: unknown): value is StudioSpec => {
   const v = value as Record<string, unknown>;
   return (
     typeof v.item === 'string' &&
+    (v.kind === undefined || v.kind === 'box' || v.kind === 'table') &&
     typeof v.width === 'number' &&
     typeof v.depth === 'number' &&
     typeof v.height === 'number' &&
@@ -103,12 +106,28 @@ export const CAD_INITIAL_DESIGN_SESSION_KEY = 'tanei-cad-initial-design-v1';
 // backPanel・legs・shelvesはStudioSpec側に存在しない値のため、systemPrompt.tsが
 // 前提としている「天板・底板・側板・背板からなる棚なし箱型」という既存ルールに忠実な
 // 既定値（背板あり・脚なし・棚なし）で補うだけで、新しい推測ロジックは追加しない
-export const studioSpecToFurnitureDesign = (spec: StudioSpec): FurnitureDesign => ({
-  width: spec.width,
-  depth: spec.depth,
-  height: spec.height,
-  thickness: spec.thickness ?? DEFAULT_THICKNESS_MM,
-  backPanel: true,
-  legs: false,
-  shelves: [],
-});
+export const studioSpecToFurnitureDesign = (spec: StudioSpec): FurnitureDesign => {
+  if (spec.kind === 'table') {
+    // テーブル（天板+脚+幕板）の場合、backPanel/legs/shelvesは型互換のためのプレースホルダー
+    // 値で、geometry.tsのbuildDefaultTablePanelsはこれらを一切参照しない
+    return {
+      kind: 'table',
+      width: spec.width,
+      depth: spec.depth,
+      height: spec.height,
+      thickness: spec.thickness ?? DEFAULT_THICKNESS_MM,
+      backPanel: false,
+      legs: true,
+      shelves: [],
+    };
+  }
+  return {
+    width: spec.width,
+    depth: spec.depth,
+    height: spec.height,
+    thickness: spec.thickness ?? DEFAULT_THICKNESS_MM,
+    backPanel: true,
+    legs: false,
+    shelves: [],
+  };
+};

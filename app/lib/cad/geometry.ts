@@ -149,6 +149,99 @@ function buildLegPanels({ width, depth, thickness: t }: BoxDimensions): Furnitur
   }));
 }
 
+// テーブル（天板+脚+幕板）専用の寸法定数。箱型のLEG_SIZE_MM/LEG_HEIGHT_MMとは別に持つ
+// （箱型の脚は本体の下にぶら下がる短い飾り脚、テーブルの脚は床から天板下面まで届く
+// 構造材のため、太さ・高さの考え方がそもそも異なる）
+const TABLE_LEG_SIZE_MM = 40;
+const TABLE_LEG_INSET_MM = 20;
+const TABLE_APRON_HEIGHT_MM = 80;
+
+/**
+ * テーブル（天板+脚4本+幕板4枚）のパネル一式を計算する。箱型のbuildDefaultFurniturePanelsと
+ * 対になる関数。天板・底板・側板・背板といった箱型固有の語彙は一切使わない。
+ * 脚は床（z=0）から天板下面まで届くフルハイトで配置し、幕板は天板のすぐ下で
+ * 隣り合う脚同士をつなぐ枠として配置する（実際の仕口を厳密に再現するものではなく、
+ * 木取り図・3D表示・作り方ガイド向けの簡易的な構造表現）
+ */
+export function buildDefaultTablePanels({ width, depth, height, thickness: t }: BoxDimensions): FurniturePanel[] {
+  if (width <= 0 || depth <= 0 || height <= 0 || t <= 0) {
+    throw new Error('width/depth/height/thicknessは正の数値で指定してください。');
+  }
+  const legHeight = height - t;
+  if (legHeight <= TABLE_APRON_HEIGHT_MM) {
+    throw new Error('heightが天板の厚み・幕板の高さに対して小さすぎます。');
+  }
+
+  const legX1 = TABLE_LEG_INSET_MM;
+  const legX2 = width - TABLE_LEG_INSET_MM - TABLE_LEG_SIZE_MM;
+  const legY1 = TABLE_LEG_INSET_MM;
+  const legY2 = depth - TABLE_LEG_INSET_MM - TABLE_LEG_SIZE_MM;
+  if (legX2 <= legX1 || legY2 <= legY1) {
+    throw new Error('widthまたはdepthが脚を配置するには小さすぎます。');
+  }
+
+  const panels: FurniturePanel[] = [
+    {
+      id: 'top',
+      kind: 'top',
+      label: '天板',
+      position: vec3(0, 0, height - t),
+      size: vec3(width, depth, t),
+    },
+  ];
+
+  const legPositions: { id: string; label: string; x: number; y: number }[] = [
+    { id: 'leg-front-left', label: '脚（前左）', x: legX1, y: legY1 },
+    { id: 'leg-front-right', label: '脚（前右）', x: legX2, y: legY1 },
+    { id: 'leg-back-left', label: '脚（奥左）', x: legX1, y: legY2 },
+    { id: 'leg-back-right', label: '脚（奥右）', x: legX2, y: legY2 },
+  ];
+  for (const p of legPositions) {
+    panels.push({
+      id: p.id,
+      kind: 'leg',
+      label: p.label,
+      position: vec3(p.x, p.y, 0),
+      size: vec3(TABLE_LEG_SIZE_MM, TABLE_LEG_SIZE_MM, legHeight),
+    });
+  }
+
+  const apronZ = legHeight - TABLE_APRON_HEIGHT_MM;
+  const apronSpanX = legX2 - (legX1 + TABLE_LEG_SIZE_MM);
+  const apronSpanY = legY2 - (legY1 + TABLE_LEG_SIZE_MM);
+  const aprons: { id: string; label: string; position: Vector3Mm; size: Vector3Mm }[] = [
+    {
+      id: 'apron-front',
+      label: '幕板（前）',
+      position: vec3(legX1 + TABLE_LEG_SIZE_MM, legY1, apronZ),
+      size: vec3(apronSpanX, t, TABLE_APRON_HEIGHT_MM),
+    },
+    {
+      id: 'apron-back',
+      label: '幕板（奥）',
+      position: vec3(legX1 + TABLE_LEG_SIZE_MM, legY2 + TABLE_LEG_SIZE_MM - t, apronZ),
+      size: vec3(apronSpanX, t, TABLE_APRON_HEIGHT_MM),
+    },
+    {
+      id: 'apron-left',
+      label: '幕板（左）',
+      position: vec3(legX1, legY1 + TABLE_LEG_SIZE_MM, apronZ),
+      size: vec3(t, apronSpanY, TABLE_APRON_HEIGHT_MM),
+    },
+    {
+      id: 'apron-right',
+      label: '幕板（右）',
+      position: vec3(legX2 + TABLE_LEG_SIZE_MM - t, legY1 + TABLE_LEG_SIZE_MM, apronZ),
+      size: vec3(t, apronSpanY, TABLE_APRON_HEIGHT_MM),
+    },
+  ];
+  for (const a of aprons) {
+    panels.push({ id: a.id, kind: 'apron', label: a.label, position: a.position, size: a.size });
+  }
+
+  return panels;
+}
+
 /**
  * FurnitureDesign全体から、実際に描画・木取りに使うパネル一式を計算する
  * （FurnitureDesign → Panel[]の変換の本体）。
@@ -160,6 +253,10 @@ export function buildFurniturePanels(design: FurnitureDesign): FurniturePanel[] 
     height: design.height,
     thickness: design.thickness,
   };
+
+  if (design.kind === 'table') {
+    return buildDefaultTablePanels(dims);
+  }
 
   let panels = buildDefaultFurniturePanels(dims);
   if (!design.backPanel) {

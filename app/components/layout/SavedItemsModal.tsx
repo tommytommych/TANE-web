@@ -1170,18 +1170,30 @@ export default function SavedItemsModal({
                       <p className="text-tanei-ink-muted">材料</p>
                       <p className="font-bold text-tanei-ink break-words">{viewingRelatedProject.material}</p>
                     </div>
-                    <div>
-                      <p className="text-tanei-ink-muted">棚板</p>
-                      <p className="font-bold text-tanei-ink">{viewingRelatedProject.design.shelves.length} 枚</p>
-                    </div>
-                    <div>
-                      <p className="text-tanei-ink-muted">背板</p>
-                      <p className="font-bold text-tanei-ink">{viewingRelatedProject.design.backPanel ? 'あり' : 'なし'}</p>
-                    </div>
-                    <div>
-                      <p className="text-tanei-ink-muted">脚</p>
-                      <p className="font-bold text-tanei-ink">{viewingRelatedProject.design.legs ? 'あり' : 'なし'}</p>
-                    </div>
+                    {/* テーブル（design.kind==='table'）はbackPanel/legs/shelvesが型互換のための
+                        未使用プレースホルダー値のため、そのまま表示せず構造の説明1行に置き換える。
+                        箱型（既存、kindが無いデータも含む）はこれまでどおり3項目を表示する */}
+                    {viewingRelatedProject.design.kind === 'table' ? (
+                      <div className="col-span-2">
+                        <p className="text-tanei-ink-muted">構造</p>
+                        <p className="font-bold text-tanei-ink">テーブル（天板+脚+幕板）</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div>
+                          <p className="text-tanei-ink-muted">棚板</p>
+                          <p className="font-bold text-tanei-ink">{viewingRelatedProject.design.shelves.length} 枚</p>
+                        </div>
+                        <div>
+                          <p className="text-tanei-ink-muted">背板</p>
+                          <p className="font-bold text-tanei-ink">{viewingRelatedProject.design.backPanel ? 'あり' : 'なし'}</p>
+                        </div>
+                        <div>
+                          <p className="text-tanei-ink-muted">脚</p>
+                          <p className="font-bold text-tanei-ink">{viewingRelatedProject.design.legs ? 'あり' : 'なし'}</p>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {viewingProgress && viewingBuildStatus && (

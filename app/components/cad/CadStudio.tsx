@@ -17,6 +17,7 @@ import {
   addShelfToDesign,
   buildFurnitureModel,
   createDefaultFurnitureDesign,
+  createDefaultTableDesign,
   FURNITURE_MATERIALS,
   removeShelfFromDesign,
   resizeFurnitureDesign,
@@ -267,6 +268,15 @@ export default function CadStudio({ initialDesign, initialProjectName, initialMa
     setDesign((prev) => setLegs(prev, !prev.legs));
   }, []);
 
+  // 家具の種類（箱型／テーブル）の切り替え。CadViewport.tsxの「正面から見る／斜めから見る」
+  // と同じ、明示的なボタン操作による切り替えという考え方を踏襲する。切り替えると
+  // 該当する種類の既定寸法へリセットする（別構造への切り替えのため、現在の寸法・
+  // 棚板等を引き継ごうとはしない）。選択中パネルもリセットする
+  const handleSwitchKind = useCallback((kind: 'box' | 'table') => {
+    setDesign(kind === 'table' ? createDefaultTableDesign() : createDefaultFurnitureDesign());
+    setSelectedPanelId(null);
+  }, []);
+
   const handleUpdateShelf = useCallback(
     (patch: { zAtMm?: number; widthMm?: number; depthMm?: number }) => {
       if (!selectedPanelId) return;
@@ -377,6 +387,34 @@ export default function CadStudio({ initialDesign, initialProjectName, initialMa
           </button>
         </div>
         {saveMessage && <p className="text-xs font-bold text-tanei-brand">{saveMessage}</p>}
+
+        {/* 家具の種類の切り替え。押すと該当する種類の既定寸法へリセットするため、
+            CadViewport.tsxの視点切り替えボタンと同じ「ピル型ボタン2つ」の見た目にして、
+            現在編集中の家具そのものを切り替える操作だと分かるようにしている */}
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => handleSwitchKind('box')}
+            className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-colors ${
+              design.kind !== 'table'
+                ? 'bg-tanei-brand text-white border-tanei-brand'
+                : 'bg-white text-tanei-ink-muted border-tanei-border hover:border-tanei-brand'
+            }`}
+          >
+            📦 箱型
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSwitchKind('table')}
+            className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-colors ${
+              design.kind === 'table'
+                ? 'bg-tanei-brand text-white border-tanei-brand'
+                : 'bg-white text-tanei-ink-muted border-tanei-border hover:border-tanei-brand'
+            }`}
+          >
+            🪑 テーブル
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-1 min-h-0 flex-col sm:flex-row">
@@ -392,6 +430,7 @@ export default function CadStudio({ initialDesign, initialProjectName, initialMa
             model={lastValidModel}
             backPanel={design.backPanel}
             legs={design.legs}
+            kind={design.kind}
             selectedPanelId={selectedPanelId}
             onAddShelf={handleAddShelf}
             onToggleBackPanel={handleToggleBackPanel}

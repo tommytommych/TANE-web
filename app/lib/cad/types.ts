@@ -27,7 +27,7 @@ export interface Vector3Mm {
 /** パネル1枚の役割（意味的な種類）。tanei-studioのラベル方式と違い、UIの言語に依存しない
  * 識別子にしている（表示用の日本語ラベルは別途labelフィールドに持たせる）。
  * 一覧にない特殊パーツは 'custom' + label で表現できるようにし、将来の拡張を妨げない */
-export type FurniturePanelKind = 'top' | 'bottom' | 'left' | 'right' | 'back' | 'shelf' | 'leg' | 'custom';
+export type FurniturePanelKind = 'top' | 'bottom' | 'left' | 'right' | 'back' | 'shelf' | 'leg' | 'apron' | 'custom';
 
 /** パネルの仕上げ（tanei-studio/app/lib/studioSpec.tsのPanelFinishと同じ語彙で揃えている） */
 export type PanelFinish = 'clear' | 'walnut' | 'white' | 'black';
@@ -90,6 +90,10 @@ export interface ShelfEntry {
  * データ駆動の流れを維持するための入力型。
  */
 export interface FurnitureDesign {
+  /** 家具の構造の種類。省略時は既存仕様どおり箱型（'box'）として扱う。
+   * テーブル（'table'）追加時、backPanel/legs/shelvesは型互換のため残すが未使用の
+   * プレースホルダー値になる（保存データの構造・isValidFurnitureDesignは変更しない） */
+  kind?: 'box' | 'table';
   width: number;
   depth: number;
   height: number;
@@ -106,6 +110,7 @@ export const isValidFurnitureDesign = (value: unknown): value is FurnitureDesign
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
   return (
+    (v.kind === undefined || v.kind === 'box' || v.kind === 'table') &&
     typeof v.width === 'number' &&
     typeof v.depth === 'number' &&
     typeof v.height === 'number' &&
