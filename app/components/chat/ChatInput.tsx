@@ -12,6 +12,7 @@ interface ChatInputProps {
   onSelectImage: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onClearImage: () => void;
   fileInputRef: RefObject<HTMLInputElement | null>;
+  textInputRef: RefObject<HTMLInputElement | null>;
 }
 
 export default function ChatInput({
@@ -24,6 +25,7 @@ export default function ChatInput({
   onSelectImage,
   onClearImage,
   fileInputRef,
+  textInputRef,
 }: ChatInputProps) {
   return (
     <div className="p-3 sm:p-5 bg-white border-t border-tanei-border">
@@ -58,6 +60,7 @@ export default function ChatInput({
           aria-label="相談用の写真を選択"
         />
         <input
+          ref={textInputRef}
           type="text"
           value={input}
           onChange={(e) => onInputChange(e.target.value)}

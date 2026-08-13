@@ -34,7 +34,14 @@ interface MessageBubbleProps {
     file?: { dataUrl: string; mimeType: string }
   ) => void;
   showToast: (msg: string) => void;
+  onFocusChatInput: () => void;
 }
+
+// AIが提示する選択肢の最後には、必ず「自由に入力する」（自由入力を促す文言）が付く
+// （systemPrompt.ts参照）。これはユーザーからの実際の回答ではないため、他の選択肢のように
+// そのままメッセージとして送信すると、AIが具体的な回答を得られず同じ質問を繰り返してしまう
+// （実際に報告された不具合）。クリックされたら送信せず、チャット入力欄にフォーカスするだけにする
+const isFreeInputOption = (option: string) => option.includes('自由') && option.includes('入力');
 
 const renderMessageContent = (content: string, isUser: boolean) => {
   if (!content) return null;
@@ -57,6 +64,7 @@ function MessageBubble({
   isGeneratingPdf,
   addItem,
   showToast,
+  onFocusChatInput,
 }: MessageBubbleProps) {
   // メッセージ本文が変わらない限り再計算しない（同じ内容を親の再レンダーのたびに
   // JSON.parseし直したり、シート材の自動配置を再計算したりする無駄を避ける）
@@ -126,7 +134,7 @@ function MessageBubble({
           {options.map((opt) => (
             <button
               key={opt}
-              onClick={() => onSendMessage(opt, true)}
+              onClick={() => (isFreeInputOption(opt) ? onFocusChatInput() : onSendMessage(opt, true))}
               className="text-xs font-bold bg-tanei-accent/10 hover:bg-tanei-accent hover:text-white text-tanei-accent border border-tanei-accent/30 px-3 py-1.5 rounded-full transition-all"
             >
               {opt}

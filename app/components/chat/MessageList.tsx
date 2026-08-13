@@ -23,6 +23,7 @@ interface MessageListProps {
     file?: { dataUrl: string; mimeType: string }
   ) => void;
   showToast: (msg: string) => void;
+  onFocusChatInput: () => void;
 }
 
 function MessageList({
@@ -38,6 +39,7 @@ function MessageList({
   isGeneratingPdf,
   addItem,
   showToast,
+  onFocusChatInput,
 }: MessageListProps) {
   return (
     <div className="w-full max-w-none space-y-4">
@@ -55,6 +57,7 @@ function MessageList({
           isGeneratingPdf={isGeneratingPdf}
           addItem={addItem}
           showToast={showToast}
+          onFocusChatInput={onFocusChatInput}
         />
       ))}
 

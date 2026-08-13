@@ -95,6 +95,7 @@ export default function Home() {
   const [shuffledTools, setShuffledTools] = useState(AMAZON_TOOLS);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // 保存用effectが、読み込み用effectより先に「読み込み前の初期state」で発火して
   // sessionStorageを上書きしてしまわないようにするためのガード（マウント直後の1回だけスキップする）
@@ -653,6 +654,7 @@ export default function Home() {
             isGeneratingPdf={isGeneratingPdf}
             addItem={addItem}
             showToast={showToast}
+            onFocusChatInput={() => textInputRef.current?.focus()}
           />
 
           {messages.length === 1 && (
@@ -673,6 +675,7 @@ export default function Home() {
           onSelectImage={handleImageSelect}
           onClearImage={() => setSelectedImage(null)}
           fileInputRef={fileInputRef}
+          textInputRef={textInputRef}
         />
       </div>
 
