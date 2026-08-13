@@ -353,11 +353,16 @@ export default function Home() {
 
   const handleDownloadCutSheetPdf = useCallback(async (
     materialGroups?: MaterialGroup[] | 'blank',
-    sheetLayouts?: SheetLayout[]
+    sheetLayouts?: SheetLayout[],
+    itemName?: string
   ) => {
     if (!consumeImageUsage()) return;
     const isBlank = materialGroups === 'blank';
     const usingChatData = !isBlank && ((!!materialGroups && materialGroups.length > 0) || (!!sheetLayouts && sheetLayouts.length > 0));
+    // 「テーブル」「棚」など、AIが会話コンテキスト（tanei-context）に記録した作品名。
+    // 保存したカット申込書が複数あるとき、一覧のメモだけで何のデータか分かるようにするため
+    // （Phase「カット申込書のメモ自動入力」）。無ければ従来どおりの汎用文言にフォールバックする
+    const itemLabel = itemName?.trim() || null;
     setIsGeneratingPdf(true);
     showToast(
       isBlank
@@ -386,7 +391,9 @@ export default function Home() {
         isBlank
           ? '手書き記入用の白紙カット申込書です。'
           : usingChatData
-          ? 'この会話の木取り図データをもとに生成したカット申込書です。'
+          ? itemLabel
+            ? `${itemLabel}の木取り図データをもとに生成したカット申込書です。`
+            : 'この会話の木取り図データをもとに生成したカット申込書です。'
           : 'サンプルデータで生成したカット申込書です。',
         { dataUrl: bytesToDataUrl(pdfByteArray, 'application/pdf'), mimeType: 'application/pdf' }
       );

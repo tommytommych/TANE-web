@@ -23,7 +23,7 @@ interface MessageBubbleProps {
   isLatest: boolean;
   onOpenGeminiImage: (prompt: string) => void;
   onSendMessage: (text: string, countUp?: boolean) => void;
-  onDownloadCutSheet: (materialGroups?: MaterialGroup[], sheetLayouts?: SheetLayout[]) => void;
+  onDownloadCutSheet: (materialGroups?: MaterialGroup[], sheetLayouts?: SheetLayout[], itemName?: string) => void;
   onDownloadAssemblyManual: (manual?: AssemblyManual) => void;
   onConsumeImageUsage: () => boolean;
   isGeneratingPdf: boolean;

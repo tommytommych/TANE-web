@@ -19,7 +19,7 @@ import { CAD_INITIAL_DESIGN_SESSION_KEY } from '../../lib/studioSpec';
 
 interface CompletionCardsProps {
   msg: Message;
-  onDownloadCutSheet: (materialGroups?: MaterialGroup[], sheetLayouts?: SheetLayout[]) => void;
+  onDownloadCutSheet: (materialGroups?: MaterialGroup[], sheetLayouts?: SheetLayout[], itemName?: string) => void;
   onConsumeImageUsage: () => boolean;
   isGeneratingPdf: boolean;
   addItem: (
@@ -107,7 +107,7 @@ function CompletionCards({
           {
             icon: isGeneratingPdf ? '⏳' : '📝',
             label: isGeneratingPdf ? '生成中…' : 'カット申込書',
-            onClick: () => onDownloadCutSheet(materialGroups ?? undefined, sheetLayouts ?? undefined),
+            onClick: () => onDownloadCutSheet(materialGroups ?? undefined, sheetLayouts ?? undefined, context?.item ?? undefined),
             accent: true,
             disabled: isGeneratingPdf,
           },
