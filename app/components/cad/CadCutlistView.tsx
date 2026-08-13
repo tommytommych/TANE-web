@@ -20,6 +20,7 @@ import {
   furnitureModelToDimensionalLumberItems,
   furnitureModelToSheetLayout,
   furnitureModelToSheetLayoutsByMaterial,
+  getAllowedMaterialsForPartLabel,
   type CutListItem,
   type PartMaterialLabel,
 } from '../../lib/cad/model';
@@ -226,6 +227,11 @@ export default function CadCutlistView({
                 </option>
               ))}
             </select>
+            {/* 「パーツごとに材料を分ける」で個別設定したパーツにはここを変えても反映
+                されない（下の一覧に「個別設定中」と表示される）ため、その旨を明記する */}
+            <span className="text-[11px] text-tanei-ink-muted font-normal">
+              個別設定していないパーツ全てに使われます
+            </span>
           </label>
 
           {/* パーツごとに材料を分ける（任意）。「天板はパイン集成材、脚・幕板はSPF材」のように、
@@ -246,7 +252,10 @@ export default function CadCutlistView({
                       className="border border-tanei-border rounded-tanei-control px-2 py-1.5 text-xs text-tanei-ink font-bold bg-white focus:outline-none focus:ring-2 focus:ring-tanei-brand"
                     >
                       <option value="">（全体の材料に合わせる）</option>
-                      {FURNITURE_MATERIALS.map((m) => (
+                      {/* 脚・幕板は規格材（SPF材系）、それ以外は板材のみに選択肢を絞り、
+                          「テーブルの脚が合板」のような現実にありえない組み合わせを
+                          選べないようにする（getAllowedMaterialsForPartLabel参照） */}
+                      {getAllowedMaterialsForPartLabel(label).map((m) => (
                         <option key={m} value={m}>
                           {m}
                         </option>
@@ -332,16 +341,35 @@ export default function CadCutlistView({
             <div>
               <h3 className="text-sm font-bold text-tanei-ink mb-1">パーツ一覧</h3>
               <ul className="rounded-tanei-control border border-tanei-border divide-y divide-tanei-border overflow-hidden bg-white">
-                {model.panels.map((panel) => (
-                  <li key={panel.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                    <span className="font-bold text-tanei-ink">{panel.label}</span>
-                    <span className="text-tanei-ink-muted text-xs text-right">
-                      {Math.round(panel.size.x)} × {Math.round(panel.size.y)} × {Math.round(panel.size.z)} mm
-                      <br />
-                      {panel.material ?? material}
-                    </span>
-                  </li>
-                ))}
+                {model.panels.map((panel) => {
+                  // panel.materialは、buildFurnitureModel()が「パーツごとに材料を分ける」の
+                  // 上書き（partMaterials）がある場合だけ設定する（geometry.ts側では設定
+                  // されない）。そのため値の有無＝このパーツだけ個別設定中、と判定できる
+                  const partLabel = CUT_LIST_KIND_NAME[panel.kind] as PartMaterialLabel | undefined;
+                  const isOverridden = Boolean(panel.material);
+                  return (
+                    <li key={panel.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                      <span className="font-bold text-tanei-ink">{panel.label}</span>
+                      <span className="text-tanei-ink-muted text-xs text-right">
+                        {Math.round(panel.size.x)} × {Math.round(panel.size.y)} × {Math.round(panel.size.z)} mm
+                        <br />
+                        {panel.material ?? material}
+                        {isOverridden && partLabel && (
+                          <>
+                            <span className="ml-1 text-tanei-accent font-bold">（個別設定中）</span>
+                            <button
+                              type="button"
+                              onClick={() => onPartMaterialChange(partLabel, '')}
+                              className="ml-1 underline hover:text-tanei-brand"
+                            >
+                              初期値に戻す
+                            </button>
+                          </>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
 

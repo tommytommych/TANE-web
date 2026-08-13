@@ -531,6 +531,20 @@ export const CUT_LIST_KIND_NAME: Partial<Record<FurniturePanelKind, string>> = {
 export type PartMaterialLabel = '天板' | '底板' | '側板' | '背板' | '棚板' | '脚' | '幕板';
 export const PART_MATERIAL_LABELS: PartMaterialLabel[] = ['天板', '底板', '側板', '背板', '棚板', '脚', '幕板'];
 
+// 脚・幕板は現実には規格材（SPF材等の角材）で作るパーツのため、パーツごとの材料選択で
+// 板材（パイン集成材・合板等）を選べてしまうと「テーブルの脚が合板」のような、現実には
+// ありえない組み合わせになってしまう。逆に天板・底板・側板・背板・棚板は板から切り出す
+// パーツのため、規格材は選択肢に出さない。getFurnitureMaterialType（材料名→板材/規格材の
+// 判定）をそのまま再利用し、パーツの種類ごとに矛盾しない材料だけを選べるようにする
+const DIMENSIONAL_LUMBER_ONLY_LABELS: readonly PartMaterialLabel[] = ['脚', '幕板'];
+
+export function getAllowedMaterialsForPartLabel(label: PartMaterialLabel): readonly FurnitureMaterial[] {
+  const wantType: FurnitureMaterialType = DIMENSIONAL_LUMBER_ONLY_LABELS.includes(label)
+    ? 'dimensionalLumber'
+    : 'sheet';
+  return FURNITURE_MATERIALS.filter((m) => getFurnitureMaterialType(m) === wantType);
+}
+
 export interface CutListItem {
   /** name・寸法（材料混在時はmaterialも）から作る安定したキー。同じ寸法・同じ名称・同じ
    * 材料のパーツをまとめる際のグループキーにも、チェック状態を保存する際のキーにも使う */
