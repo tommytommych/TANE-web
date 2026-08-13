@@ -218,7 +218,7 @@ export default function CadCutlistView({
             <select
               value={material}
               onChange={(e) => onMaterialChange(e.target.value)}
-              className="border border-tanei-border rounded-tanei-control px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-tanei-brand"
+              className="border border-tanei-border rounded-tanei-control px-3 py-2 text-sm text-tanei-ink font-bold bg-white focus:outline-none focus:ring-2 focus:ring-tanei-brand"
             >
               {FURNITURE_MATERIALS.map((m) => (
                 <option key={m} value={m}>
@@ -243,7 +243,7 @@ export default function CadCutlistView({
                     <select
                       value={partMaterials[label] ?? ''}
                       onChange={(e) => onPartMaterialChange(label, e.target.value)}
-                      className="border border-tanei-border rounded-tanei-control px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-tanei-brand"
+                      className="border border-tanei-border rounded-tanei-control px-2 py-1.5 text-xs text-tanei-ink font-bold bg-white focus:outline-none focus:ring-2 focus:ring-tanei-brand"
                     >
                       <option value="">（全体の材料に合わせる）</option>
                       {FURNITURE_MATERIALS.map((m) => (
