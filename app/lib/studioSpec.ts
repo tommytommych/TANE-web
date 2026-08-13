@@ -131,3 +131,25 @@ export const studioSpecToFurnitureDesign = (spec: StudioSpec): FurnitureDesign =
     shelves: [],
   };
 };
+
+// ブラウザCAD（CadStudio.tsx）から「完成イメージを見る」で設計スタジオへ送るための、
+// studioSpecToFurnitureDesign()とは逆方向の変換。設計スタジオ側のレンダリング処理
+// （tanei-studio/freecad_scripts/generate_model.pyのcompute_panels）は常に
+// 天板・底板・側板・背板の箱型パネルを生成する実装で、kind:'table'
+// （天板+脚+幕板、箱体なし）という概念が存在しない。そのためkind:'table'の設計を
+// 渡すとCADでの見た目と矛盾した「閉じた箱」が生成されてしまうため、その場合はnullを
+// 返し、呼び出し側（CadStudio.tsx）で「完成イメージを見る」を無効化する判断材料にする
+export const furnitureDesignToStudioSpec = (
+  design: FurnitureDesign,
+  opts: { item: string; material: string }
+): StudioSpec | null => {
+  if (design.kind === 'table') return null;
+  return {
+    item: opts.item,
+    width: design.width,
+    depth: design.depth,
+    height: design.height,
+    thickness: design.thickness,
+    material: opts.material,
+  };
+};

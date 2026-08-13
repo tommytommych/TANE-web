@@ -6,6 +6,7 @@
 // 毎回再計算） → 3D表示、というデータ駆動の流れを維持している。
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import CadViewport from './CadViewport';
 import CadControls from './CadControls';
 import CadPartsPanel from './CadPartsPanel';
@@ -33,6 +34,8 @@ import {
   saveFurnitureProject,
   type SavedFurnitureProject,
 } from '../../lib/cad/projectStore';
+import { furnitureDesignToStudioSpec } from '../../lib/studioSpec';
+import { pushSpecToStudio } from '../../lib/studioSync';
 
 interface CadStudioProps {
   initialDesign?: FurnitureDesign;
@@ -47,6 +50,7 @@ interface CadStudioProps {
 type CadViewMode = 'design' | 'cutlist' | 'cutMaterials' | 'buildCheck';
 
 export default function CadStudio({ initialDesign, initialProjectName, initialMaterial }: CadStudioProps) {
+  const router = useRouter();
   const [design, setDesign] = useState<FurnitureDesign>(initialDesign ?? createDefaultFurnitureDesign());
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
   const [material, setMaterial] = useState<string>(initialMaterial ?? FURNITURE_MATERIALS[0]);
@@ -277,6 +281,24 @@ export default function CadStudio({ initialDesign, initialProjectName, initialMa
     setSelectedPanelId(null);
   }, []);
 
+  // 「完成イメージを見る」（設計スタジオへ現在の設計を送って写真のようなリアルな
+  // レンダリングを見る補助導線）。既存のpushSpecToStudio（AIチャット側の「🖥 設計
+  // スタジオで開く」等と同じ関数、変更しない）をそのまま再利用する。設計スタジオ側の
+  // レンダリング処理はkind:'table'に対応していないため、furnitureDesignToStudioSpecが
+  // nullを返した場合（テーブルの場合）は何もしない（呼び出し元のボタンをdisabledに
+  // することで、そもそも押せない状態にしている）
+  const handleViewCompletionImage = useCallback(() => {
+    const spec = furnitureDesignToStudioSpec(design, {
+      item: projectName.trim() || DEFAULT_FURNITURE_PROJECT_NAME,
+      material,
+    });
+    if (!spec) return;
+    pushSpecToStudio(spec);
+    const query = new URLSearchParams({ from: 'cad' });
+    if (projectId) query.set('projectId', projectId);
+    router.push(`/app/studio?${query.toString()}`);
+  }, [design, projectName, material, projectId, router]);
+
   const handleUpdateShelf = useCallback(
     (patch: { zAtMm?: number; widthMm?: number; depthMm?: number }) => {
       if (!selectedPanelId) return;
@@ -384,6 +406,15 @@ export default function CadStudio({ initialDesign, initialProjectName, initialMa
             className="flex items-center gap-1.5 bg-tanei-accent hover:bg-tanei-accent-dark text-white text-sm font-bold px-3 py-1.5 rounded-tanei-control shadow-sm transition-colors"
           >
             🪚 木取り図を見る
+          </button>
+          <button
+            type="button"
+            onClick={handleViewCompletionImage}
+            disabled={design.kind === 'table'}
+            title={design.kind === 'table' ? 'テーブルの完成イメージ生成には現在対応していません' : 'パソコン専用機能です'}
+            className="flex items-center gap-1.5 bg-white hover:bg-tanei-brand-soft text-tanei-ink border border-tanei-border text-sm font-bold px-3 py-1.5 rounded-tanei-control shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
+          >
+            ✨ 完成イメージを見る
           </button>
         </div>
         {saveMessage && <p className="text-xs font-bold text-tanei-brand">{saveMessage}</p>}

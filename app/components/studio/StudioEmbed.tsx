@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { connectStudioSync } from '../../lib/studioSync';
 import { studioSpecToSheetLayout, type StudioSpec } from '../../lib/studioSpec';
@@ -11,6 +12,13 @@ import { DEFAULT_STUDIO_BASE_URL, getStudioBaseUrl, setStudioBaseUrl } from '../
 import { getOrCreateStudioSessionId } from '../../lib/studioSession';
 
 export default function StudioEmbed() {
+  // ブラウザCAD（CadStudio.tsx「✨ 完成イメージを見る」）からの遷移時のみ?from=cadが付く。
+  // 既存のAIチャット側3導線（CompletionCards.tsx・LeftSidebar.tsx・ChatInput.tsx）からは
+  // このパラメータが付かないため、そちらの「← チャットに戻る」という挙動は変更しない
+  const searchParams = useSearchParams();
+  const cameFromCad = searchParams.get('from') === 'cad';
+  const cadProjectId = searchParams.get('projectId');
+
   // SSRとの整合性のため初期値は既定URL（http://localhost:5002）にしておき、
   // マウント後にlocalStorageの保存値（手動で接続先を変更していた場合）へ差し替える
   const [studioBaseUrl, setStudioBaseUrlState] = useState(DEFAULT_STUDIO_BASE_URL);
@@ -112,10 +120,10 @@ export default function StudioEmbed() {
 
       <div className="flex items-center gap-3 px-4 py-3 border-b border-tanei-border bg-white flex-shrink-0">
         <Link
-          href="/app"
+          href={cameFromCad ? `/app/cad${cadProjectId ? `?projectId=${cadProjectId}` : ''}` : '/app'}
           className="text-sm font-bold text-tanei-ink-muted hover:text-tanei-brand flex-shrink-0"
         >
-          ← チャットに戻る
+          {cameFromCad ? '← CADに戻る' : '← チャットに戻る'}
         </Link>
         <span className="text-sm font-black text-tanei-brand truncate">🌱 TANE:i 設計スタジオ（完成イメージ）</span>
 
@@ -141,7 +149,7 @@ export default function StudioEmbed() {
       </div>
 
       <p className="px-4 py-1.5 border-b border-tanei-border bg-amber-50 text-amber-800 text-[11px] text-center flex-shrink-0">
-        ⚠️ 完成イメージ（設計スタジオ）はパソコン専用機能です。スマートフォンでご利用の場合は⚙️から接続先の設定が必要です。
+        ⚠️ 完成イメージ（設計スタジオ）はパソコン専用機能です。実際の寸法・構造はブラウザCADで調整してください。スマートフォンでご利用の場合は⚙️から接続先の設定が必要です。
       </p>
 
       {isSettingsOpen && (
