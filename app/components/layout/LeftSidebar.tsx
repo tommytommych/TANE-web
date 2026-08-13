@@ -25,7 +25,6 @@ const MY_PAGE_GROUPS: { title: string; items: { icon: string; label: string; typ
   {
     title: '設計する',
     items: [
-      { icon: '⭐', label: 'お気に入り', type: 'favorite' },
       { icon: '💾', label: '保存した設計・アイデア', type: 'design' },
       { icon: '🧊', label: '保存した設計（ブラウザCAD）', type: 'cadProject' },
     ],
