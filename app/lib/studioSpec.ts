@@ -3,6 +3,7 @@
 
 import type { SheetLayout } from './sheetLayout';
 import type { FurnitureDesign } from './cad/types';
+import { PART_MATERIAL_LABELS, type PartMaterialLabel, buildFurnitureModel, furnitureModelToSheetLayoutsByMaterial } from './cad/model';
 
 export type PanelFinish = 'clear' | 'walnut' | 'white' | 'black';
 
@@ -16,6 +17,12 @@ export interface StudioSpec {
   thickness?: number;
   material: string;
   panelFinishes?: Partial<Record<'天板' | '底板' | '側板' | '背板', PanelFinish>>;
+  /** 「天板はパイン集成材、脚・幕板はSPF材」のような、パーツ単位の材料指定（任意）。
+   * 省略時は今まで通りmaterialが全パーツに使われる。値はmaterialと同じ語彙
+   * （FURNITURE_MATERIALS）を想定しているが、ここでは型（string）までしか検証しない
+   * （実在する材料名かどうかは、消費側＝CadPageShell.tsxが既存のsafeMaterialと同じ
+   * 考え方でチェックする） */
+  partMaterials?: Partial<Record<PartMaterialLabel, string>>;
 }
 
 const PANEL_LABELS = ['天板', '底板', '側板', '背板'];
@@ -26,6 +33,14 @@ const isValidPanelFinishes = (value: unknown): value is StudioSpec['panelFinishe
   if (typeof value !== 'object' || value === null) return false;
   return Object.entries(value as Record<string, unknown>).every(
     ([label, finish]) => PANEL_LABELS.includes(label) && PANEL_FINISHES.includes(finish as PanelFinish)
+  );
+};
+
+const isValidPartMaterials = (value: unknown): value is StudioSpec['partMaterials'] => {
+  if (value === undefined) return true;
+  if (typeof value !== 'object' || value === null) return false;
+  return Object.entries(value as Record<string, unknown>).every(
+    ([label, material]) => PART_MATERIAL_LABELS.includes(label as PartMaterialLabel) && typeof material === 'string'
   );
 };
 
@@ -40,36 +55,31 @@ export const isValidStudioSpec = (value: unknown): value is StudioSpec => {
     typeof v.height === 'number' &&
     (v.thickness === undefined || typeof v.thickness === 'number') &&
     typeof v.material === 'string' &&
-    isValidPanelFinishes(v.panelFinishes)
+    isValidPanelFinishes(v.panelFinishes) &&
+    isValidPartMaterials(v.partMaterials)
   );
 };
 
-// 国内のホームセンターで一般的な合板・集成材の規格サイズ（3×6版、910×1820mm）を
-// 標準の元板として想定する
-const DEFAULT_SHEET_WIDTH_MM = 910;
-const DEFAULT_SHEET_HEIGHT_MM = 1820;
 const DEFAULT_THICKNESS_MM = 18;
 
-// 設計スタジオの確定仕様（天板・底板・側板・背板からなる箱型家具の外寸）から、
-// カット申込書PDF（buildUniversalCutSheetPdf）が受け取れる2次元木取り図データを組み立てる。
-// 天板・底板は外寸そのまま、側板は天板・底板の間、背板はさらに側板の内側に収まる前提の
-// 簡易的な箱組み構成で近似しており、実際の組み方によって多少の誤差は出ることを想定している
-// （PDF側にも「実際の誤差は店舗の機械により異なります」旨の注記が入っている）
-export const studioSpecToSheetLayout = (spec: StudioSpec): SheetLayout => {
-  const t = spec.thickness ?? DEFAULT_THICKNESS_MM;
-  const clamp = (n: number) => Math.max(20, Math.round(n));
-
-  return {
-    name: `${spec.material}（${t}mm厚）`,
-    sheetWidthMm: DEFAULT_SHEET_WIDTH_MM,
-    sheetHeightMm: DEFAULT_SHEET_HEIGHT_MM,
-    parts: [
-      { widthMm: clamp(spec.width), heightMm: clamp(spec.depth), qty: 1, label: '天板' },
-      { widthMm: clamp(spec.width), heightMm: clamp(spec.depth), qty: 1, label: '底板' },
-      { widthMm: clamp(spec.depth), heightMm: clamp(spec.height - 2 * t), qty: 2, label: '側板' },
-      { widthMm: clamp(spec.width - 2 * t), heightMm: clamp(spec.height - 2 * t), qty: 1, label: '背板' },
-    ],
-  };
+// 設計スタジオの確定仕様から、カット申込書PDF（buildUniversalCutSheetPdf）が受け取れる
+// 2次元木取り図データ（材料ごとに1件）を組み立てる。以前はここに専用の箱型4パーツ計算
+// （天板・底板・側板・背板）を直接持っていたが、spec.kindを見ていなかったためテーブル
+// （天板+脚+幕板）でも常に箱型パーツを生成してしまう不具合があった。新しい計算式を
+// 増やすのではなく、既存のstudioSpecToFurnitureDesign（寸法→FurnitureDesign）→
+// buildFurnitureModel（→パーツごとの材料反映）→furnitureModelToSheetLayoutsByMaterial
+// （材料ごとの木取り図）という、ブラウザCAD側と全く同じ既存パイプラインに委譲する。
+// これにより、box/tableどちらでも実際の構造どおりのパーツが生成され、材料ごとに
+// 正しく分離されたセクションになる（ブラウザCADの木取り図と計算方法が完全に一致する）
+export const studioSpecToSheetLayout = (spec: StudioSpec): SheetLayout[] => {
+  const design = studioSpecToFurnitureDesign(spec);
+  const model = buildFurnitureModel(design, {
+    projectId: 'studio-cutsheet',
+    name: spec.item,
+    material: spec.material,
+    partMaterials: spec.partMaterials,
+  });
+  return furnitureModelToSheetLayoutsByMaterial(model);
 };
 
 // StudioSpecの寸法が、ブラウザCADの初期設計として安全に使える正の数値かどうかを確認する
@@ -133,15 +143,13 @@ export const studioSpecToFurnitureDesign = (spec: StudioSpec): FurnitureDesign =
 };
 
 // ブラウザCAD（CadStudio.tsx）から「完成イメージを見る」で設計スタジオへ送るための、
-// studioSpecToFurnitureDesign()とは逆方向の変換。設計スタジオ側のレンダリング処理
-// （tanei-studio/freecad_scripts/generate_model.pyのcompute_panels）は常に
-// 天板・底板・側板・背板の箱型パネルを生成する実装で、kind:'table'
-// （天板+脚+幕板、箱体なし）という概念が存在しない。そのためkind:'table'の設計を
-// 渡すとCADでの見た目と矛盾した「閉じた箱」が生成されてしまうため、その場合はnullを
-// 返し、呼び出し側（CadStudio.tsx）で「完成イメージを見る」を無効化する判断材料にする
+// studioSpecToFurnitureDesign()とは逆方向の変換。tanei-studio側は現在box・table
+// どちらのkindにも対応済み（generate_model.pyのcompute_panels_for_kind）のため、
+// 戻り値はnullを返さず常にStudioSpecを返す（呼び出し側の型はnull許容のまま維持し、
+// 将来また非対応のkindが増えた場合に安全に拡張できるようにしている）
 export const furnitureDesignToStudioSpec = (
   design: FurnitureDesign,
-  opts: { item: string; material: string }
+  opts: { item: string; material: string; partMaterials?: Partial<Record<PartMaterialLabel, string>> }
 ): StudioSpec | null => ({
   item: opts.item,
   kind: design.kind === 'table' ? 'table' : 'box',
@@ -150,4 +158,7 @@ export const furnitureDesignToStudioSpec = (
   height: design.height,
   thickness: design.thickness,
   material: opts.material,
+  ...(opts.partMaterials && Object.keys(opts.partMaterials).length > 0
+    ? { partMaterials: opts.partMaterials }
+    : {}),
 });

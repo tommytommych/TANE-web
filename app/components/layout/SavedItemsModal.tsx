@@ -279,7 +279,8 @@ export default function SavedItemsModal({
         viewingRelatedProject.design,
         viewingRelatedProject.material,
         viewingRelatedProject.cutListChecked,
-        viewingRelatedProject.buildChecklist
+        viewingRelatedProject.buildChecklist,
+        viewingRelatedProject.partMaterials
       )
     : null;
   // 「制作実績」（Phase 3-21）。保存設計カードと全く同じ、relatedProjectIdの完全一致
@@ -647,7 +648,13 @@ export default function SavedItemsModal({
                 // 安全に動作する（未着手として扱う。クラッシュしない）
                 const project = parseSavedItem(item);
                 const progress = project
-                  ? computeFurnitureProjectProgress(project.design, project.material, project.cutListChecked, project.buildChecklist)
+                  ? computeFurnitureProjectProgress(
+                      project.design,
+                      project.material,
+                      project.cutListChecked,
+                      project.buildChecklist,
+                      project.partMaterials
+                    )
                   : null;
                 // 制作進捗フィルター（Phase 3-17）と同じ判定をカード側にも表示する。
                 // 「✓ 制作完了」は既に下のprogressブロックで表示されるため、そちらとの

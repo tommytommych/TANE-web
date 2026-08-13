@@ -93,8 +93,11 @@ export default function StudioEmbed() {
     setIsGeneratingPdf(true);
     showStatus('この設計内容をもとにカット申込書PDFを生成しています…');
     try {
-      const sheetLayout = studioSpecToSheetLayout(latestSpec);
-      const pdfBytes = await buildUniversalCutSheetPdf([], [sheetLayout]);
+      // 材料ごとに分離された木取り図（複数の場合あり）をそのまま渡す。
+      // buildUniversalCutSheetPdfは元々複数のSheetLayoutを材料ごとの別セクションとして
+      // 描画できるため、ここでの結合・変換は不要
+      const sheetLayouts = studioSpecToSheetLayout(latestSpec);
+      const pdfBytes = await buildUniversalCutSheetPdf([], sheetLayouts);
       downloadPdfBytes(new Uint8Array(pdfBytes), 'TANEi_Universal_Cut_Sheet.pdf');
       consumeLocalUsage(IMAGE_USAGE_STORAGE_KEY, DAILY_IMAGE_LIMIT);
       showStatus('カット申込書PDFのダウンロードが完了しました！');

@@ -13,6 +13,7 @@
 import type { SavedItem } from '../types';
 import { deleteSavedItem, loadAllSavedItems, putSavedItem } from '../savedItemsStore';
 import { isValidFurnitureDesign, type FurnitureDesign } from './types';
+import { PART_MATERIAL_LABELS, type PartMaterialLabel } from './model';
 
 export interface SavedFurnitureProject {
   id: string;
@@ -22,6 +23,10 @@ export interface SavedFurnitureProject {
   updatedAt: string; // ISO 8601
   design: FurnitureDesign;
   material: string;
+  /** 「天板だけパイン集成材、脚・幕板はSPF材」のような、パーツ単位の材料指定（任意）。
+   * この機能より前に保存されたプロジェクトには存在しないため、undefinedのまま
+   * 「全パーツmaterialを使う」という既存の挙動にフォールバックする */
+  partMaterials?: Partial<Record<PartMaterialLabel, string>>;
   /** カットリスト（Phase 2-7）のチェック状態。キーはCutListItem.id。任意項目のため、
    * Phase 2-6以前に保存されたプロジェクトには存在しない（undefinedのまま扱う） */
   cutListChecked?: Record<string, boolean>;
@@ -61,6 +66,21 @@ const parseOptionalBooleanRecord = (value: unknown): Record<string, boolean> | u
   return Object.fromEntries(entries) as Record<string, boolean>;
 };
 
+// partMaterials（Phase「パーツごとの材料」）も同じ方針：形が不正なら無視してundefinedとして
+// 扱う（プロジェクト全体は読み込み失敗にしない）。キーはPART_MATERIAL_LABELSの語彙のみ許可する
+const parseOptionalPartMaterials = (value: unknown): Partial<Record<PartMaterialLabel, string>> | undefined => {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (
+    !entries.every(
+      ([label, material]) => PART_MATERIAL_LABELS.includes(label as PartMaterialLabel) && typeof material === 'string'
+    )
+  ) {
+    return undefined;
+  }
+  return Object.fromEntries(entries) as Partial<Record<PartMaterialLabel, string>>;
+};
+
 // content（JSON文字列）は他バージョンのデータ・ブラウザ保存領域の破損等で壊れている
 // 可能性があるため、必ず構造を検証してから使う（不正な場合はnullを返し、呼び出し側で
 // 「読み込めませんでした」という初心者向けメッセージを出す。アプリを落とさない）。
@@ -90,6 +110,7 @@ export const parseSavedItem = (item: SavedItem): SavedFurnitureProject | null =>
       updatedAt: p.updatedAt,
       design: p.design,
       material: p.material,
+      partMaterials: parseOptionalPartMaterials(p.partMaterials),
       cutListChecked: parseOptionalBooleanRecord(p.cutListChecked),
       buildChecklist: parseOptionalBooleanRecord(p.buildChecklist),
       notes: typeof p.notes === 'string' ? p.notes : undefined,
@@ -139,5 +160,6 @@ export const duplicateFurnitureProject = (project: SavedFurnitureProject): Saved
     updatedAt: now,
     design: structuredClone(project.design),
     material: project.material,
+    partMaterials: project.partMaterials ? structuredClone(project.partMaterials) : undefined,
   };
 };

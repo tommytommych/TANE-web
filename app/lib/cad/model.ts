@@ -183,9 +183,27 @@ export function updateShelfInDesign(
  * （FurnitureDesign → Panel[] → 3D Renderingという流れの、Panel[]計算の入口） */
 export function buildFurnitureModel(
   design: FurnitureDesign,
-  overrides?: { projectId?: string; name?: string; material?: string }
+  overrides?: {
+    projectId?: string;
+    name?: string;
+    material?: string;
+    /** 「天板だけパイン集成材、脚・幕板はSPF材」のような、パーツ単位の材料指定（任意）。
+     * 省略時・キーが無いパーツは、今まで通りmaterial（家具全体の材料）を使う */
+    partMaterials?: Partial<Record<PartMaterialLabel, string>>;
+  }
 ): FurnitureModel {
   const material = overrides?.material ?? FURNITURE_MATERIALS[0];
+  const partMaterials = overrides?.partMaterials;
+
+  // 既存のFurniturePanel.material（元々あるが、これまで書き込み元が無かったフィールド）へ、
+  // パーツ種類ごとの上書き材料を反映する。該当する上書きが無いパネルはそのまま返す
+  // （新しい配列参照にはなるが、内容は既存のbuildFurniturePanels(design)の結果と同一）
+  const panels = buildFurniturePanels(design).map((panel) => {
+    if (!partMaterials) return panel;
+    const label = CUT_LIST_KIND_NAME[panel.kind] as PartMaterialLabel | undefined;
+    const overrideMaterial = label ? partMaterials[label] : undefined;
+    return overrideMaterial ? { ...panel, material: overrideMaterial } : panel;
+  });
 
   return {
     kind: 'furniture',
@@ -196,7 +214,7 @@ export function buildFurnitureModel(
     height: design.height,
     material,
     thickness: design.thickness,
-    panels: buildFurniturePanels(design),
+    panels,
     options: { backPanel: design.backPanel, legs: design.legs, shelfCount: design.shelves.length },
   };
 }
@@ -211,9 +229,13 @@ export interface StandardBoardSize {
 // freecad-integration/src/boardSizes.tsのSTANDARD_BOARD_SIZESと同じ2種類（小さい順）を
 // 採用している（値の重複はあるが、あちらはNode.js単体パッケージとして意図的に
 // 依存関係を持たないため、ここでも同じ値をそのまま定義する）
+// widthMmを横方向として描画する木取り図（cutSheetPdf.ts・SheetLayoutSvg.tsx）が縦長に
+// ならないよう、長辺をwidthMmに割り当てる（横長・landscape）。pickBoardSizeForPanels側は
+// 縦横どちらの向きでも収まるか判定しているため、この並び順を変えても判定結果（どの定尺を
+// 選ぶか）自体には影響しない
 export const STANDARD_BOARD_SIZES: StandardBoardSize[] = [
-  { label: 'サブロク板 (910×1820mm)', widthMm: 910, heightMm: 1820 },
-  { label: 'シハチ板 (1210×2430mm)', widthMm: 1210, heightMm: 2430 },
+  { label: 'サブロク板 (910×1820mm)', widthMm: 1820, heightMm: 910 },
+  { label: 'シハチ板 (1210×2430mm)', widthMm: 2430, heightMm: 1210 },
 ];
 
 /** 全パネルの中で最大の辺が収まる、最小の定尺サイズを選ぶ（回転して収まる向きも考慮）。
@@ -261,6 +283,49 @@ export function furnitureModelToSheetLayout(model: FurnitureModel): SheetLayout 
     sheetHeightMm: boardSize.heightMm,
     parts,
   };
+}
+
+/** furnitureModelToSheetLayout()の材料別バージョン。パネルごとの材料（panel.material、
+ * 無ければmodel.material）でグルーピングし、材料ごとに独立した木取り図（SheetLayout）を
+ * 作る。「天板はパイン集成材、脚・幕板はSPF材」のような設計で、材料ごとに正しく分離された
+ * 木取り図・カットリスト・PDFを表示するために使う（既存のfurnitureModelToSheetLayoutは
+ * 単一のSheetLayoutしか返さず、Phase3（CadBuildChecklistView.tsx）が今も依存しているため
+ * 変更していない。こちらは新規追加の別関数）。
+ * どの定尺サイズにも収まらない材料グループは、そのグループだけを結果から除外する
+ * （他の材料グループの木取りまで丸ごと計算不能にはしない） */
+export function furnitureModelToSheetLayoutsByMaterial(model: FurnitureModel): SheetLayout[] {
+  if (model.panels.length === 0) return [];
+
+  const groups = new Map<string, FurniturePanel[]>();
+  model.panels.forEach((panel) => {
+    const material = panel.material ?? model.material;
+    const list = groups.get(material);
+    if (list) {
+      list.push(panel);
+    } else {
+      groups.set(material, [panel]);
+    }
+  });
+
+  const layouts: SheetLayout[] = [];
+  groups.forEach((panels, material) => {
+    const boardSize = pickBoardSizeForPanels(panels);
+    if (!boardSize) return;
+
+    const parts: SheetPart[] = panels.map((panel) => {
+      const { widthMm, heightMm } = panelToCutSizeMm(panel);
+      return { widthMm, heightMm, qty: 1, label: panel.label };
+    });
+
+    layouts.push({
+      name: `${material}（${model.thickness}mm厚）・${boardSize.label}`,
+      sheetWidthMm: boardSize.widthMm,
+      sheetHeightMm: boardSize.heightMm,
+      parts,
+    });
+  });
+
+  return layouts;
 }
 
 /** Three.js/React Three Fiber（Phase 2以降）でそのまま描画できる形式。
@@ -420,20 +485,40 @@ export const CUT_LIST_KIND_NAME: Partial<Record<FurniturePanelKind, string>> = {
   apron: '幕板',
 };
 
+// パーツ単位で材料を指定する際のキー。CUT_LIST_KIND_NAMEの値と同じ語彙を使うことで、
+// 「天板だからパイン」「脚だからSPF」のような指定を、AIの提案（StudioSpec.partMaterials）・
+// ブラウザCADの編集状態（buildFurnitureModelのoverrides.partMaterials）・保存データ
+// （SavedFurnitureProject.partMaterials）のどこでも同じ形で扱えるようにする
+export type PartMaterialLabel = '天板' | '底板' | '側板' | '背板' | '棚板' | '脚' | '幕板';
+export const PART_MATERIAL_LABELS: PartMaterialLabel[] = ['天板', '底板', '側板', '背板', '棚板', '脚', '幕板'];
+
 export interface CutListItem {
-  /** name・寸法から作る安定したキー。同じ寸法・同じ名称のパーツをまとめる際のグループキーにも、
-   * チェック状態を保存する際のキーにも使う */
+  /** name・寸法（材料混在時はmaterialも）から作る安定したキー。同じ寸法・同じ名称・同じ
+   * 材料のパーツをまとめる際のグループキーにも、チェック状態を保存する際のキーにも使う */
   id: string;
   name: string;
+  /** このパーツの材料（panel.material、無ければmodel.material）。常に埋まる */
+  material: string;
   widthMm: number;
   heightMm: number;
   thicknessMm: number;
   qty: number;
 }
 
-/** Panel[]から「カットする材料」一覧を作る。同じ名称・同じ寸法のパーツは1行にまとめ、
- * 枚数（qty）を積み上げる。新しい木取り計算は行わず、既存のPanel[]の寸法をそのまま集計するだけ */
+/** Panel[]から「カットする材料」一覧を作る。同じ名称・同じ寸法・同じ材料のパーツは1行に
+ * まとめ、枚数（qty）を積み上げる。材料が異なるパーツは、寸法・名称が同じでも絶対に
+ * 併合しない。新しい木取り計算は行わず、既存のPanel[]の寸法をそのまま集計するだけ。
+ *
+ * 【後方互換】全パネルが同じ材料（panel.materialの上書きが1つも無い）場合は、キーの形式を
+ * 従来通り「名前__寸法」のままにする（材料をキーに含めない）。これにより、この機能より前に
+ * 保存されたプロジェクトのcutListChecked（チェック済み状態）がそのまま一致し続ける。
+ * 実際に複数材料が使われている設計だけ、新しいキー形式（材料__名前__寸法）になる
+ * （その設計はこの機能より前には存在しえないため、互換性の問題は生じない） */
 export function buildCutListItems(model: FurnitureModel): CutListItem[] {
+  const hasPartMaterialOverride = model.panels.some(
+    (panel) => panel.material !== undefined && panel.material !== model.material
+  );
+
   const grouped = new Map<string, CutListItem>();
   let unnamedCount = 0;
 
@@ -442,6 +527,7 @@ export function buildCutListItems(model: FurnitureModel): CutListItem[] {
     const thicknessMm = Math.round(dims[0]);
     const heightMm = Math.round(dims[1]);
     const widthMm = Math.round(dims[2]);
+    const material = panel.material ?? model.material;
 
     let name = CUT_LIST_KIND_NAME[panel.kind];
     if (!name) {
@@ -449,12 +535,14 @@ export function buildCutListItems(model: FurnitureModel): CutListItem[] {
       name = panel.label || `パーツ${unnamedCount}`;
     }
 
-    const key = `${name}__${widthMm}x${heightMm}x${thicknessMm}`;
+    const key = hasPartMaterialOverride
+      ? `${material}__${name}__${widthMm}x${heightMm}x${thicknessMm}`
+      : `${name}__${widthMm}x${heightMm}x${thicknessMm}`;
     const existing = grouped.get(key);
     if (existing) {
       existing.qty += 1;
     } else {
-      grouped.set(key, { id: key, name, widthMm, heightMm, thicknessMm, qty: 1 });
+      grouped.set(key, { id: key, name, material, widthMm, heightMm, thicknessMm, qty: 1 });
     }
   });
 
@@ -524,14 +612,15 @@ export function computeFurnitureProjectProgress(
   design: FurnitureDesign,
   material: string,
   cutListChecked: Record<string, boolean> | undefined,
-  buildChecklist: Record<string, boolean> | undefined
+  buildChecklist: Record<string, boolean> | undefined,
+  partMaterials?: Partial<Record<PartMaterialLabel, string>>
 ): FurnitureProjectProgress {
   let cutListTotal = 0;
   let cutListDone = 0;
   let cutListAvailable = false;
 
   try {
-    const model = buildFurnitureModel(design, { material });
+    const model = buildFurnitureModel(design, { material, partMaterials });
     const sheetLayout = furnitureModelToSheetLayout(model);
     if (sheetLayout) {
       cutListAvailable = true;

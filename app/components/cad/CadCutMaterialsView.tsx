@@ -12,7 +12,7 @@
 
 import { useMemo } from 'react';
 import type { FurnitureModel } from '../../lib/cad/types';
-import { buildCutListItems, furnitureModelToSheetLayout } from '../../lib/cad/model';
+import { buildCutListItems, furnitureModelToSheetLayoutsByMaterial, type CutListItem } from '../../lib/cad/model';
 
 interface CadCutMaterialsViewProps {
   model: FurnitureModel;
@@ -25,8 +25,26 @@ interface CadCutMaterialsViewProps {
 export default function CadCutMaterialsView({ model, checked, onToggle, onBack, onNext }: CadCutMaterialsViewProps) {
   // カットリストは「木取り図が実際に作れる設計かどうか」を前提にする。木取り不能な
   // （どの定尺サイズにも収まらない）設計では、架空のカットリストを作らず案内文だけを出す
-  const sheetLayout = useMemo(() => furnitureModelToSheetLayout(model), [model]);
-  const items = useMemo(() => (sheetLayout ? buildCutListItems(model) : []), [model, sheetLayout]);
+  const sheetLayouts = useMemo(() => furnitureModelToSheetLayoutsByMaterial(model), [model]);
+  const items = useMemo(() => (sheetLayouts.length > 0 ? buildCutListItems(model) : []), [model, sheetLayouts]);
+
+  // 材料が違うパーツを絶対に同じ行にまとめないため、buildCutListItems側で既に材料単位で
+  // 分かれている（item.material）。表示側はそれを見出し（### 材料名）でグルーピングするだけで、
+  // 新しい集計ロジックは追加しない。登場順（＝パネル配列の登場順）でグループを並べる
+  const groupedByMaterial = useMemo(() => {
+    const order: string[] = [];
+    const groups = new Map<string, CutListItem[]>();
+    items.forEach((item) => {
+      const list = groups.get(item.material);
+      if (list) {
+        list.push(item);
+      } else {
+        groups.set(item.material, [item]);
+        order.push(item.material);
+      }
+    });
+    return order.map((material) => ({ material, items: groups.get(material) ?? [] }));
+  }, [items]);
 
   const doneCount = items.filter((item) => checked[item.id]).length;
 
@@ -49,7 +67,7 @@ export default function CadCutMaterialsView({ model, checked, onToggle, onBack, 
           </p>
         </div>
 
-        {!sheetLayout || items.length === 0 ? (
+        {items.length === 0 ? (
           <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-tanei-control px-4 py-3 text-sm">
             カットリストを作成するための設計情報が不足しています。
             <br />
@@ -61,37 +79,46 @@ export default function CadCutMaterialsView({ model, checked, onToggle, onBack, 
               進捗：<span className="font-black text-tanei-brand">{doneCount} / {items.length}</span> 完了
             </p>
 
-            <ul className="flex flex-col gap-2">
-              {items.map((item) => {
-                const isChecked = Boolean(checked[item.id]);
-                return (
-                  <li key={item.id}>
-                    <label
-                      className={`flex items-start gap-3 rounded-tanei-control border px-3 py-2.5 cursor-pointer transition-colors ${
-                        isChecked
-                          ? 'bg-tanei-brand-soft border-tanei-brand'
-                          : 'bg-white border-tanei-border hover:bg-tanei-surface'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => onToggle(item.id)}
-                        className="mt-0.5 h-4 w-4 accent-tanei-brand flex-shrink-0"
-                      />
-                      <span className="flex-1">
-                        <span className={`block font-bold text-sm ${isChecked ? 'text-tanei-ink line-through' : 'text-tanei-ink'}`}>
-                          {item.name}
-                        </span>
-                        <span className="block text-xs text-tanei-ink-muted mt-0.5">
-                          {item.widthMm} × {item.heightMm} × {item.thicknessMm} mm　×{item.qty}
-                        </span>
-                      </span>
-                    </label>
-                  </li>
-                );
-              })}
-            </ul>
+            {/* 材料が違うパーツを絶対に同じグループにまとめないため、材料ごとに見出しを分ける。
+                「天板はパイン集成材、脚・幕板はSPF材」のような設計では2つ以上のセクションになる */}
+            <div className="flex flex-col gap-4">
+              {groupedByMaterial.map((group) => (
+                <div key={group.material}>
+                  <h3 className="text-xs font-bold text-tanei-brand mb-1.5">■ {group.material}</h3>
+                  <ul className="flex flex-col gap-2">
+                    {group.items.map((item) => {
+                      const isChecked = Boolean(checked[item.id]);
+                      return (
+                        <li key={item.id}>
+                          <label
+                            className={`flex items-start gap-3 rounded-tanei-control border px-3 py-2.5 cursor-pointer transition-colors ${
+                              isChecked
+                                ? 'bg-tanei-brand-soft border-tanei-brand'
+                                : 'bg-white border-tanei-border hover:bg-tanei-surface'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => onToggle(item.id)}
+                              className="mt-0.5 h-4 w-4 accent-tanei-brand flex-shrink-0"
+                            />
+                            <span className="flex-1">
+                              <span className={`block font-bold text-sm ${isChecked ? 'text-tanei-ink line-through' : 'text-tanei-ink'}`}>
+                                {item.name}
+                              </span>
+                              <span className="block text-xs text-tanei-ink-muted mt-0.5">
+                                {item.widthMm} × {item.heightMm} × {item.thicknessMm} mm　×{item.qty}
+                              </span>
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
 
             <button
               type="button"

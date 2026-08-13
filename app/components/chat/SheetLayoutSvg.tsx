@@ -115,11 +115,27 @@ const SheetSvg = ({
           const ph = piece.heightMm * scale;
           const color = colorMap.get(`${piece.widthMm}x${piece.heightMm}`) ?? '#EEEEEE';
           const showLabel = pw > 34 && ph > 18;
+          // 「No.1」だけではどのパーツか分からないため、十分な高さがあるピースには
+          // パーツ名（piece.label）もNo.Xの上にもう1行表示する（cutSheetPdf.tsのPDF側と
+          // 同じ考え方。スペースが無い小さいピースでは無理に表示しない）
+          const showPartLabel = showLabel && Boolean(piece.label) && ph > 40;
           return (
             <g key={piece.cutNumber}>
               <rect x={px} y={py} width={pw} height={ph} fill={color} stroke="#3A2F27" strokeWidth={1} />
               {showLabel && (
                 <>
+                  {showPartLabel && (
+                    <text
+                      x={px + pw / 2}
+                      y={py + ph / 2 - 15}
+                      textAnchor="middle"
+                      fontSize={8.5}
+                      fontWeight="bold"
+                      fill="#16A34A"
+                    >
+                      {piece.label}
+                    </text>
+                  )}
                   <text
                     x={px + pw / 2}
                     y={py + ph / 2 - 3}

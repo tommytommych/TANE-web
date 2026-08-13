@@ -584,6 +584,22 @@ export const buildUniversalCutSheetPdf = async (
                 color: gray,
               });
             }
+            // 「No.1」だけではどのパーツか分からないため、十分な高さがあるピースには
+            // パーツ名（piece.label、例:「天板」「脚（前左）」）もNo.Xの上にもう1行表示する。
+            // 一覧表（カット依頼リスト）の備考列には既にlabelが入っているため、ここは
+            // スペースが無い小さいピースでは無理に表示しない（既存の省略しきい値と同じ考え方）
+            if (piece.label && ph > 34) {
+              const partLabelWidth = fontBold.widthOfTextAtSize(piece.label, 7);
+              if (partLabelWidth + 4 < pw) {
+                page.drawText(piece.label, {
+                  x: px + pw / 2 - partLabelWidth / 2,
+                  y: py + ph / 2 + 11,
+                  size: 7,
+                  font: fontBold,
+                  color: brand,
+                });
+              }
+            }
           }
         });
 

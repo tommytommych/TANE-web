@@ -14,7 +14,12 @@ import SheetLayoutSvgView from '../chat/SheetLayoutSvg';
 import { buildUniversalCutSheetPdf } from '../../lib/cutSheetPdf';
 import { downloadPdfBytes } from '../../lib/download';
 import type { FurnitureModel } from '../../lib/cad/types';
-import { FURNITURE_MATERIALS, furnitureModelToSheetLayout } from '../../lib/cad/model';
+import {
+  CUT_LIST_KIND_NAME,
+  FURNITURE_MATERIALS,
+  furnitureModelToSheetLayoutsByMaterial,
+  type PartMaterialLabel,
+} from '../../lib/cad/model';
 import CadBuildGuide from './CadBuildGuide';
 
 // 制作チェック画面の「制作へ進む」から来たときだけ、この要素まで自動スクロールする
@@ -27,6 +32,10 @@ interface CadCutlistViewProps {
   model: FurnitureModel;
   material: string;
   onMaterialChange: (material: string) => void;
+  /** パーツ単位の材料上書き（「天板だけパイン集成材、脚・幕板はSPF材」等）。
+   * キーが無いパーツはmaterialを使う */
+  partMaterials: Partial<Record<PartMaterialLabel, string>>;
+  onPartMaterialChange: (label: PartMaterialLabel, value: string) => void;
   onBack: () => void;
   onOpenCutList: () => void;
   /** trueのとき、マウント時に「制作する」セクションまで自動スクロールする
@@ -50,6 +59,8 @@ export default function CadCutlistView({
   model,
   material,
   onMaterialChange,
+  partMaterials,
+  onPartMaterialChange,
   onBack,
   onOpenCutList,
   scrollToBuildGuide,
@@ -63,8 +74,33 @@ export default function CadCutlistView({
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  const sheetLayout = useMemo(() => furnitureModelToSheetLayout(model), [model]);
-  const sheets = useMemo(() => (sheetLayout ? packSheetLayout(sheetLayout) : []), [sheetLayout]);
+  // 材料ごとに分離した木取り図（「天板はパイン集成材、脚・幕板はSPF材」等の場合、
+  // 材料の種類だけ配列に並ぶ。全パーツ同じ材料なら要素数1になり、見た目は今まで通り）
+  const sheetLayouts = useMemo(() => furnitureModelToSheetLayoutsByMaterial(model), [model]);
+  const packedByLayout = useMemo(() => sheetLayouts.map((layout) => packSheetLayout(layout)), [sheetLayouts]);
+  const totalSheetCount = packedByLayout.reduce((sum, sheets) => sum + sheets.length, 0);
+
+  // Phase3（CadBuildGuide.tsx、変更禁止）は単一のsheetLayout/material/sheetCountという
+  // 既存のprops形のまま。全体のmaterialに対応するレイアウトを代表として渡し、
+  // 見つからない場合（全パーツが上書きされ、全体のmaterialを使うパーツが1つも無い場合）は
+  // 先頭のレイアウトにフォールバックする
+  const primaryLayoutIndex = Math.max(
+    0,
+    sheetLayouts.findIndex((layout) => layout.name.startsWith(material))
+  );
+  const primaryLayout = sheetLayouts[primaryLayoutIndex] ?? null;
+  const primarySheetCount = packedByLayout[primaryLayoutIndex]?.length ?? 0;
+
+  // 実在するパーツ種類（天板・脚・幕板等、CUT_LIST_KIND_NAMEの値）だけを、登場順で重複無く
+  // 列挙する。「パーツごとに材料を分ける」の選択肢一覧に使う
+  const availablePartLabels = useMemo(() => {
+    const labels: PartMaterialLabel[] = [];
+    model.panels.forEach((panel) => {
+      const label = CUT_LIST_KIND_NAME[panel.kind] as PartMaterialLabel | undefined;
+      if (label && !labels.includes(label)) labels.push(label);
+    });
+    return labels;
+  }, [model.panels]);
 
   useEffect(() => {
     if (!scrollToBuildGuide) return;
@@ -86,13 +122,13 @@ export default function CadCutlistView({
   };
 
   const handleDownloadPdf = async () => {
-    if (!sheetLayout) return;
+    if (sheetLayouts.length === 0) return;
     setIsGeneratingPdf(true);
     try {
-      const pdfBytes = await buildUniversalCutSheetPdf([], [sheetLayout], {
+      const pdfBytes = await buildUniversalCutSheetPdf([], sheetLayouts, {
         name: model.name,
         material,
-        sheetCount: sheets.length,
+        sheetCount: totalSheetCount,
       });
       downloadPdfBytes(new Uint8Array(pdfBytes), 'TANEi_CutSheet.pdf');
       showStatus('木取り図PDFのダウンロードが完了しました！');
@@ -148,23 +184,57 @@ export default function CadCutlistView({
             </select>
           </label>
 
-          {sheetLayout && sheets.length > 0 && (
+          {/* パーツごとに材料を分ける（任意）。「天板はパイン集成材、脚・幕板はSPF材」のように、
+              一部のパーツだけ上の「使用する材料」と異なる材料を指定できる。既定（空欄）は
+              全パーツが上の材料に従う、という既存の挙動のまま */}
+          {availablePartLabels.length > 0 && (
+            <details className="text-xs">
+              <summary className="cursor-pointer font-bold text-tanei-ink-muted select-none">
+                パーツごとに材料を分ける（任意）
+              </summary>
+              <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {availablePartLabels.map((label) => (
+                  <label key={label} className="flex flex-col gap-1">
+                    <span className="font-bold text-tanei-ink-muted">{label}</span>
+                    <select
+                      value={partMaterials[label] ?? ''}
+                      onChange={(e) => onPartMaterialChange(label, e.target.value)}
+                      className="border border-tanei-border rounded-tanei-control px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-tanei-brand"
+                    >
+                      <option value="">（全体の材料に合わせる）</option>
+                      {FURNITURE_MATERIALS.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+            </details>
+          )}
+
+          {sheetLayouts.length > 0 && (
             <div className="text-sm text-tanei-ink flex flex-wrap gap-x-4 gap-y-1">
               <span>
-                板サイズ：<span className="font-bold">{sheetLayout.sheetWidthMm}×{sheetLayout.sheetHeightMm}mm</span>
+                必要枚数：<span className="font-black text-tanei-brand">{totalSheetCount}枚</span>
               </span>
-              <span>
-                必要枚数：<span className="font-black text-tanei-brand">{sheets.length}枚</span>
-              </span>
+              {sheetLayouts.length > 1 && (
+                <span className="text-tanei-ink-muted text-xs">（{sheetLayouts.length}種類の材料）</span>
+              )}
             </div>
           )}
         </div>
 
-        {sheetLayout && sheets.length > 0 ? (
+        {sheetLayouts.length > 0 && primaryLayout ? (
           <>
             <div>
               <h3 id={CUT_LAYOUT_ANCHOR_ID} className="text-sm font-bold text-tanei-ink mb-1 scroll-mt-4">木取り図</h3>
-              <SheetLayoutSvgView layout={sheetLayout} showToast={showStatus} />
+              <div className="flex flex-col gap-3">
+                {sheetLayouts.map((layout) => (
+                  <SheetLayoutSvgView key={layout.name} layout={layout} showToast={showStatus} />
+                ))}
+              </div>
             </div>
 
             <div>
@@ -173,8 +243,10 @@ export default function CadCutlistView({
                 {model.panels.map((panel) => (
                   <li key={panel.id} className="flex items-center justify-between px-3 py-2 text-sm">
                     <span className="font-bold text-tanei-ink">{panel.label}</span>
-                    <span className="text-tanei-ink-muted text-xs">
+                    <span className="text-tanei-ink-muted text-xs text-right">
                       {Math.round(panel.size.x)} × {Math.round(panel.size.y)} × {Math.round(panel.size.z)} mm
+                      <br />
+                      {panel.material ?? material}
                     </span>
                   </li>
                 ))}
@@ -203,8 +275,8 @@ export default function CadCutlistView({
               <CadBuildGuide
                 model={model}
                 material={material}
-                sheetLayout={sheetLayout}
-                sheetCount={sheets.length}
+                sheetLayout={primaryLayout}
+                sheetCount={primarySheetCount}
                 onViewPanel={onViewPanel}
                 buildChecklist={buildChecklist}
                 onViewBuildCheck={onViewBuildCheck}

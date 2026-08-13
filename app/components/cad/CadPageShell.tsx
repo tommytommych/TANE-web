@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import CadStudio from './CadStudio';
 import type { FurnitureDesign } from '../../lib/cad/types';
-import { FURNITURE_MATERIALS } from '../../lib/cad/model';
+import { FURNITURE_MATERIALS, PART_MATERIAL_LABELS, type PartMaterialLabel } from '../../lib/cad/model';
 import {
   CAD_INITIAL_DESIGN_SESSION_KEY,
   isSafeStudioSpecDimensions,
@@ -56,6 +56,12 @@ export default function CadPageShell() {
   // （CadStudio.tsx側の既存デフォルト値へ自然にフォールバックする）
   const [initialProjectName, setInitialProjectName] = useState<string | undefined>(undefined);
   const [initialMaterial, setInitialMaterial] = useState<string | undefined>(undefined);
+  // AI提案のpartMaterials（「天板だけパイン集成材、脚・幕板はSPF材」等のパーツ単位の指定）を、
+  // initialMaterialと同じ考え方でCadStudio.tsxへ渡すための状態。安全と確認できたキーだけを
+  // 保持し、不正な値は個別に取り除く（他のキー・寸法・material・itemの反映は妨げない）
+  const [initialPartMaterials, setInitialPartMaterials] = useState<Partial<Record<PartMaterialLabel, string>> | undefined>(
+    undefined
+  );
   const [cadInstanceKey, setCadInstanceKey] = useState(0);
   // Phase 4-09監査で判明：AI提案の寸法がCADへ反映されたことが画面上どこにも
   // 示されておらず、ユーザーが「自分で入力し直さなくてよい」と気づけなかった。
@@ -91,6 +97,23 @@ export default function CadPageShell() {
           ? parsed.material
           : undefined;
 
+        // partMaterialsも同じ考え方：キー（PART_MATERIAL_LABELS）・値（FURNITURE_MATERIALS）の
+        // どちらも既知の語彙と一致するエントリだけを残す。不正なキー・値は個別に取り除くだけで、
+        // 他の正しいエントリや寸法・item・materialの反映は妨げない
+        const rawPartMaterials = parsed.partMaterials;
+        let safePartMaterials: Partial<Record<PartMaterialLabel, string>> | undefined;
+        if (typeof rawPartMaterials === 'object' && rawPartMaterials !== null) {
+          const entries = Object.entries(rawPartMaterials as Record<string, unknown>).filter(
+            ([label, material]) =>
+              PART_MATERIAL_LABELS.includes(label as PartMaterialLabel) &&
+              typeof material === 'string' &&
+              (FURNITURE_MATERIALS as readonly string[]).includes(material)
+          );
+          if (entries.length > 0) {
+            safePartMaterials = Object.fromEntries(entries) as Partial<Record<PartMaterialLabel, string>>;
+          }
+        }
+
         // sessionStorage（外部システム）から読み取った値をReact stateへ同期するだけの
         // 呼び出しのため、既存のapp/app/page.tsxと同様に明示的に抑制する
         // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -105,6 +128,7 @@ export default function CadPageShell() {
         setInitialDesign(studioSpecToFurnitureDesign(parsed));
         setInitialProjectName(safeProjectName);
         setInitialMaterial(safeMaterial);
+        setInitialPartMaterials(safePartMaterials);
         setCadInstanceKey((prev) => prev + 1);
       }
       // 不正な値だった場合はaiSpecSummaryを設定しないため、確認表示も出ないまま
@@ -151,6 +175,7 @@ export default function CadPageShell() {
           initialDesign={initialDesign}
           initialProjectName={initialProjectName}
           initialMaterial={initialMaterial}
+          initialPartMaterials={initialPartMaterials}
         />
       </div>
     </div>

@@ -11,6 +11,8 @@ import { defaultShelfSize, panelToCutSizeMm } from '../../lib/cad/geometry';
 interface CadSelectedPartPanelProps {
   design: FurnitureDesign;
   selectedPanel: FurniturePanel | null;
+  /** 家具全体の材料。選択中パネルにpanel.materialの上書きが無い場合、この値を表示する */
+  material: string;
   onUpdateShelf: (patch: { zAtMm?: number; widthMm?: number; depthMm?: number }) => void;
   onRemoveShelf: () => void;
   onDeselect: () => void;
@@ -19,6 +21,7 @@ interface CadSelectedPartPanelProps {
 export default function CadSelectedPartPanel({
   design,
   selectedPanel,
+  material,
   onUpdateShelf,
   onRemoveShelf,
   onDeselect,
@@ -93,6 +96,8 @@ export default function CadSelectedPartPanel({
         <p className="text-xs text-tanei-ink-muted">
           板のサイズ: {panelToCutSizeMm(selectedPanel).widthMm} × {panelToCutSizeMm(selectedPanel).heightMm}mm
           （厚み{Math.round(Math.min(selectedPanel.size.x, selectedPanel.size.y, selectedPanel.size.z))}mm）
+          <br />
+          材料: {selectedPanel.material ?? material}
           <br />
           このパーツは家具全体のサイズ変更に応じて自動的に調整されます。
         </p>
