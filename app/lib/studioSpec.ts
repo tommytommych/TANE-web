@@ -142,14 +142,12 @@ export const studioSpecToFurnitureDesign = (spec: StudioSpec): FurnitureDesign =
 export const furnitureDesignToStudioSpec = (
   design: FurnitureDesign,
   opts: { item: string; material: string }
-): StudioSpec | null => {
-  if (design.kind === 'table') return null;
-  return {
-    item: opts.item,
-    width: design.width,
-    depth: design.depth,
-    height: design.height,
-    thickness: design.thickness,
-    material: opts.material,
-  };
-};
+): StudioSpec | null => ({
+  item: opts.item,
+  kind: design.kind === 'table' ? 'table' : 'box',
+  width: design.width,
+  depth: design.depth,
+  height: design.height,
+  thickness: design.thickness,
+  material: opts.material,
+});

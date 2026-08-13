@@ -410,8 +410,7 @@ export default function CadStudio({ initialDesign, initialProjectName, initialMa
           <button
             type="button"
             onClick={handleViewCompletionImage}
-            disabled={design.kind === 'table'}
-            title={design.kind === 'table' ? 'テーブルの完成イメージ生成には現在対応していません' : 'パソコン専用機能です'}
+            title="パソコン専用機能です"
             className="flex items-center gap-1.5 bg-white hover:bg-tanei-brand-soft text-tanei-ink border border-tanei-border text-sm font-bold px-3 py-1.5 rounded-tanei-control shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
           >
             ✨ 完成イメージを見る
