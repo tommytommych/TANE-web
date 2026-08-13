@@ -9,13 +9,11 @@ import {
   type MaterialGroup,
   type SheetLayout,
   type AssemblyManual,
-  extractSheetLayoutFromContent,
   extractCameoDesignsFromContent,
   extractOptionsFromContent,
   stripInternalBlocks,
 } from '../../lib/cutlist';
 import type { SavedItemType } from '../../lib/types';
-import SheetLayoutSvgView from './SheetLayoutSvg';
 import CameoDesignGallery from './CameoDesignGallery';
 import CompletionCards from './CompletionCards';
 
@@ -66,10 +64,6 @@ function MessageBubble({
     () => (msg.role === 'assistant' ? extractOptionsFromContent(msg.content) : null),
     [msg.role, msg.content]
   );
-  const sheetLayouts = useMemo(
-    () => (msg.role === 'assistant' ? extractSheetLayoutFromContent(msg.content) : null),
-    [msg.role, msg.content]
-  );
   const cameoDesigns = useMemo(
     () => (msg.role === 'assistant' ? extractCameoDesignsFromContent(msg.content) : null),
     [msg.role, msg.content]
@@ -108,9 +102,11 @@ function MessageBubble({
             </button>
           </div>
         )}
+        {/* 木取り図（tanei-sheetlayoutブロックのSVG表示）はチャット内には表示しない。
+            設計が確定した後のブラウザCAD（/app/cad、木取り図画面）を唯一の正式な表示場所と
+            するため（材料ごとの木取り図・カットリストとの二重表示を避ける）。AIの回答文章
+            （設計概要・材料の簡潔な説明）はrenderMessageContentでそのまま表示され続ける */}
         <div className="mb-2">{renderMessageContent(msg.content, msg.role === 'user')}</div>
-        {sheetLayouts &&
-          sheetLayouts.map((layout, i) => <SheetLayoutSvgView key={i} layout={layout} showToast={showToast} />)}
         {cameoDesigns && <CameoDesignGallery designs={cameoDesigns} onOpenGeminiImage={onOpenGeminiImage} />}
       </div>
 

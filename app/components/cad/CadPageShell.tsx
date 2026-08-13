@@ -149,7 +149,15 @@ export default function CadPageShell() {
         >
           ← チャットに戻る
         </Link>
-        <span className="text-sm font-black text-tanei-brand truncate">🌱 TANE:i ブラウザCAD</span>
+        {/* TANE:iの唯一の設計画面であることが一目で分かるよう、タイトルの下に短い説明文を
+            添える（「ここで設計する」ことを明示する。STEP5対応）。ヘッダーの高さを大きく
+            変えないよう、既存のitems-center・truncateの考え方を維持したまま2行構成にする */}
+        <span className="flex flex-col leading-tight min-w-0">
+          <span className="text-sm font-black text-tanei-brand truncate">🌱 TANE:i ブラウザCAD</span>
+          <span className="text-[10px] text-tanei-ink-muted truncate">
+            ここで家具を設計します／幅・奥行・高さ・材料・パーツを自由に調整できます
+          </span>
+        </span>
       </div>
 
       {/* Phase 4-10：AI提案から到達した場合だけ表示する軽量な確認表示。通常の新規CAD・

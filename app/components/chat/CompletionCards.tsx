@@ -123,28 +123,14 @@ function CompletionCards({
       </div>
 
       {/* 天板・底板・側板・背板からなる箱型の家具のみ、AIがtanei-studio-specブロックを
-          出力する（Phase 4-01調査で判明：この時点まではブラウザCAD（/app/cad）への導線が
-          一切無く、設計スタジオ（要PCローカルサーバー）しか選べなかった）。Phase 4-02で、
-          設定不要でスマホからも使えるブラウザCADを選択肢として追加する。TANE:iの設計画面は
-          ブラウザCADのみで、完成イメージは「見る」ための補助機能という位置づけのため、
-          表示順は基本導線（AI提案→完成イメージを見る→ブラウザCADで設計する）に合わせて
-          完成イメージを先に置くが、強調色（tanei-brand-soft）は引き続き実際の設計画面である
-          ブラウザCAD側に付ける。完成イメージ側の導線（handleOpenInStudio・pushSpecToStudio）
-          は変更しない */}
+          出力する。TANE:iの唯一の設計画面はブラウザCADで、完成イメージは「今の設計を見た目で
+          確認する」ための補助機能という位置づけのため、表示順は基本導線
+          （AI提案→ブラウザCADで設計する→（任意で）完成イメージを見る）に合わせて
+          ブラウザCADを先に置く。強調色（tanei-brand-soft）も引き続きブラウザCAD側に付け、
+          完成イメージ側を視覚的に強く見せない。完成イメージ側の導線
+          （handleOpenInStudio・pushSpecToStudio）は変更しない */}
       {studioSpec && (
         <div className="flex flex-col gap-1.5 mb-2">
-          <button
-            type="button"
-            onClick={handleOpenInStudio}
-            title="パソコン専用機能です"
-            className="flex items-center gap-2.5 px-3 py-2.5 rounded-tanei-card border border-tanei-border bg-white text-tanei-ink hover:border-tanei-brand transition-colors text-left"
-          >
-            <span className="text-lg flex-shrink-0">✨</span>
-            <span className="flex flex-col leading-tight min-w-0">
-              <span className="text-xs font-bold">完成イメージを見る</span>
-              <span className="text-[10px] text-tanei-ink-muted">PC専用／写真のようなリアルな完成イメージを見る</span>
-            </span>
-          </button>
           {/* Phase 4-07：クリック時、既存のstudioSpec（AIが提案した確定仕様、変更しない）を
               一時的にsessionStorageへ書き込んでから/app/cadへ遷移する。CadPageShell.tsx側が
               マウント時に読み取り、既存のinitialDesignプロパティ（CadStudio.tsxに元々ある、
@@ -174,6 +160,18 @@ function CompletionCards({
               <span className="text-[10px] text-tanei-ink-muted">AI提案の寸法（幅・奥行・高さ・板厚）をそのまま引き継ぎます</span>
             </span>
           </Link>
+          <button
+            type="button"
+            onClick={handleOpenInStudio}
+            title="パソコン専用機能です"
+            className="flex items-center gap-2.5 px-3 py-2.5 rounded-tanei-card border border-tanei-border bg-white text-tanei-ink hover:border-tanei-brand transition-colors text-left"
+          >
+            <span className="text-lg flex-shrink-0">✨</span>
+            <span className="flex flex-col leading-tight min-w-0">
+              <span className="text-xs font-bold">完成イメージを見る</span>
+              <span className="text-[10px] text-tanei-ink-muted">PC専用／写真のようなリアルな完成イメージを見る</span>
+            </span>
+          </button>
         </div>
       )}
 
