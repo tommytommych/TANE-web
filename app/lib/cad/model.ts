@@ -19,7 +19,19 @@ import { KOHNAN_WOOD_LIST } from '../constants';
 
 // systemPrompt.ts（tanei-studio-specブロック）・tanei-studio/freecad_scripts/generate_model.pyと
 // 語彙を揃えている（AIの提案・FreeCAD版・ブラウザCADのどれでも同じ材質名で扱えるようにするため）
-export const FURNITURE_MATERIALS = ['パイン集成材', 'シナベニヤ', 'ラワン合板', 'SPF材', 'OSB合板'] as const;
+// 'SPF材（1×4）'・'SPF材（2×4）'は、app/lib/constants.tsのKOHNAN_WOOD_LISTに既に存在する
+// 同名エントリ（価格目安データ）とまったく同じ表記にしている。区別なしの'SPF材'は削除せず、
+// 既存の保存データ・AIが具体的な規格を明言しなかった場合のフォールバックとして残す
+// （従来通り2×4相当として扱われる。geometry.ts参照）
+export const FURNITURE_MATERIALS = [
+  'パイン集成材',
+  'シナベニヤ',
+  'ラワン合板',
+  'SPF材',
+  'SPF材（1×4）',
+  'SPF材（2×4）',
+  'OSB合板',
+] as const;
 export type FurnitureMaterial = (typeof FURNITURE_MATERIALS)[number];
 
 /** 木取り図の表示方法を左右する、材料の購入単位の区別。
@@ -30,8 +42,10 @@ export type FurnitureMaterial = (typeof FURNITURE_MATERIALS)[number];
  * 行う（同じ材料が箱型の天板等に使われた場合も同様に規格材として扱う） */
 export type FurnitureMaterialType = 'sheet' | 'dimensionalLumber';
 
+const DIMENSIONAL_LUMBER_MATERIALS: readonly string[] = ['SPF材', 'SPF材（1×4）', 'SPF材（2×4）'];
+
 export function getFurnitureMaterialType(material: string): FurnitureMaterialType {
-  return material === 'SPF材' ? 'dimensionalLumber' : 'sheet';
+  return DIMENSIONAL_LUMBER_MATERIALS.includes(material) ? 'dimensionalLumber' : 'sheet';
 }
 
 const DEFAULT_THICKNESS_MM = 18;
@@ -372,6 +386,8 @@ const MATERIAL_COLOR_HEX: Record<string, string> = {
   シナベニヤ: '#E4D5B7',
   ラワン合板: '#C99A6C',
   SPF材: '#D9C29A',
+  'SPF材（1×4）': '#D9C29A',
+  'SPF材（2×4）': '#D9C29A',
   OSB合板: '#B8926A',
 };
 const DEFAULT_COLOR_HEX = '#D9C29A';

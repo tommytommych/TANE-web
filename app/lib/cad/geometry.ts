@@ -156,10 +156,13 @@ const TABLE_LEG_SIZE_MM = 40;
 const TABLE_LEG_INSET_MM = 20;
 const TABLE_APRON_HEIGHT_MM = 80;
 
-// SPF材（2×4）の実寸（厚み×幅）。app/lib/constants.tsのKOHNAN_WOOD_LISTの
-// 'SPF材（2×4）'エントリ（厚38×幅89mm）と同じ値。脚・幕板の材料としてSPF材が
-// 選ばれた場合のみ、テーブルの脚・幕板の断面にこの実寸を反映する（新しい固定値を
-// 増やすのではなく、既存の価格目安データと同じ値を使う）
+// SPF材の規格材としての実寸（厚み×幅）。app/lib/constants.tsのKOHNAN_WOOD_LISTの
+// 'SPF材（1×4）'（厚19×幅89mm）・'SPF材（2×4）'（厚38×幅89mm）エントリと同じ値。
+// 脚・幕板の材料としてこれらが選ばれた場合のみ、テーブルの脚・幕板の断面に実寸を反映する
+// （新しい固定値を増やすのではなく、既存の価格目安データと同じ値を使う）。
+// 区別なしの'SPF材'は、これまで通り2×4相当（38×89mm）のまま扱う（後方互換のフォールバック）
+const SPF_1X4_THICKNESS_MM = 19;
+const SPF_1X4_WIDTH_MM = 89;
 const SPF_2X4_THICKNESS_MM = 38;
 const SPF_2X4_WIDTH_MM = 89;
 
@@ -168,13 +171,24 @@ interface CrossSection {
   widthYMm: number;
 }
 
-/** 脚の材料としてSPF材が選ばれている場合のみ、実際の2×4断面（38×89mm）を使う。
- * それ以外の材料（未指定含む）では従来通りの正方形断面（40×40mm）のまま */
-function resolveLegCrossSection(legMaterial: string | undefined): CrossSection {
-  if (legMaterial === 'SPF材') {
+/** 材料名が既知の規格材（SPF材／SPF材（1×4）／SPF材（2×4））に一致する場合のみ、実際の断面
+ * （厚み×幅）を返す。一致しない場合（未指定・パイン集成材等）はnullを返し、呼び出し側で
+ * 従来通りの既定断面にフォールバックさせる */
+function resolveDimensionalLumberCrossSection(material: string | undefined): CrossSection | null {
+  if (material === 'SPF材（1×4）') {
+    return { widthXMm: SPF_1X4_THICKNESS_MM, widthYMm: SPF_1X4_WIDTH_MM };
+  }
+  if (material === 'SPF材（2×4）' || material === 'SPF材') {
     return { widthXMm: SPF_2X4_THICKNESS_MM, widthYMm: SPF_2X4_WIDTH_MM };
   }
-  return { widthXMm: TABLE_LEG_SIZE_MM, widthYMm: TABLE_LEG_SIZE_MM };
+  return null;
+}
+
+/** 脚の材料が既知の規格材（SPF材系）の場合のみ、実際の断面（1×4なら19×89mm、
+ * 2×4またはSPF材（区別なし）なら38×89mm）を使う。それ以外の材料（未指定含む）では
+ * 従来通りの正方形断面（40×40mm）のまま */
+function resolveLegCrossSection(legMaterial: string | undefined): CrossSection {
+  return resolveDimensionalLumberCrossSection(legMaterial) ?? { widthXMm: TABLE_LEG_SIZE_MM, widthYMm: TABLE_LEG_SIZE_MM };
 }
 
 interface ApronCrossSection {
@@ -182,12 +196,13 @@ interface ApronCrossSection {
   heightMm: number;
 }
 
-/** 幕板の材料としてSPF材が選ばれている場合のみ、実際の2×4断面（厚み38mm・見付け高さ89mm）を
- * 使う。それ以外の材料（未指定含む）では従来通り、板厚（design.thickness）を厚みに、
+/** 幕板の材料が既知の規格材（SPF材系）の場合のみ、実際の断面（厚み・見付け高さ）を使う。
+ * それ以外の材料（未指定含む）では従来通り、板厚（design.thickness）を厚みに、
  * TABLE_APRON_HEIGHT_MMを見付け高さに使う */
 function resolveApronCrossSection(apronMaterial: string | undefined, defaultThicknessMm: number): ApronCrossSection {
-  if (apronMaterial === 'SPF材') {
-    return { thicknessMm: SPF_2X4_THICKNESS_MM, heightMm: SPF_2X4_WIDTH_MM };
+  const cross = resolveDimensionalLumberCrossSection(apronMaterial);
+  if (cross) {
+    return { thicknessMm: cross.widthXMm, heightMm: cross.widthYMm };
   }
   return { thicknessMm: defaultThicknessMm, heightMm: TABLE_APRON_HEIGHT_MM };
 }

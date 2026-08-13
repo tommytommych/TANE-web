@@ -165,30 +165,46 @@ TABLE_LEG_SIZE_MM = 40
 TABLE_LEG_INSET_MM = 20
 TABLE_APRON_HEIGHT_MM = 80
 
-# SPF材（2×4）の実寸（厚み×幅）。app/lib/constants.tsのKOHNAN_WOOD_LISTの
-# 'SPF材（2×4）'エントリ（厚38×幅89mm）、およびTypeScript側
-# （app/lib/cad/geometry.tsのSPF_2X4_THICKNESS_MM/SPF_2X4_WIDTH_MM）と同じ値。
-# 脚・幕板の材料としてSPF材が選ばれた場合のみ、この実寸を断面に反映する
+# SPF材の規格材としての実寸（厚み×幅）。app/lib/constants.tsのKOHNAN_WOOD_LISTの
+# 'SPF材（1×4）'（厚19×幅89mm）・'SPF材（2×4）'（厚38×幅89mm）エントリ、および
+# TypeScript側（app/lib/cad/geometry.ts）と同じ値。脚・幕板の材料としてこれらが
+# 選ばれた場合のみ、この実寸を断面に反映する。区別なしの"SPF材"は従来通り2×4相当のまま
+SPF_1X4_THICKNESS_MM = 19
+SPF_1X4_WIDTH_MM = 89
 SPF_2X4_THICKNESS_MM = 38
 SPF_2X4_WIDTH_MM = 89
 
 
-def _resolve_leg_cross_section(leg_material):
-    """脚の材料としてSPF材が選ばれている場合のみ実際の2×4断面（38×89mm）を使う。
-    それ以外の材料（未指定含む）では従来通りの正方形断面（40×40mm）のまま
-    （app/lib/cad/geometry.tsのresolveLegCrossSectionと同じ判定）。"""
-    if leg_material == "SPF材":
+def _resolve_dimensional_lumber_cross_section(material):
+    """材料名が既知の規格材（SPF材／SPF材（1×4）／SPF材（2×4））に一致する場合のみ、
+    実際の断面（厚み, 幅）のタプルを返す。一致しない場合はNoneを返し、呼び出し側で
+    従来通りの既定断面にフォールバックさせる
+    （app/lib/cad/geometry.tsのresolveDimensionalLumberCrossSectionと同じ判定）。"""
+    if material == "SPF材（1×4）":
+        return SPF_1X4_THICKNESS_MM, SPF_1X4_WIDTH_MM
+    if material in ("SPF材（2×4）", "SPF材"):
         return SPF_2X4_THICKNESS_MM, SPF_2X4_WIDTH_MM
+    return None
+
+
+def _resolve_leg_cross_section(leg_material):
+    """脚の材料が既知の規格材（SPF材系）の場合のみ実際の断面を使う。それ以外の材料
+    （未指定含む）では従来通りの正方形断面（40×40mm）のまま
+    （app/lib/cad/geometry.tsのresolveLegCrossSectionと同じ判定）。"""
+    cross = _resolve_dimensional_lumber_cross_section(leg_material)
+    if cross:
+        return cross
     return TABLE_LEG_SIZE_MM, TABLE_LEG_SIZE_MM
 
 
 def _resolve_apron_cross_section(apron_material, default_thickness_mm):
-    """幕板の材料としてSPF材が選ばれている場合のみ実際の2×4断面（厚み38mm・見付け高さ89mm）を
-    使う。それ以外の材料（未指定含む）では従来通り、板厚（thickness_mm）を厚みに、
+    """幕板の材料が既知の規格材（SPF材系）の場合のみ実際の断面（厚み・見付け高さ）を使う。
+    それ以外の材料（未指定含む）では従来通り、板厚（thickness_mm）を厚みに、
     TABLE_APRON_HEIGHT_MMを見付け高さに使う
     （app/lib/cad/geometry.tsのresolveApronCrossSectionと同じ判定）。"""
-    if apron_material == "SPF材":
-        return SPF_2X4_THICKNESS_MM, SPF_2X4_WIDTH_MM
+    cross = _resolve_dimensional_lumber_cross_section(apron_material)
+    if cross:
+        return cross
     return default_thickness_mm, TABLE_APRON_HEIGHT_MM
 
 
@@ -888,6 +904,8 @@ MATERIAL_COLORS = {
     "シナベニヤ": "0.90, 0.80, 0.62",
     "ラワン合板": "0.72, 0.55, 0.38",
     "SPF材": "0.88, 0.78, 0.60",
+    "SPF材（1×4）": "0.88, 0.78, 0.60",
+    "SPF材（2×4）": "0.88, 0.78, 0.60",
     "OSB合板": "0.75, 0.62, 0.42",
 }
 DEFAULT_MATERIAL_COLOR = "0.80, 0.65, 0.45"
@@ -900,6 +918,8 @@ MATERIAL_WOOD_TEXTURE = {
     "シナベニヤ": "T_Wood13",    # 直線的でまっすぐな木目、白っぽい
     "ラワン合板": "T_Wood15",    # 中間色の茶色
     "SPF材": "T_Wood11",         # Spruce（黄色みの強い、まっすぐで細かい木目）
+    "SPF材（1×4）": "T_Wood11",  # SPF材と同じ樹種のため同じテクスチャ
+    "SPF材（2×4）": "T_Wood11",  # SPF材と同じ樹種のため同じテクスチャ
     "OSB合板": "T_Wood9",        # 不規則なうねり（OSB特有のチップ感に近い）
 }
 DEFAULT_WOOD_TEXTURE = "T_Wood10"

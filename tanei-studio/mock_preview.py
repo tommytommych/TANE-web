@@ -19,6 +19,8 @@ MATERIAL_HEX = {
     "シナベニヤ": "#e6cca3",
     "ラワン合板": "#b78a5f",
     "SPF材": "#e0c799",
+    "SPF材（1×4）": "#e0c799",
+    "SPF材（2×4）": "#e0c799",
     "OSB合板": "#c19f6b",
 }
 DEFAULT_MATERIAL_HEX = "#cca675"
