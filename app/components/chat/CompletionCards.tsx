@@ -96,20 +96,22 @@ function CompletionCards({
     router.push('/app/studio');
   };
 
+  // 「PDF」はファイル形式であって利用者が知りたい「何に使うものか」を表さないため、
+  // 「カット申込書」（ホームセンターなどにカットを依頼するための書類）と表示する。
+  // 内部のダウンロード処理・生成ロジック（onDownloadCutSheet）自体は変更しない。
+  // シルエットカメオの相談にはカット申込書が関係ないため、この相談ではボタンを出さない
   const cards: { icon: string; label: string; onClick: () => void; accent?: boolean; disabled?: boolean; title?: string }[] = [
-    // シルエットカメオの相談には木取り図PDFが関係ないため、この相談ではPDFボタンを出さない
     ...(isCameoContent
       ? []
       : [
           {
-            icon: isGeneratingPdf ? '⏳' : '📄',
-            label: isGeneratingPdf ? '生成中…' : 'PDF',
+            icon: isGeneratingPdf ? '⏳' : '📝',
+            label: isGeneratingPdf ? '生成中…' : 'カット申込書',
             onClick: () => onDownloadCutSheet(materialGroups ?? undefined, sheetLayouts ?? undefined),
             accent: true,
             disabled: isGeneratingPdf,
           },
         ]),
-    { icon: '💚', label: 'LINE送信', onClick: handleLineShare },
     { icon: '💾', label: '保存', onClick: handleSaveDesign },
     { icon: '🔗', label: '共有', onClick: handleShare },
     { icon: '🛒', label: 'Amazon', onClick: handleAmazonSearch },
@@ -175,7 +177,7 @@ function CompletionCards({
         </div>
       )}
 
-      <div className={`grid gap-2 ${isCameoContent ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3 sm:grid-cols-5'}`}>
+      <div className={`grid gap-2 ${isCameoContent ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-4'}`}>
         {cards.map((card) => (
           <button
             key={card.label}
@@ -192,6 +194,15 @@ function CompletionCards({
             <span className="text-xs font-bold">{card.label}</span>
           </button>
         ))}
+      </div>
+
+      {/* LINE送信は制作の必須工程ではないため、主要アクションと同じ重みのボタンとしては
+          並べない（初心者が「LINEに送らないと進めないのか」と誤解しないように）。
+          機能自体は削除せず、カット申込書の下に控えめな補助リンクとして残す */}
+      <div className="mt-1.5 flex justify-end">
+        <button type="button" onClick={handleLineShare} className="text-[11px] text-tanei-ink-muted hover:text-tanei-brand underline">
+          💚 LINEで送る
+        </button>
       </div>
     </div>
   );

@@ -34,7 +34,7 @@ const MY_PAGE_GROUPS: { title: string; items: { icon: string; label: string; typ
     title: '制作・作品',
     items: [
       { icon: '📏', label: '木取り図', type: 'cutlist' },
-      { icon: '📄', label: '保存したPDF', type: 'pdf' },
+      { icon: '📝', label: '保存したカット申込書', type: 'pdf' },
       { icon: '🖼️', label: '保存した画像', type: 'image' },
       { icon: '🏆', label: '完成作品', type: 'finished' },
     ],
@@ -221,7 +221,7 @@ export default function LeftSidebar({
                   disabled={isGeneratingPdf}
                   className="flex items-center justify-center gap-2 px-3 py-3 rounded-tanei-control text-sm text-white font-bold transition-all shadow-sm w-full disabled:opacity-50 bg-tanei-accent hover:bg-tanei-accent-dark"
                 >
-                  {isGeneratingPdf ? 'PDF作成中...' : 'TANE:iカット申込書PDF出力'}
+                  {isGeneratingPdf ? 'カット申込書を作成中…' : '📝 TANE:iカット申込書を出力'}
                 </button>
                 <div className="text-xs text-tanei-ink-muted px-1 mt-1.5 leading-tight">
                   コーナン・カインズ・コメリなど主要ホームセンター共通で使える1枚です

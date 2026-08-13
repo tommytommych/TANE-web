@@ -175,10 +175,10 @@ export default function CadCutlistView({
         dimensionalLumberItems
       );
       downloadPdfBytes(new Uint8Array(pdfBytes), 'TANEi_CutSheet.pdf');
-      showStatus('木取り図PDFのダウンロードが完了しました！');
+      showStatus('カット申込書のダウンロードが完了しました！');
     } catch (error) {
       console.error(error);
-      showStatus('PDFの生成に失敗しました。時間をおいて再度お試しください。');
+      showStatus('カット申込書の生成に失敗しました。時間をおいて再度お試しください。');
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -352,7 +352,7 @@ export default function CadCutlistView({
                 disabled={isGeneratingPdf}
                 className="flex-1 bg-tanei-brand text-white px-4 py-3 rounded-tanei-control text-sm font-bold hover:bg-tanei-brand-dark transition-colors disabled:opacity-50"
               >
-                {isGeneratingPdf ? 'PDFを作成中…' : '📄 PDFを保存'}
+                {isGeneratingPdf ? 'カット申込書を作成中…' : '📝 カット申込書を保存'}
               </button>
               <button
                 type="button"

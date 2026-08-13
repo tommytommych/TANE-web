@@ -91,7 +91,7 @@ export default function StudioEmbed() {
     }
 
     setIsGeneratingPdf(true);
-    showStatus('この設計内容をもとにカット申込書PDFを生成しています…');
+    showStatus('この設計内容をもとにカット申込書を生成しています…');
     try {
       // 材料ごとに分離された木取り図（複数の場合あり）をそのまま渡す。
       // buildUniversalCutSheetPdfは元々複数のSheetLayoutを材料ごとの別セクションとして
@@ -102,10 +102,10 @@ export default function StudioEmbed() {
       const pdfBytes = await buildUniversalCutSheetPdf([], sheetLayouts, undefined, dimensionalLumberItems);
       downloadPdfBytes(new Uint8Array(pdfBytes), 'TANEi_Universal_Cut_Sheet.pdf');
       consumeLocalUsage(IMAGE_USAGE_STORAGE_KEY, DAILY_IMAGE_LIMIT);
-      showStatus('カット申込書PDFのダウンロードが完了しました！');
+      showStatus('カット申込書のダウンロードが完了しました！');
     } catch (error) {
       console.error(error);
-      showStatus('PDFの生成に失敗しました。時間をおいて再度お試しください。');
+      showStatus('カット申込書の生成に失敗しました。時間をおいて再度お試しください。');
     } finally {
       setIsGeneratingPdf(false);
     }

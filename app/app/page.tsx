@@ -363,8 +363,8 @@ export default function Home() {
       isBlank
         ? 'TANE:iカット申込書（原紙）を生成しています…'
         : usingChatData
-        ? 'この会話の木取り図をもとにPDFを生成しています…'
-        : 'TANE:iオリジナル汎用カット申込書PDFを生成しています…'
+        ? 'この会話の木取り図をもとにカット申込書を生成しています…'
+        : 'TANE:iオリジナル汎用カット申込書を生成しています…'
     );
 
     try {
@@ -382,7 +382,7 @@ export default function Home() {
 
       await addItem(
         'pdf',
-        isBlank ? 'カット申込書（原紙）' : '①ホームセンター提出用PDF',
+        isBlank ? 'カット申込書（原紙）' : '①ホームセンター提出用カット申込書',
         isBlank
           ? '手書き記入用の白紙カット申込書です。'
           : usingChatData
@@ -400,7 +400,7 @@ export default function Home() {
       );
     } catch (error) {
       console.error(error);
-      showToast('PDFの生成に失敗しました。時間をおいて再度お試しください。');
+      showToast('カット申込書の生成に失敗しました。時間をおいて再度お試しください。');
     } finally {
       setIsGeneratingPdf(false);
     }

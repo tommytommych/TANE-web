@@ -49,7 +49,7 @@ const MODAL_META: Record<SavedItemType, { icon: string; label: string }> = {
   favorite: { icon: '⭐', label: 'お気に入り' },
   design: { icon: '💾', label: '保存した設計・アイデア' },
   cutlist: { icon: '📏', label: '木取り図' },
-  pdf: { icon: '📄', label: '保存したPDF' },
+  pdf: { icon: '📝', label: '保存したカット申込書' },
   image: { icon: '🖼️', label: '保存した画像' },
   finished: { icon: '🏆', label: '完成作品' },
   history: { icon: '🕒', label: '相談履歴' },
@@ -976,7 +976,7 @@ export default function SavedItemsModal({
                           download={`${item.title}.pdf`}
                           className="inline-flex items-center gap-1.5 self-start text-xs font-bold bg-tanei-accent text-white px-3 py-1.5 rounded-tanei-control hover:bg-tanei-accent-dark transition-colors"
                         >
-                          📄 PDFをダウンロード
+                          📝 カット申込書をダウンロード
                         </a>
                       )}
 
