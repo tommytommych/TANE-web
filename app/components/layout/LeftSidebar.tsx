@@ -45,19 +45,14 @@ const MY_PAGE_GROUPS: { title: string; items: { icon: string; label: string; typ
   },
 ];
 
-const QUICK_START_ITEMS = [
-  { icon: '💬', label: 'DIY相談', desc: 'まずは気軽に相談する', message: 'DIYの相談をしたいです' },
-  {
-    icon: '📐',
-    label: '設計する',
-    desc: 'イメージから設計案を作る',
-    message: '作品の設計を手伝ってほしいです。大まかなイメージから具体的な設計案を提案してください。',
-  },
-  { icon: '📋', label: '木取り図', desc: '必要な部材を整理する', message: '木取り図を作ってほしいです' },
-  { icon: '🪵', label: '木材リスト', desc: '種類と価格を見る', message: 'コーナンの木材の種類と価格リストを教えて' },
-];
-
+// チャットTOP（StartCards.tsx）を「DIYを相談」「写真からAI空間診断」の2入口に
+// 絞ったことに合わせ、サイドバーの「はじめる」（DIY相談・設計する・木取り図・木材リスト）と
+// 「メニュー」（おすすめ工具・木材の選び方・シルエットカメオデザイン）に分かれていた
+// ショートカットを1つの「メニュー」リストに統合する。「設計する」「木取り図」はチャットTOP・
+// ブラウザCADの導線と役割が重複するため外し、DIY相談・木材リストはそのまま残す
 const MENU_ITEMS = [
+  { icon: '💬', label: 'DIY相談', message: 'DIYの相談をしたいです' },
+  { icon: '🪵', label: '木材リスト', message: 'コーナンの木材の種類と価格リストを教えて' },
   { icon: '🔧', label: 'おすすめ工具', message: '初心者におすすめの工具を教えて' },
   { icon: '🔍', label: '木材の選び方', message: '木材の選び方を箇条書きで教えて' },
   {
@@ -162,30 +157,10 @@ export default function LeftSidebar({
               </Card>
             </div>
 
-            {/* はじめる（カードUI） */}
-            <div>
-              <SectionTitle icon="⚡" className="px-1 mb-2 normal-case">
-                はじめる
-              </SectionTitle>
-              <div className="grid grid-cols-2 gap-2">
-                {QUICK_START_ITEMS.map((item) => (
-                  <button
-                    key={item.label}
-                    onClick={() => onSendMessage(item.message, false)}
-                    className="text-left bg-tanei-surface hover:bg-white border border-tanei-border rounded-tanei-card p-3 shadow-sm hover:shadow-md transition-all group"
-                  >
-                    <span className="text-xl block mb-1">{item.icon}</span>
-                    <span className="text-sm font-bold text-tanei-ink block group-hover:text-tanei-brand">
-                      {item.label}
-                    </span>
-                    <span className="text-xs text-tanei-ink-muted block mt-0.5">{item.desc}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div className="pt-2.5 border-t border-tanei-border flex flex-col gap-1.5">
-              <SectionTitle className="px-3 mb-1 normal-case">メニュー</SectionTitle>
+              <SectionTitle icon="⚡" className="px-3 mb-1 normal-case">
+                メニュー
+              </SectionTitle>
 
               {MENU_ITEMS.map((item) => (
                 <button
