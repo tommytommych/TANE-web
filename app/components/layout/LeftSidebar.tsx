@@ -221,7 +221,7 @@ export default function LeftSidebar({
                   disabled={isGeneratingPdf}
                   className="flex items-center justify-center gap-2 px-3 py-3 rounded-tanei-control text-sm text-white font-bold transition-all shadow-sm w-full disabled:opacity-50 bg-tanei-accent hover:bg-tanei-accent-dark"
                 >
-                  {isGeneratingPdf ? 'カット申込書を作成中…' : '📝 TANE:iカット申込書を出力'}
+                  {isGeneratingPdf ? 'カット申込書を作成中…' : '📝 TANE:iカット申込書をダウンロード'}
                 </button>
                 <div className="text-xs text-tanei-ink-muted px-1 mt-1.5 leading-tight">
                   コーナン・カインズ・コメリなど主要ホームセンター共通で使える1枚です

@@ -380,7 +380,7 @@ export default function CadCutlistView({
                 disabled={isGeneratingPdf}
                 className="flex-1 bg-tanei-brand text-white px-4 py-3 rounded-tanei-control text-sm font-bold hover:bg-tanei-brand-dark transition-colors disabled:opacity-50"
               >
-                {isGeneratingPdf ? 'カット申込書を作成中…' : '📝 カット申込書を保存'}
+                {isGeneratingPdf ? 'カット申込書を作成中…' : '📝 カット申込書をダウンロード'}
               </button>
               <button
                 type="button"
