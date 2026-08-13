@@ -61,6 +61,13 @@ export default function CadStudio({
 }: CadStudioProps) {
   const router = useRouter();
   const [design, setDesign] = useState<FurnitureDesign>(initialDesign ?? createDefaultFurnitureDesign());
+  // AI相談（チャット）からの提案を反映して来た場合のみtrue。initialDesignと同じく
+  // マウント時の値を最初の1回だけ使う（design.kindはその後ユーザー操作で変わらないため、
+  // ここが変わっても再判定する必要はない）。チャットから来た場合はAIが家具の種類
+  // （箱型／テーブル）を既に決めているため、種類の切り替えボタンは現在の種類だけを
+  // 表示し、もう一方の種類への切り替え（＝既定寸法へのリセット、AI提案の消失）を
+  // 誤って選べないようにする
+  const [cameFromChat] = useState(Boolean(initialDesign));
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
   const [material, setMaterial] = useState<string>(initialMaterial ?? FURNITURE_MATERIALS[0]);
   // パーツ単位の材料上書き（「天板だけパイン集成材、脚・幕板はSPF材」等）。キーが無い
@@ -499,30 +506,39 @@ export default function CadStudio({
 
         {/* 家具の種類の切り替え。押すと該当する種類の既定寸法へリセットするため、
             CadViewport.tsxの視点切り替えボタンと同じ「ピル型ボタン2つ」の見た目にして、
-            現在編集中の家具そのものを切り替える操作だと分かるようにしている */}
+            現在編集中の家具そのものを切り替える操作だと分かるようにしている。
+            ただしAI相談からの提案で来た場合は、AIが既に種類を決めているため、
+            もう一方の種類へ切り替えるボタン（＝既定寸法へリセットし、AI提案の
+            寸法・材料が消えてしまう）は表示せず、現在の種類だけを示す */}
         <div className="flex gap-1.5">
-          <button
-            type="button"
-            onClick={() => handleSwitchKind('box')}
-            className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-colors ${
-              design.kind !== 'table'
-                ? 'bg-tanei-brand text-white border-tanei-brand'
-                : 'bg-white text-tanei-ink-muted border-tanei-border hover:border-tanei-brand'
-            }`}
-          >
-            📦 箱型
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSwitchKind('table')}
-            className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-colors ${
-              design.kind === 'table'
-                ? 'bg-tanei-brand text-white border-tanei-brand'
-                : 'bg-white text-tanei-ink-muted border-tanei-border hover:border-tanei-brand'
-            }`}
-          >
-            🪑 テーブル
-          </button>
+          {(!cameFromChat || design.kind !== 'table') && (
+            <button
+              type="button"
+              onClick={() => handleSwitchKind('box')}
+              disabled={cameFromChat}
+              className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-colors disabled:cursor-default ${
+                design.kind !== 'table'
+                  ? 'bg-tanei-brand text-white border-tanei-brand'
+                  : 'bg-white text-tanei-ink-muted border-tanei-border hover:border-tanei-brand'
+              }`}
+            >
+              📦 箱型
+            </button>
+          )}
+          {(!cameFromChat || design.kind === 'table') && (
+            <button
+              type="button"
+              onClick={() => handleSwitchKind('table')}
+              disabled={cameFromChat}
+              className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-colors disabled:cursor-default ${
+                design.kind === 'table'
+                  ? 'bg-tanei-brand text-white border-tanei-brand'
+                  : 'bg-white text-tanei-ink-muted border-tanei-border hover:border-tanei-brand'
+              }`}
+            >
+              🪑 テーブル
+            </button>
+          )}
         </div>
       </div>
 
