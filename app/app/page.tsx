@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 
 import { KOHNAN_WOOD_LIST, AMAZON_TOOLS, shuffleArray } from '../lib/constants';
 import {
@@ -9,9 +8,7 @@ import {
   type MaterialGroup,
   type SheetLayout,
   type AssemblyManual,
-  type StudioSpec,
   extractContextFromContent,
-  extractStudioSpecFromContent,
   stripInternalBlocks,
 } from '../lib/cutlist';
 import { buildUniversalCutSheetPdf } from '../lib/cutSheetPdf';
@@ -33,7 +30,7 @@ import {
   DAILY_IMAGE_LIMIT,
   IMAGE_USAGE_STORAGE_KEY,
 } from '../lib/localUsage';
-import { connectStudioSync, pushSpecToStudio } from '../lib/studioSync';
+import { connectStudioSync } from '../lib/studioSync';
 
 import TopBar from '../components/layout/TopBar';
 import LeftSidebar from '../components/layout/LeftSidebar';
@@ -66,7 +63,6 @@ const WELCOME_MESSAGE: Message = {
 };
 
 export default function Home() {
-  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -586,33 +582,6 @@ export default function Home() {
     window.open('https://gemini.google.com/', '_blank');
   }, [messages, showToast, consumeImageUsage]);
 
-  // チャット入力欄の「完成イメージ」ボタン（家具の完成イメージ専用。シルエットカメオの
-  // デザイン案はhandleOpenGeminiImageのまま外部Geminiを使い続ける）。以前は外部Geminiへの
-  // 画像生成導線だったが、自社のTANE:i設計スタジオ（/app/studio）でFreeCAD+POV-Rayによる
-  // 正確な寸法の完成イメージを生成できるようになったため、そちらへ画面遷移するように変更した。
-  // 会話を新しい方から遡ってtanei-studio-specブロック（AIが設計提案時に付加する、天板・底板・
-  // 側板・背板の箱型家具の寸法データ）を探し、見つかればWebSocket経由で設計スタジオへ
-  // 自動反映してから遷移する（studioSync.ts参照。設計スタジオ側は/ws/syncへの新規接続時に
-  // 直近の仕様を受け取り、自動でフォームへ反映・レンダリングする）。画面遷移がほぼ即時に
-  // 起きるため、ここでトーストを出しても表示されずに終わる（実機検証済み）。椅子など箱型に
-  // 当てはまらない相談や、まだ寸法が固まっていない場合はブロックが無いため、その場合は
-  // 仕様を送らず画面遷移のみ行う（設計スタジオ側のデフォルトフォームで手動入力すれば使える）。
-  // なお設計スタジオでの完成イメージ生成も「本日のAI機能利用」の対象とするため、遷移前に
-  // 消費・上限チェックを行う（上限到達時はconsumeImageUsage内でトーストを出して遷移せず終了する）
-  const handleOpenCompletionImage = useCallback(() => {
-    if (!consumeImageUsage()) return;
-
-    const latestSpec = [...messages]
-      .reverse()
-      .map((m) => (m.role === 'assistant' ? extractStudioSpecFromContent(m.content) : null))
-      .find((spec): spec is StudioSpec => spec !== null);
-
-    if (latestSpec) {
-      pushSpecToStudio(latestSpec);
-    }
-    router.push('/app/studio');
-  }, [messages, router, consumeImageUsage]);
-
   // RightPanel「ご意見、リクエストはこちらから」用。ご意見・ご質問フォームへ遷移する前に、
   // 一言添えることでLINE Bot側のハンドオフ案内メッセージと体験を揃える（docs/survey-schema.md参照）
   const handleOpenFeedbackLink = useCallback(() => {
@@ -704,7 +673,6 @@ export default function Home() {
           onSelectImage={handleImageSelect}
           onClearImage={() => setSelectedImage(null)}
           fileInputRef={fileInputRef}
-          onOpenCompletionImage={handleOpenCompletionImage}
         />
       </div>
 

@@ -1,7 +1,6 @@
 'use client';
 
 import type { RefObject } from 'react';
-import Link from 'next/link';
 
 interface ChatInputProps {
   input: string;
@@ -13,7 +12,6 @@ interface ChatInputProps {
   onSelectImage: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onClearImage: () => void;
   fileInputRef: RefObject<HTMLInputElement | null>;
-  onOpenCompletionImage: () => void;
 }
 
 export default function ChatInput({
@@ -26,7 +24,6 @@ export default function ChatInput({
   onSelectImage,
   onClearImage,
   fileInputRef,
-  onOpenCompletionImage,
 }: ChatInputProps) {
   return (
     <div className="p-3 sm:p-5 bg-white border-t border-tanei-border">
@@ -45,20 +42,12 @@ export default function ChatInput({
         </div>
       )}
 
-      {/* Phase 4-01調査で判明：この文言が「ブラウザCAD（/app/cad）までPC専用」という
-          誤解を招いていた。完成イメージ（FreeCAD+POV-Rayのローカルサーバー連携、
-          CadPageShell.tsx等で確認済み）が実際にPC専用である事実はそのまま伝えつつ、
-          サーバー不要でスマホからも使えるブラウザCADへの導線を併記する（Phase 4-02）。
-          onOpenCompletionImage（✨完成イメージボタン）自体はTANE:iのPOV-Rayレンダリング
-          専用の機能であり、CADへの遷移とは役割が異なるため変更しない */}
-      <p className="text-[11px] text-tanei-ink-muted mb-1.5 sm:mb-2">
-        ⚠️ 完成イメージはパソコン専用です（スマートフォンでは別途接続設定が必要です）。スマホ・タブレットなら
-        <Link href="/app/cad" className="font-bold text-tanei-brand hover:text-tanei-brand-dark underline">
-          🌿ブラウザCAD
-        </Link>
-        もご利用いただけます。
-      </p>
-
+      {/* チャット画面の役割を「AIに相談する」ことに集中させるため、チャット下部の常設ボタン
+          （📷写真でAI診断・✨完成イメージ）は削除した。両機能自体は削除しておらず、
+          写真でAI診断は会話開始前のStartCards（「写真からAI空間診断」カード、
+          fileInputRef・onSelectImageを引き続き共有）から、完成イメージはAI提案カード→
+          ブラウザCAD→「この家具の完成イメージを見る」という正式な導線から、
+          それぞれ引き続き利用できる */}
       <div className="w-full max-w-none flex gap-1.5 sm:gap-2 items-center">
         <input
           type="file"
@@ -68,16 +57,6 @@ export default function ChatInput({
           className="hidden"
           aria-label="相談用の写真を選択"
         />
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="bg-gradient-to-r from-tanei-brand to-tanei-accent text-white px-3 sm:px-4 py-3 rounded-tanei-control text-sm font-bold shadow-sm hover:brightness-105 transition-all flex items-center gap-1.5 flex-shrink-0"
-          title="お部屋や置きたい場所の写真をアップロードしてAI空間診断"
-          aria-label="写真でAI診断"
-        >
-          <span>📷</span>
-          <span className="hidden sm:inline">写真でAI診断</span>
-        </button>
-
         <input
           type="text"
           value={input}
@@ -94,16 +73,6 @@ export default function ChatInput({
           className="bg-tanei-brand text-white px-4 sm:px-6 py-3 rounded-tanei-control text-sm font-bold hover:bg-tanei-brand-dark transition-colors disabled:opacity-50 flex-shrink-0"
         >
           送信
-        </button>
-
-        <button
-          onClick={onOpenCompletionImage}
-          disabled={isLoading}
-          className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 text-white shadow-lg shadow-indigo-500/25 px-3 sm:px-5 py-3 rounded-tanei-control text-sm font-bold hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 flex-shrink-0 flex items-center gap-1.5 border border-white/20"
-          title="TANE:i 完成イメージを見る（パソコン専用機能です）"
-        >
-          <span>✨</span>
-          <span className="hidden sm:inline">完成イメージ</span>
         </button>
       </div>
     </div>
