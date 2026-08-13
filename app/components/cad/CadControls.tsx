@@ -46,7 +46,7 @@ export default function CadControls({ design, onDimensionChange, errorMessage }:
               min={field.min}
               max={field.max}
               onChange={(e) => handleFieldChange(field.key, e.target.value)}
-              className="border border-tanei-border rounded-tanei-control px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-tanei-brand"
+              className="border border-tanei-border rounded-tanei-control px-3 py-2 text-sm text-tanei-ink font-bold focus:outline-none focus:ring-2 focus:ring-tanei-brand"
             />
           </label>
         ))}

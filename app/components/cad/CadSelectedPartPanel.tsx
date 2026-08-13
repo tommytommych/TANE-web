@@ -53,7 +53,7 @@ export default function CadSelectedPartPanel({
                 min={t}
                 max={design.height - t}
                 onChange={(e) => onUpdateShelf({ zAtMm: Number(e.target.value) })}
-                className="border border-tanei-border rounded-tanei-control px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-tanei-brand"
+                className="border border-tanei-border rounded-tanei-control px-2 py-2 text-sm text-tanei-ink font-bold focus:outline-none focus:ring-2 focus:ring-tanei-brand"
               />
             </label>
             <label className="flex flex-col gap-1">
@@ -65,7 +65,7 @@ export default function CadSelectedPartPanel({
                 min={50}
                 max={maxWidth}
                 onChange={(e) => onUpdateShelf({ widthMm: Number(e.target.value) })}
-                className="border border-tanei-border rounded-tanei-control px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-tanei-brand"
+                className="border border-tanei-border rounded-tanei-control px-2 py-2 text-sm text-tanei-ink font-bold focus:outline-none focus:ring-2 focus:ring-tanei-brand"
               />
             </label>
             <label className="flex flex-col gap-1">
@@ -77,7 +77,7 @@ export default function CadSelectedPartPanel({
                 min={50}
                 max={maxDepth}
                 onChange={(e) => onUpdateShelf({ depthMm: Number(e.target.value) })}
-                className="border border-tanei-border rounded-tanei-control px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-tanei-brand"
+                className="border border-tanei-border rounded-tanei-control px-2 py-2 text-sm text-tanei-ink font-bold focus:outline-none focus:ring-2 focus:ring-tanei-brand"
               />
             </label>
           </div>
