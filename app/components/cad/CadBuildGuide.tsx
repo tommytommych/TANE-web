@@ -86,6 +86,11 @@ interface CadBuildGuideProps {
   /** 制作チェック（Phase 2-7）のチェック状態。ここでは表示専用で、チェックの追加・変更は
    * 既存のCadBuildChecklistViewからのみ行う（Phase 3-5） */
   buildChecklist: Record<string, boolean>;
+  /** 「作り方」9STEPそれぞれのチェック状態。buildChecklist（制作チェック10項目）とは
+   * 独立した、STEPごとの完了状態。キーはSTEP番号（1〜9）の文字列 */
+  buildGuideChecked: Record<string, boolean>;
+  /** STEPのチェックボックスから呼ばれる。CadStudio.tsxのbuildGuideCheckedを更新する */
+  onToggleBuildGuideStep: (step: number) => void;
   /** 「制作チェックを見る」から、既存のviewMode切り替えでCadBuildChecklistViewへ戻る */
   onViewBuildCheck: () => void;
 }
@@ -106,28 +111,28 @@ export default function CadBuildGuide({
   sheetCount,
   onViewPanel,
   buildChecklist,
+  buildGuideChecked,
+  onToggleBuildGuideStep,
   onViewBuildCheck,
 }: CadBuildGuideProps) {
   const steps = buildFurnitureSteps(model.panels);
-  // 制作チェック（Phase 2-7）と全く同じ関数・同じデータを使い、進捗表示が食い違わないようにする
+  // 制作チェック（Phase 2-7）と全く同じ関数・同じデータを使い、進捗表示が食い違わないようにする。
+  // この「制作進捗」カード自体は10項目の制作チェックの全体進捗を示すもので、
+  // 下記のSTEPごとのチェック（buildGuideChecked）とは独立して維持する
   const buildDoneCount = BUILD_CHECKLIST_STEPS.filter((_, i) => buildChecklist[String(i + 1)]).length;
   const buildPercent = Math.round((buildDoneCount / BUILD_CHECKLIST_STEPS.length) * 100);
   const nextBuildStep = getNextBuildStep(buildChecklist);
 
-  // 「作り方」9ステップの「現在の作業」表示（Phase 3-25）。制作チェックの10項目と
-  // 作り方の9ステップは完全には1対1対応しない（例：チェック項目3「材料に寸法を書いた」に
-  // 対応する作り方ステップは存在せず、逆にチェック項目6〜9は既存のCONFIRM_TARGETS
-  // （CadBuildChecklistView.tsx、Phase 3-10）でもまとめて「作り方を見る」の1セクションにしか
-  // 対応付けられていない）。そのため、特定のチェック項目IDと特定のステップ番号を新しく
-  // 対応付けるようなテーブルは作らず、既存のbuildDoneCount（完了したチェック項目の総数）を
-  // そのまま9ステップ側の「大まかな進み具合」として引き写すだけの、順序だけに基づく
-  // 安全な近似表示にとどめる
-  const currentBuildStepNumber = buildDoneCount < steps.length ? buildDoneCount + 1 : null;
-  const isBuildStepDone = (stepNumber: number) => stepNumber <= buildDoneCount;
+  // 「作り方」9ステップの「現在の作業」表示。各STEPカードに追加したチェックボックス
+  // （buildGuideChecked、制作チェック10項目のbuildChecklistとは別の独立した状態）から、
+  // 最初にチェックが入っていないSTEPを「現在の作業」として求める
+  const guideDoneCount = steps.filter((s) => buildGuideChecked[String(s.stepNumber)]).length;
+  const currentBuildStepNumber = steps.find((s) => !buildGuideChecked[String(s.stepNumber)])?.stepNumber ?? null;
+  const isBuildStepDone = (stepNumber: number) => Boolean(buildGuideChecked[String(stepNumber)]);
 
   // 「作り方の進捗」サマリー（Phase 3-34）。新しい保存データは作らず、既存の
   // isBuildStepDone・steps.lengthから毎回算出するだけ
-  const completedStepCount = Math.min(buildDoneCount, steps.length);
+  const completedStepCount = guideDoneCount;
   const stepProgressPercent = Math.round((completedStepCount / steps.length) * 100);
 
   // 「作り方」と制作チェックの関連表示（Phase 3-26）。既存のCONFIRM_TARGETS
@@ -189,6 +194,17 @@ export default function CadBuildGuide({
   const goToBuildStep = (stepNumber: number) => {
     setExpandedStepNumber(stepNumber);
     scrollToSection(`cad-build-step-${stepNumber}`);
+  };
+
+  // STEPのチェックボックス。未完了→完了に変わった瞬間だけ、次のSTEPがあれば
+  // 既存のgoToBuildStep（開閉状態変更＋scrollIntoViewの仕組みを流用するだけ）で
+  // 自動的に次のSTEPへ移動する。完了→未完了に戻す場合や、最後のSTEPでは移動しない
+  const handleToggleStepDone = (stepNumber: number) => {
+    const wasDone = isBuildStepDone(stepNumber);
+    onToggleBuildGuideStep(stepNumber);
+    if (!wasDone && stepNumber < steps.length) {
+      goToBuildStep(stepNumber + 1);
+    }
   };
 
   return (
@@ -723,35 +739,47 @@ export default function CadBuildGuide({
                 {isCurrent && (
                   <p className="text-[10px] font-black text-tanei-accent px-3 pt-2">▶ 現在の作業</p>
                 )}
-                <button
-                  type="button"
-                  onClick={() => toggleStep(step.stepNumber)}
-                  aria-expanded={isExpanded}
-                  aria-controls={panelId}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-tanei-brand"
-                >
-                  <span
-                    className={`flex-shrink-0 text-white text-xs font-black w-7 h-7 rounded-full flex items-center justify-center ${
-                      isDone ? 'bg-tanei-ink-muted' : 'bg-tanei-brand'
-                    }`}
+                <div className="w-full flex items-center gap-2.5 px-3 py-2.5">
+                  {/* STEPの完了チェックボックス。開閉トグルのbuttonとは別の独立した要素にし、
+                      クリックしても開閉トグルが誤発火しないようstopPropagationする */}
+                  <input
+                    type="checkbox"
+                    checked={isDone}
+                    onChange={() => handleToggleStepDone(step.stepNumber)}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={`STEP ${step.stepNumber}「${step.title}」を完了にする`}
+                    className="h-5 w-5 flex-shrink-0 accent-tanei-brand cursor-pointer"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => toggleStep(step.stepNumber)}
+                    aria-expanded={isExpanded}
+                    aria-controls={panelId}
+                    className="flex-1 min-w-0 flex items-center gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-tanei-brand"
                   >
-                    {step.stepNumber}
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] font-bold text-tanei-accent">STEP {step.stepNumber}</span>
-                      {isDone && <span className="text-[10px] font-bold text-tanei-ink-muted">✓ 完了</span>}
-                    </span>
                     <span
-                      className={`block font-bold text-sm break-words ${isDone ? 'text-tanei-ink-muted line-through' : 'text-tanei-ink'}`}
+                      className={`flex-shrink-0 text-white text-xs font-black w-7 h-7 rounded-full flex items-center justify-center ${
+                        isDone ? 'bg-tanei-ink-muted' : 'bg-tanei-brand'
+                      }`}
                     >
-                      {step.title}
+                      {step.stepNumber}
                     </span>
-                  </span>
-                  <span className="flex-shrink-0 text-xs text-tanei-ink-muted" aria-hidden="true">
-                    {isExpanded ? '▲' : '▼'}
-                  </span>
-                </button>
+                    <span className="flex-1 min-w-0">
+                      <span className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-bold text-tanei-accent">STEP {step.stepNumber}</span>
+                        {isDone && <span className="text-[10px] font-bold text-tanei-ink-muted">✓ 完了</span>}
+                      </span>
+                      <span
+                        className={`block font-bold text-sm break-words ${isDone ? 'text-tanei-ink-muted line-through' : 'text-tanei-ink'}`}
+                      >
+                        {step.title}
+                      </span>
+                    </span>
+                    <span className="flex-shrink-0 text-xs text-tanei-ink-muted" aria-hidden="true">
+                      {isExpanded ? '▲' : '▼'}
+                    </span>
+                  </button>
+                </div>
                 {isExpanded && (
                   <div id={panelId} className="pl-10 pr-3 pb-3">
                     {/* 「STEP状態」（Phase 3-42）。新しい判定ロジックは作らず、既存の

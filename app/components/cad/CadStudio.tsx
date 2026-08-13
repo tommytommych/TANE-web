@@ -92,6 +92,9 @@ export default function CadStudio({
   const [cutListChecked, setCutListChecked] = useState<Record<string, boolean>>({});
   // 制作チェック（Phase 2-7）のチェック状態。キーはステップ番号（1〜10）の文字列
   const [buildChecklist, setBuildChecklist] = useState<Record<string, boolean>>({});
+  // 「作り方」9STEPそれぞれのチェック状態。キーはSTEP番号（1〜9）の文字列。
+  // buildChecklist（制作チェック10項目）とは別の独立したチェック状態
+  const [buildGuideChecked, setBuildGuideChecked] = useState<Record<string, boolean>>({});
   // 設計・制作メモ（Phase 3-22）。マイページ（SavedItemsModal.tsx）で編集する読み取り専用の
   // 表示用state。ここでは編集しないが、保存のたびに読み込んだ値をそのまま引き継がないと
   // 「CADで保存する」を押しただけでマイページ側のメモが消えてしまうため、handleSave・
@@ -122,6 +125,7 @@ export default function CadStudio({
         setProjectName(project.projectName);
         setCutListChecked(project.cutListChecked ?? {});
         setBuildChecklist(project.buildChecklist ?? {});
+        setBuildGuideChecked(project.buildGuideChecked ?? {});
         setNotes(project.notes ?? '');
       } catch (error) {
         console.error(error);
@@ -151,6 +155,7 @@ export default function CadStudio({
       partMaterials: Object.keys(partMaterials).length > 0 ? partMaterials : undefined,
       cutListChecked,
       buildChecklist,
+      buildGuideChecked,
       notes: notes || undefined,
     };
     try {
@@ -172,13 +177,28 @@ export default function CadStudio({
       setIsSaving(false);
       setTimeout(() => setSaveMessage(null), 4000);
     }
-  }, [projectId, projectCreatedAt, projectName, design, material, partMaterials, cutListChecked, buildChecklist, notes]);
+  }, [
+    projectId,
+    projectCreatedAt,
+    projectName,
+    design,
+    material,
+    partMaterials,
+    cutListChecked,
+    buildChecklist,
+    buildGuideChecked,
+    notes,
+  ]);
 
   // カットリスト・制作チェックのチェック状態は、既に保存済みのプロジェクト（projectIdがある）
   // であれば、トグルのたびに既存のIndexedDB保存機構（saveFurnitureProject）へ自動保存する。
   // まだ一度も保存していない設計は保存先が無いため、チェック状態はこのセッション内のみ有効
   const persistChecklists = useCallback(
-    async (patch: { cutListChecked?: Record<string, boolean>; buildChecklist?: Record<string, boolean> }) => {
+    async (patch: {
+      cutListChecked?: Record<string, boolean>;
+      buildChecklist?: Record<string, boolean>;
+      buildGuideChecked?: Record<string, boolean>;
+    }) => {
       if (!projectId) return;
       const now = new Date().toISOString();
       const project: SavedFurnitureProject = {
@@ -192,6 +212,7 @@ export default function CadStudio({
         partMaterials: Object.keys(partMaterials).length > 0 ? partMaterials : undefined,
         cutListChecked: patch.cutListChecked ?? cutListChecked,
         buildChecklist: patch.buildChecklist ?? buildChecklist,
+        buildGuideChecked: patch.buildGuideChecked ?? buildGuideChecked,
         notes: notes || undefined,
       };
       try {
@@ -201,7 +222,18 @@ export default function CadStudio({
         console.error(error);
       }
     },
-    [projectId, projectCreatedAt, projectName, design, material, partMaterials, cutListChecked, buildChecklist, notes]
+    [
+      projectId,
+      projectCreatedAt,
+      projectName,
+      design,
+      material,
+      partMaterials,
+      cutListChecked,
+      buildChecklist,
+      buildGuideChecked,
+      notes,
+    ]
   );
 
   const handleToggleCutListItem = useCallback(
@@ -221,6 +253,17 @@ export default function CadStudio({
       void persistChecklists({ buildChecklist: next });
     },
     [buildChecklist, persistChecklists]
+  );
+
+  // 「作り方」9STEPそれぞれのチェック（buildChecklist・10項目とは独立）
+  const handleToggleBuildGuideStep = useCallback(
+    (step: number) => {
+      const key = String(step);
+      const next = { ...buildGuideChecked, [key]: !buildGuideChecked[key] };
+      setBuildGuideChecked(next);
+      void persistChecklists({ buildGuideChecked: next });
+    },
+    [buildGuideChecked, persistChecklists]
   );
 
   // 自動スクロール後にフラグを戻すためのコールバック。参照を固定しておくことで、
@@ -402,6 +445,8 @@ export default function CadStudio({
         onScrolledToBuildGuide={handleScrolledToBuildGuide}
         onViewPanel={handleViewPanel}
         buildChecklist={buildChecklist}
+        buildGuideChecked={buildGuideChecked}
+        onToggleBuildGuideStep={handleToggleBuildGuideStep}
         onViewBuildCheck={() => setViewMode('buildCheck')}
         pendingAnchor={pendingCutlistAnchor}
         onScrolledToPendingAnchor={handleScrolledToPendingAnchor}

@@ -32,6 +32,10 @@ export interface SavedFurnitureProject {
   cutListChecked?: Record<string, boolean>;
   /** 制作チェック（Phase 2-7）のチェック状態。キーはステップ番号（1〜10）を文字列化したもの */
   buildChecklist?: Record<string, boolean>;
+  /** 「作り方」9STEPそれぞれのチェック状態。キーはSTEP番号（1〜9）を文字列化したもの。
+   * buildChecklist（制作チェック10項目）とは別の独立したチェック状態で、この機能より前に
+   * 保存されたプロジェクトには存在しない（undefinedのまま「未着手」として扱う） */
+  buildGuideChecked?: Record<string, boolean>;
   /** 設計・制作メモ（Phase 3-22）。ユーザーが自由入力する任意項目。Phase 3-22より前の
    * 保存データには存在しないため、undefinedのまま「メモなし」として扱う */
   notes?: string;
@@ -113,6 +117,7 @@ export const parseSavedItem = (item: SavedItem): SavedFurnitureProject | null =>
       partMaterials: parseOptionalPartMaterials(p.partMaterials),
       cutListChecked: parseOptionalBooleanRecord(p.cutListChecked),
       buildChecklist: parseOptionalBooleanRecord(p.buildChecklist),
+      buildGuideChecked: parseOptionalBooleanRecord(p.buildGuideChecked),
       notes: typeof p.notes === 'string' ? p.notes : undefined,
     };
   } catch {

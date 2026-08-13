@@ -50,6 +50,10 @@ interface CadCutlistViewProps {
   /** 制作チェック（Phase 2-7）のチェック状態。CadBuildGuideの制作進捗表示にそのまま渡す
    * だけで、ここでは読み書きしない（Phase 3-5） */
   buildChecklist: Record<string, boolean>;
+  /** 「作り方」9STEPそれぞれのチェック状態（buildChecklistとは独立）。CadBuildGuideへ
+   * そのまま中継するだけで、ここでは読み書きしない */
+  buildGuideChecked: Record<string, boolean>;
+  onToggleBuildGuideStep: (step: number) => void;
   /** CadBuildGuideの「制作チェックを見る」から呼ばれる（Phase 3-5） */
   onViewBuildCheck: () => void;
   /** 制作チェックの各項目の「確認する」導線（Phase 3-10）から指定される、この画面内の
@@ -70,6 +74,8 @@ export default function CadCutlistView({
   onScrolledToBuildGuide,
   onViewPanel,
   buildChecklist,
+  buildGuideChecked,
+  onToggleBuildGuideStep,
   onViewBuildCheck,
   pendingAnchor,
   onScrolledToPendingAnchor,
@@ -103,7 +109,7 @@ export default function CadCutlistView({
   }, [dimensionalLumberItems]);
 
   // 板材（sheetLayouts）が1件も無い場合（理論上、全パーツが規格材の場合のみ発生しうる
-  // 稀なケース）だけ、Phase3（CadBuildGuide.tsx、変更禁止）向けに既存のfurnitureModelToSheetLayout
+  // 稀なケース）だけ、CadBuildGuide.tsx向けに既存のfurnitureModelToSheetLayout
   // （全材料混在の単一板版、furnitureModelToSheetLayoutsByMaterial導入前から存在する関数）へ
   // フォールバックする。CadBuildGuide自体の必須propsを満たすためだけの措置で、
   // 板材が1件でもあれば従来通りそちらを使う
@@ -113,8 +119,8 @@ export default function CadCutlistView({
   );
   const fallbackSheets = useMemo(() => (fallbackLayout ? packSheetLayout(fallbackLayout) : []), [fallbackLayout]);
 
-  // Phase3（CadBuildGuide.tsx、変更禁止）は単一のsheetLayout/material/sheetCountという
-  // 既存のprops形のまま。全体のmaterialに対応するレイアウトを代表として渡し、
+  // CadBuildGuide.tsxは単一のsheetLayout/material/sheetCountという既存のprops形のまま。
+  // 全体のmaterialに対応するレイアウトを代表として渡し、
   // 見つからない場合（全パーツが上書きされ、全体のmaterialを使うパーツが1つも無い場合）は
   // 先頭のレイアウトに、板材自体が無い場合はfallbackLayoutにフォールバックする
   const primaryLayoutIndex = Math.max(
@@ -366,6 +372,8 @@ export default function CadCutlistView({
                   sheetCount={primarySheetCount}
                   onViewPanel={onViewPanel}
                   buildChecklist={buildChecklist}
+                  buildGuideChecked={buildGuideChecked}
+                  onToggleBuildGuideStep={onToggleBuildGuideStep}
                   onViewBuildCheck={onViewBuildCheck}
                 />
               </div>
