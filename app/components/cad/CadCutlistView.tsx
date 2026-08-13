@@ -373,23 +373,26 @@ export default function CadCutlistView({
               </ul>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button
-                type="button"
-                onClick={handleDownloadPdf}
-                disabled={isGeneratingPdf}
-                className="flex-1 bg-tanei-brand text-white px-4 py-3 rounded-tanei-control text-sm font-bold hover:bg-tanei-brand-dark transition-colors disabled:opacity-50"
-              >
-                {isGeneratingPdf ? 'カット申込書を作成中…' : '📝 カット申込書をダウンロード'}
-              </button>
-              <button
-                type="button"
-                onClick={onOpenCutList}
-                className="flex-1 bg-tanei-accent text-white px-4 py-3 rounded-tanei-control text-sm font-bold hover:bg-tanei-accent-dark transition-colors"
-              >
-                📋 カットリストを見る
-              </button>
-            </div>
+            {/* 「カット申込書をダウンロード」はこの画面に留まったまま完結する操作、
+                「カットリストを見る」は画面自体が切り替わる次のステップへの移動のため、
+                同じ横並びの2択に見せると「押したら想定外に先へ進んでしまった」と
+                感じやすい（実際にユーザーから報告あり）。見た目・並び順を分けて、
+                後者が「次へ進むボタン」だとひと目で分かるようにする */}
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf}
+              className="w-full bg-tanei-brand text-white px-4 py-3 rounded-tanei-control text-sm font-bold hover:bg-tanei-brand-dark transition-colors disabled:opacity-50"
+            >
+              {isGeneratingPdf ? 'カット申込書を作成中…' : '📝 カット申込書をダウンロード'}
+            </button>
+            <button
+              type="button"
+              onClick={onOpenCutList}
+              className="w-full flex items-center justify-center gap-1.5 bg-white border border-tanei-border text-tanei-ink px-4 py-3 rounded-tanei-control text-sm font-bold hover:border-tanei-brand hover:text-tanei-brand transition-colors"
+            >
+              次へ：📋 カットリストを見る →
+            </button>
 
             {primaryLayout && (
               <div id={BUILD_GUIDE_ANCHOR_ID}>
