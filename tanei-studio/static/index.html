@@ -701,6 +701,11 @@ function collectPanelFinishes() {
   return finishes;
 }
 
+// チャットから届いた仕様のpartMaterials（「天板だけパイン集成材、脚・幕板はSPF材」等の
+// パーツ単位の材料指定）を保持する。フォームには対応する入力欄が無いため、
+// 受け取った値をそのまま次のレンダリング（自動・手動どちらも）まで持ち越すだけに使う
+let currentPartMaterials = {};
+
 // フォームの現在の入力値から、/api/renderへ送るpayloadを組み立てる
 function collectPayloadFromForm() {
   const formData = new FormData(form);
@@ -714,6 +719,7 @@ function collectPayloadFromForm() {
     thickness: Number(formData.get('thickness')),
     material: formData.get('material'),
     panelFinishes: collectPanelFinishes(),
+    partMaterials: currentPartMaterials,
     options: collectOptionsFromForm(),
   };
 }
@@ -739,6 +745,7 @@ function applySpecToForm(spec) {
       }
     }
   }
+  currentPartMaterials = (spec.partMaterials && typeof spec.partMaterials === 'object') ? spec.partMaterials : {};
 }
 
 // /api/renderを呼び出し、結果を画面に反映する（フォーム送信・チャットからの自動反映の両方から使う共通処理）

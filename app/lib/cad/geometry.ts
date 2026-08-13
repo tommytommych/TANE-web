@@ -156,6 +156,49 @@ const TABLE_LEG_SIZE_MM = 40;
 const TABLE_LEG_INSET_MM = 20;
 const TABLE_APRON_HEIGHT_MM = 80;
 
+// SPF材（2×4）の実寸（厚み×幅）。app/lib/constants.tsのKOHNAN_WOOD_LISTの
+// 'SPF材（2×4）'エントリ（厚38×幅89mm）と同じ値。脚・幕板の材料としてSPF材が
+// 選ばれた場合のみ、テーブルの脚・幕板の断面にこの実寸を反映する（新しい固定値を
+// 増やすのではなく、既存の価格目安データと同じ値を使う）
+const SPF_2X4_THICKNESS_MM = 38;
+const SPF_2X4_WIDTH_MM = 89;
+
+interface CrossSection {
+  widthXMm: number;
+  widthYMm: number;
+}
+
+/** 脚の材料としてSPF材が選ばれている場合のみ、実際の2×4断面（38×89mm）を使う。
+ * それ以外の材料（未指定含む）では従来通りの正方形断面（40×40mm）のまま */
+function resolveLegCrossSection(legMaterial: string | undefined): CrossSection {
+  if (legMaterial === 'SPF材') {
+    return { widthXMm: SPF_2X4_THICKNESS_MM, widthYMm: SPF_2X4_WIDTH_MM };
+  }
+  return { widthXMm: TABLE_LEG_SIZE_MM, widthYMm: TABLE_LEG_SIZE_MM };
+}
+
+interface ApronCrossSection {
+  thicknessMm: number;
+  heightMm: number;
+}
+
+/** 幕板の材料としてSPF材が選ばれている場合のみ、実際の2×4断面（厚み38mm・見付け高さ89mm）を
+ * 使う。それ以外の材料（未指定含む）では従来通り、板厚（design.thickness）を厚みに、
+ * TABLE_APRON_HEIGHT_MMを見付け高さに使う */
+function resolveApronCrossSection(apronMaterial: string | undefined, defaultThicknessMm: number): ApronCrossSection {
+  if (apronMaterial === 'SPF材') {
+    return { thicknessMm: SPF_2X4_THICKNESS_MM, heightMm: SPF_2X4_WIDTH_MM };
+  }
+  return { thicknessMm: defaultThicknessMm, heightMm: TABLE_APRON_HEIGHT_MM };
+}
+
+export interface TableMaterials {
+  /** 脚の材料。'SPF材'のときだけ断面を2×4実寸に変更する。省略時は従来通りの断面 */
+  legMaterial?: string;
+  /** 幕板の材料。'SPF材'のときだけ断面を2×4実寸に変更する。省略時は従来通りの断面 */
+  apronMaterial?: string;
+}
+
 /**
  * テーブル（天板+脚4本+幕板4枚）のパネル一式を計算する。箱型のbuildDefaultFurniturePanelsと
  * 対になる関数。天板・底板・側板・背板といった箱型固有の語彙は一切使わない。
@@ -163,19 +206,26 @@ const TABLE_APRON_HEIGHT_MM = 80;
  * 隣り合う脚同士をつなぐ枠として配置する（実際の仕口を厳密に再現するものではなく、
  * 木取り図・3D表示・作り方ガイド向けの簡易的な構造表現）
  */
-export function buildDefaultTablePanels({ width, depth, height, thickness: t }: BoxDimensions): FurniturePanel[] {
+export function buildDefaultTablePanels(
+  { width, depth, height, thickness: t }: BoxDimensions,
+  materials?: TableMaterials
+): FurniturePanel[] {
   if (width <= 0 || depth <= 0 || height <= 0 || t <= 0) {
     throw new Error('width/depth/height/thicknessは正の数値で指定してください。');
   }
+
+  const legCross = resolveLegCrossSection(materials?.legMaterial);
+  const apronCross = resolveApronCrossSection(materials?.apronMaterial, t);
+
   const legHeight = height - t;
-  if (legHeight <= TABLE_APRON_HEIGHT_MM) {
+  if (legHeight <= apronCross.heightMm) {
     throw new Error('heightが天板の厚み・幕板の高さに対して小さすぎます。');
   }
 
   const legX1 = TABLE_LEG_INSET_MM;
-  const legX2 = width - TABLE_LEG_INSET_MM - TABLE_LEG_SIZE_MM;
+  const legX2 = width - TABLE_LEG_INSET_MM - legCross.widthXMm;
   const legY1 = TABLE_LEG_INSET_MM;
-  const legY2 = depth - TABLE_LEG_INSET_MM - TABLE_LEG_SIZE_MM;
+  const legY2 = depth - TABLE_LEG_INSET_MM - legCross.widthYMm;
   if (legX2 <= legX1 || legY2 <= legY1) {
     throw new Error('widthまたはdepthが脚を配置するには小さすぎます。');
   }
@@ -202,37 +252,37 @@ export function buildDefaultTablePanels({ width, depth, height, thickness: t }: 
       kind: 'leg',
       label: p.label,
       position: vec3(p.x, p.y, 0),
-      size: vec3(TABLE_LEG_SIZE_MM, TABLE_LEG_SIZE_MM, legHeight),
+      size: vec3(legCross.widthXMm, legCross.widthYMm, legHeight),
     });
   }
 
-  const apronZ = legHeight - TABLE_APRON_HEIGHT_MM;
-  const apronSpanX = legX2 - (legX1 + TABLE_LEG_SIZE_MM);
-  const apronSpanY = legY2 - (legY1 + TABLE_LEG_SIZE_MM);
+  const apronZ = legHeight - apronCross.heightMm;
+  const apronSpanX = legX2 - (legX1 + legCross.widthXMm);
+  const apronSpanY = legY2 - (legY1 + legCross.widthYMm);
   const aprons: { id: string; label: string; position: Vector3Mm; size: Vector3Mm }[] = [
     {
       id: 'apron-front',
       label: '幕板（前）',
-      position: vec3(legX1 + TABLE_LEG_SIZE_MM, legY1, apronZ),
-      size: vec3(apronSpanX, t, TABLE_APRON_HEIGHT_MM),
+      position: vec3(legX1 + legCross.widthXMm, legY1, apronZ),
+      size: vec3(apronSpanX, apronCross.thicknessMm, apronCross.heightMm),
     },
     {
       id: 'apron-back',
       label: '幕板（奥）',
-      position: vec3(legX1 + TABLE_LEG_SIZE_MM, legY2 + TABLE_LEG_SIZE_MM - t, apronZ),
-      size: vec3(apronSpanX, t, TABLE_APRON_HEIGHT_MM),
+      position: vec3(legX1 + legCross.widthXMm, legY2 + legCross.widthYMm - apronCross.thicknessMm, apronZ),
+      size: vec3(apronSpanX, apronCross.thicknessMm, apronCross.heightMm),
     },
     {
       id: 'apron-left',
       label: '幕板（左）',
-      position: vec3(legX1, legY1 + TABLE_LEG_SIZE_MM, apronZ),
-      size: vec3(t, apronSpanY, TABLE_APRON_HEIGHT_MM),
+      position: vec3(legX1, legY1 + legCross.widthYMm, apronZ),
+      size: vec3(apronCross.thicknessMm, apronSpanY, apronCross.heightMm),
     },
     {
       id: 'apron-right',
       label: '幕板（右）',
-      position: vec3(legX2 + TABLE_LEG_SIZE_MM - t, legY1 + TABLE_LEG_SIZE_MM, apronZ),
-      size: vec3(t, apronSpanY, TABLE_APRON_HEIGHT_MM),
+      position: vec3(legX2 + legCross.widthXMm - apronCross.thicknessMm, legY1 + legCross.widthYMm, apronZ),
+      size: vec3(apronCross.thicknessMm, apronSpanY, apronCross.heightMm),
     },
   ];
   for (const a of aprons) {
@@ -246,7 +296,7 @@ export function buildDefaultTablePanels({ width, depth, height, thickness: t }: 
  * FurnitureDesign全体から、実際に描画・木取りに使うパネル一式を計算する
  * （FurnitureDesign → Panel[]の変換の本体）。
  */
-export function buildFurniturePanels(design: FurnitureDesign): FurniturePanel[] {
+export function buildFurniturePanels(design: FurnitureDesign, materials?: TableMaterials): FurniturePanel[] {
   const dims: BoxDimensions = {
     width: design.width,
     depth: design.depth,
@@ -255,7 +305,7 @@ export function buildFurniturePanels(design: FurnitureDesign): FurniturePanel[] 
   };
 
   if (design.kind === 'table') {
-    return buildDefaultTablePanels(dims);
+    return buildDefaultTablePanels(dims, materials);
   }
 
   let panels = buildDefaultFurniturePanels(dims);

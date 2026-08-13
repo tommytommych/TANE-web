@@ -43,7 +43,9 @@ from freecad_scripts.generate_model import (  # noqa: E402
     DEFAULT_BACK_THICKNESS_MM,
     FINISH_OPTIONS,
     FOUNDATION_PART_DEFS,
+    PART_MATERIAL_LABELS,
     TIER_PART_DEFS,
+    apply_part_materials,
     compute_option_panels,
     compute_panels,
     compute_table_panels,
@@ -260,18 +262,36 @@ def resolve_kind(data):
     return value if value in ("box", "table") else "box"
 
 
-def compute_panels_for_kind(kind, width, depth, height, thickness, material, panel_finishes, options):
+def compute_panels_for_kind(kind, width, depth, height, thickness, material, panel_finishes, options, part_materials=None):
     """kindに応じてパネル構成を計算する（api_render・run_mock_pipelineで共通利用し、
     2箇所で分岐ロジックが食い違わないようにする）。"""
     if kind == "table":
         # テーブルは箱本体を持たないため、天板+脚+幕板のみで構成する
         # （既存のcompute_option_panelsによる脚・幕板追加は箱本体前提のため使わない）
-        return compute_table_panels(width, depth, height, thickness, material, panel_finishes)
+        return compute_table_panels(width, depth, height, thickness, material, panel_finishes, part_materials)
     panels = compute_panels(width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material, panel_finishes)
     panels += compute_option_panels(
         width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material, panel_finishes, options
     )
     return panels
+
+
+def parse_part_materials(data):
+    """リクエストのpartMaterialsを検証し、未知のキー・不正な値を除いた辞書にする。
+
+    「天板だけパイン集成材、脚・幕板はSPF材」のような、パーツ単位の材料指定（任意）。
+    キーはPART_MATERIAL_LABELS（TypeScript側のPartMaterialLabelと同じ語彙）のみ対象にする。
+    値の材質名自体は自由文字列として受け取る（クライアント側でFURNITURE_MATERIALSと
+    照合済みのため、ここでは型と非空文字列だけを見る）。
+    """
+    raw = data.get("partMaterials")
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        str(label): str(material)
+        for label, material in raw.items()
+        if str(label) in PART_MATERIAL_LABELS and isinstance(material, str) and material.strip()
+    }
 
 
 def validate_input(data):
@@ -317,7 +337,7 @@ def render_files(session_id, job_id, filename):
     return send_from_directory(job_dir, filename)
 
 
-def run_freecad_pipeline(job_dir, item, width, depth, height, thickness, material, panel_finishes, options, kind):
+def run_freecad_pipeline(job_dir, item, width, depth, height, thickness, material, panel_finishes, options, kind, part_materials):
     """本来のパイプライン: freecadcmdをサブプロセス実行し、FreeCAD+POV-Rayで生成する。
 
     freecadcmdは独自のCLIパーサー（boost::program_options）を持ち、一般的な
@@ -334,6 +354,7 @@ def run_freecad_pipeline(job_dir, item, width, depth, height, thickness, materia
         "thickness": thickness,
         "material": material,
         "panelFinishes": panel_finishes,
+        "partMaterials": part_materials,
         "options": options,
         "kind": kind,
         "outputDir": job_dir,
@@ -376,13 +397,14 @@ def run_freecad_pipeline(job_dir, item, width, depth, height, thickness, materia
     }, None, None
 
 
-def run_mock_pipeline(job_dir, item, width, depth, height, thickness, material, panel_finishes, options, kind):
+def run_mock_pipeline(job_dir, item, width, depth, height, thickness, material, panel_finishes, options, kind, part_materials):
     """FreeCAD/POV-Ray未接続時のフォールバック: 実際の寸法計算＋等角プレビューSVGで代替する。
 
     開発環境（FreeCAD/POV-Ray未インストール）でも、UI・APIの一連の流れを実際に動かして
     確認できるようにするためのモード。本番のフォトリアルなレンダリングの代わりにはならない。
     """
-    panels = compute_panels_for_kind(kind, width, depth, height, thickness, material, panel_finishes, options)
+    panels = compute_panels_for_kind(kind, width, depth, height, thickness, material, panel_finishes, options, part_materials)
+    panels = apply_part_materials(panels, part_materials)
 
     cutlist_csv_path = os.path.join(job_dir, "cutlist.csv")
     write_cutlist_csv(panels, cutlist_csv_path)
@@ -425,6 +447,7 @@ def api_render():
     thickness = float(data.get("thickness") or DEFAULT_THICKNESS_MM)
     material = str(data["material"]).strip()
     panel_finishes = parse_panel_finishes(data)
+    part_materials = parse_part_materials(data)
     options = parse_options(data)
     kind = resolve_kind(data)
 
@@ -439,16 +462,17 @@ def api_render():
         # インタラクティブ3Dビューア（Three.js）用のパネルジオメトリは、どちらのパイプラインでも
         # 同じcompute_panels_for_kind()から得られるため、ここで一度だけ計算して
         # 両方に使い回す（扉・脚・棚板などの追加パーツも同じ形のパネル辞書で返るため連結するだけでよい）
-        panels = compute_panels_for_kind(kind, width, depth, height, thickness, material, panel_finishes, options)
+        panels = compute_panels_for_kind(kind, width, depth, height, thickness, material, panel_finishes, options, part_materials)
+        panels = apply_part_materials(panels, part_materials)
         panels_for_viewer = serialize_panels_for_viewer(panels)
 
         if shutil.which(FREECAD_CMD_PATH):
             payload, error_payload, status = run_freecad_pipeline(
-                job_dir, item, width, depth, height, thickness, material, panel_finishes, options, kind
+                job_dir, item, width, depth, height, thickness, material, panel_finishes, options, kind, part_materials
             )
         else:
             payload, error_payload, status = run_mock_pipeline(
-                job_dir, item, width, depth, height, thickness, material, panel_finishes, options, kind
+                job_dir, item, width, depth, height, thickness, material, panel_finishes, options, kind, part_materials
             )
     except ValueError as exc:
         # compute_panels()の寸法バリデーション（高さが板厚に対して小さすぎる等）
@@ -469,6 +493,7 @@ def api_render():
             "thickness": thickness,
             "material": material,
             "panelFinishes": panel_finishes,
+            "partMaterials": part_materials,
             "options": options,
             "kind": kind,
         },

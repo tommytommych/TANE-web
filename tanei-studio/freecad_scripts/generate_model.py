@@ -165,26 +165,61 @@ TABLE_LEG_SIZE_MM = 40
 TABLE_LEG_INSET_MM = 20
 TABLE_APRON_HEIGHT_MM = 80
 
+# SPF材（2×4）の実寸（厚み×幅）。app/lib/constants.tsのKOHNAN_WOOD_LISTの
+# 'SPF材（2×4）'エントリ（厚38×幅89mm）、およびTypeScript側
+# （app/lib/cad/geometry.tsのSPF_2X4_THICKNESS_MM/SPF_2X4_WIDTH_MM）と同じ値。
+# 脚・幕板の材料としてSPF材が選ばれた場合のみ、この実寸を断面に反映する
+SPF_2X4_THICKNESS_MM = 38
+SPF_2X4_WIDTH_MM = 89
 
-def compute_table_panels(width_mm, depth_mm, height_mm, thickness_mm, material, panel_finishes=None):
+
+def _resolve_leg_cross_section(leg_material):
+    """脚の材料としてSPF材が選ばれている場合のみ実際の2×4断面（38×89mm）を使う。
+    それ以外の材料（未指定含む）では従来通りの正方形断面（40×40mm）のまま
+    （app/lib/cad/geometry.tsのresolveLegCrossSectionと同じ判定）。"""
+    if leg_material == "SPF材":
+        return SPF_2X4_THICKNESS_MM, SPF_2X4_WIDTH_MM
+    return TABLE_LEG_SIZE_MM, TABLE_LEG_SIZE_MM
+
+
+def _resolve_apron_cross_section(apron_material, default_thickness_mm):
+    """幕板の材料としてSPF材が選ばれている場合のみ実際の2×4断面（厚み38mm・見付け高さ89mm）を
+    使う。それ以外の材料（未指定含む）では従来通り、板厚（thickness_mm）を厚みに、
+    TABLE_APRON_HEIGHT_MMを見付け高さに使う
+    （app/lib/cad/geometry.tsのresolveApronCrossSectionと同じ判定）。"""
+    if apron_material == "SPF材":
+        return SPF_2X4_THICKNESS_MM, SPF_2X4_WIDTH_MM
+    return default_thickness_mm, TABLE_APRON_HEIGHT_MM
+
+
+def compute_table_panels(width_mm, depth_mm, height_mm, thickness_mm, material, panel_finishes=None, part_materials=None):
     """テーブル（天板1枚+脚4本+幕板4枚）のパネル構成を計算する。compute_panels()と対になる
     関数で、天板・底板・側板・背板といった箱型固有の語彙は一切使わない。
 
     脚は床（z=0）から天板下面（legHeight=height_mm-thickness_mm）まで届くフルハイトで配置し、
     幕板は天板のすぐ下で隣り合う脚同士をつなぐ枠として配置する（実際の仕口を厳密に再現する
     ものではなく、木取り図・3D表示・完成イメージ向けの簡易的な構造表現）。
+
+    part_materials（脚・幕板のみパーツ単位で材料を指定する任意の辞書）にSPF材が
+    指定されている場合、該当パーツの断面を実寸2×4（38×89mm）に変更する
+    （app/lib/cad/geometry.tsのbuildDefaultTablePanelsと完全に一致する計算式）。
     """
     if width_mm <= 0 or depth_mm <= 0 or height_mm <= 0 or thickness_mm <= 0:
         raise ValueError("width/depth/height/thicknessは正の数値で指定してください。")
 
+    leg_material = (part_materials or {}).get("脚", material)
+    apron_material = (part_materials or {}).get("幕板", material)
+    leg_w_x, leg_w_y = _resolve_leg_cross_section(leg_material)
+    apron_t, apron_h = _resolve_apron_cross_section(apron_material, thickness_mm)
+
     leg_height = height_mm - thickness_mm
-    if leg_height <= TABLE_APRON_HEIGHT_MM:
+    if leg_height <= apron_h:
         raise ValueError(f"高さ({height_mm}mm)が天板の厚み・幕板の高さに対して小さすぎます。")
 
     leg_x1 = TABLE_LEG_INSET_MM
-    leg_x2 = width_mm - TABLE_LEG_INSET_MM - TABLE_LEG_SIZE_MM
+    leg_x2 = width_mm - TABLE_LEG_INSET_MM - leg_w_x
     leg_y1 = TABLE_LEG_INSET_MM
-    leg_y2 = depth_mm - TABLE_LEG_INSET_MM - TABLE_LEG_SIZE_MM
+    leg_y2 = depth_mm - TABLE_LEG_INSET_MM - leg_w_y
     if leg_x2 <= leg_x1 or leg_y2 <= leg_y1:
         raise ValueError("widthまたはdepthが脚を配置するには小さすぎます。")
 
@@ -202,32 +237,31 @@ def compute_table_panels(width_mm, depth_mm, height_mm, thickness_mm, material, 
 
     panels = [
         _panel("天板", (0, 0, height_mm - thickness_mm), (width_mm, depth_mm, thickness_mm)),
-        _panel("脚（前左）", (leg_x1, leg_y1, 0), (TABLE_LEG_SIZE_MM, TABLE_LEG_SIZE_MM, leg_height)),
-        _panel("脚（前右）", (leg_x2, leg_y1, 0), (TABLE_LEG_SIZE_MM, TABLE_LEG_SIZE_MM, leg_height)),
-        _panel("脚（奥左）", (leg_x1, leg_y2, 0), (TABLE_LEG_SIZE_MM, TABLE_LEG_SIZE_MM, leg_height)),
-        _panel("脚（奥右）", (leg_x2, leg_y2, 0), (TABLE_LEG_SIZE_MM, TABLE_LEG_SIZE_MM, leg_height)),
+        _panel("脚（前左）", (leg_x1, leg_y1, 0), (leg_w_x, leg_w_y, leg_height)),
+        _panel("脚（前右）", (leg_x2, leg_y1, 0), (leg_w_x, leg_w_y, leg_height)),
+        _panel("脚（奥左）", (leg_x1, leg_y2, 0), (leg_w_x, leg_w_y, leg_height)),
+        _panel("脚（奥右）", (leg_x2, leg_y2, 0), (leg_w_x, leg_w_y, leg_height)),
     ]
 
-    apron_z = leg_height - TABLE_APRON_HEIGHT_MM
-    apron_span_x = leg_x2 - (leg_x1 + TABLE_LEG_SIZE_MM)
-    apron_span_y = leg_y2 - (leg_y1 + TABLE_LEG_SIZE_MM)
-    t = thickness_mm
+    apron_z = leg_height - apron_h
+    apron_span_x = leg_x2 - (leg_x1 + leg_w_x)
+    apron_span_y = leg_y2 - (leg_y1 + leg_w_y)
 
     panels.append(_panel(
-        "幕板（前）", (leg_x1 + TABLE_LEG_SIZE_MM, leg_y1, apron_z), (apron_span_x, t, TABLE_APRON_HEIGHT_MM)
+        "幕板（前）", (leg_x1 + leg_w_x, leg_y1, apron_z), (apron_span_x, apron_t, apron_h)
     ))
     panels.append(_panel(
         "幕板（奥）",
-        (leg_x1 + TABLE_LEG_SIZE_MM, leg_y2 + TABLE_LEG_SIZE_MM - t, apron_z),
-        (apron_span_x, t, TABLE_APRON_HEIGHT_MM),
+        (leg_x1 + leg_w_x, leg_y2 + leg_w_y - apron_t, apron_z),
+        (apron_span_x, apron_t, apron_h),
     ))
     panels.append(_panel(
-        "幕板（左）", (leg_x1, leg_y1 + TABLE_LEG_SIZE_MM, apron_z), (t, apron_span_y, TABLE_APRON_HEIGHT_MM)
+        "幕板（左）", (leg_x1, leg_y1 + leg_w_y, apron_z), (apron_t, apron_span_y, apron_h)
     ))
     panels.append(_panel(
         "幕板（右）",
-        (leg_x2 + TABLE_LEG_SIZE_MM - t, leg_y1 + TABLE_LEG_SIZE_MM, apron_z),
-        (t, apron_span_y, TABLE_APRON_HEIGHT_MM),
+        (leg_x2 + leg_w_x - apron_t, leg_y1 + leg_w_y, apron_z),
+        (apron_t, apron_span_y, apron_h),
     ))
 
     return panels
@@ -300,6 +334,33 @@ ALL_FINISHABLE_LABELS = (
     + tuple(d["label"] for d in FOUNDATION_PART_DEFS.values())
     + tuple(d["label"] for d in TIER_PART_DEFS.values())
 )
+
+# パーツ単位で材料を指定できる品名の一覧。TypeScript側のPartMaterialLabel
+# （app/lib/cad/model.ts）と同じ語彙。「天板だけパイン集成材、脚・幕板はSPF材」のような
+# 指定を、AIの提案（StudioSpec.partMaterials）からそのままこちらでも解釈できるようにする
+PART_MATERIAL_LABELS = ("天板", "底板", "側板", "背板", "棚板", "脚", "幕板")
+
+
+def apply_part_materials(panels, part_materials):
+    """生成済みのpanelsに対して、パーツ単位の材料上書き（part_materials）を後から適用する。
+
+    compute_panels()・compute_table_panels()・compute_option_panels()自体は変更せず、
+    ここ1箇所だけでpanel["material"]を上書きする（TypeScript側のbuildFurnitureModelが
+    幾何計算後にpanel.materialを上書きする設計と同じ考え方）。各パネルのlabelを「（」で
+    分割して代表ラベル（例:「脚（前左）」→「脚」）を求め、PART_MATERIAL_LABELSに含まれ、
+    かつpart_materialsにそのキーがあれば上書きする。該当しないパネルは、生成時点で既に
+    設定済みのmaterialのまま変更しない。
+    """
+    if not part_materials:
+        return panels
+    for panel in panels:
+        key = panel["label"].split("（")[0]
+        if key not in PART_MATERIAL_LABELS:
+            continue
+        value = part_materials.get(key)
+        if isinstance(value, str) and value.strip():
+            panel["material"] = value
+    return panels
 
 
 def _resolve_foundation_params(key, opt):
@@ -1130,6 +1191,9 @@ def main():
     thickness = float(params.get("thickness", DEFAULT_THICKNESS_MM))
     material = params.get("material", "パイン集成材")
     panel_finishes = params.get("panelFinishes") or {}
+    # 「天板だけパイン集成材、脚・幕板はSPF材」のような、パーツ単位の材料指定（任意）。
+    # kind:"table"の場合、脚・幕板の断面計算（compute_table_panels）にも渡す
+    part_materials = params.get("partMaterials") or {}
     options = params.get("options") or {}
     # kind未指定・不正値は既存仕様どおり'box'として扱う（後方互換。TANE:iブラウザCAD側の
     # FurnitureDesign.kindと同じ考え方）
@@ -1141,12 +1205,16 @@ def main():
     if kind == "table":
         # テーブルは箱本体を持たないため、天板+脚+幕板のみで構成する
         # （既存のcompute_option_panelsによる脚・幕板追加は箱本体前提のため使わない）
-        panels = compute_table_panels(width, depth, height, thickness, material, panel_finishes)
+        panels = compute_table_panels(width, depth, height, thickness, material, panel_finishes, part_materials)
     else:
         panels = compute_panels(width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material, panel_finishes)
         panels += compute_option_panels(
             width, depth, height, thickness, DEFAULT_BACK_THICKNESS_MM, material, panel_finishes, options
         )
+    # 天板・底板・側板・背板・棚板（box）や、テーブルの各パーツラベルに、パーツ単位の
+    # 材料指定を反映する（脚・幕板の断面自体は上のcompute_table_panelsが既に反映済みのため、
+    # ここでは主にbox側のパーツラベルへの反映と、テーブル側の再確認を兼ねる）
+    panels = apply_part_materials(panels, part_materials)
 
     fcstd_path = os.path.join(output_dir, "model.FCStd")
     csv_path = os.path.join(output_dir, "cutlist.csv")

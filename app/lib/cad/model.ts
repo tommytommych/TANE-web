@@ -195,10 +195,17 @@ export function buildFurnitureModel(
   const material = overrides?.material ?? FURNITURE_MATERIALS[0];
   const partMaterials = overrides?.partMaterials;
 
+  // テーブルの脚・幕板は、材料としてSPF材が選ばれている場合のみ実寸2×4断面
+  // （38×89mm、geometry.tsのresolveLegCrossSection/resolveApronCrossSection参照）になる。
+  // 幾何計算（buildFurniturePanels）の時点で材料を知る必要があるため、パネル生成後に
+  // 上書きする他のパーツとは別に、ここで先に解決して渡す
+  const legMaterial = partMaterials?.['脚'] ?? material;
+  const apronMaterial = partMaterials?.['幕板'] ?? material;
+
   // 既存のFurniturePanel.material（元々あるが、これまで書き込み元が無かったフィールド）へ、
   // パーツ種類ごとの上書き材料を反映する。該当する上書きが無いパネルはそのまま返す
   // （新しい配列参照にはなるが、内容は既存のbuildFurniturePanels(design)の結果と同一）
-  const panels = buildFurniturePanels(design).map((panel) => {
+  const panels = buildFurniturePanels(design, { legMaterial, apronMaterial }).map((panel) => {
     if (!partMaterials) return panel;
     const label = CUT_LIST_KIND_NAME[panel.kind] as PartMaterialLabel | undefined;
     const overrideMaterial = label ? partMaterials[label] : undefined;
