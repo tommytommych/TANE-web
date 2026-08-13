@@ -428,8 +428,13 @@ export default function SavedItemsModal({
   };
 
   const submitAdd = () => {
-    if (!newTitle.trim() || !newFileDataUrl || !newFileMimeType) return;
-    onAdd(activeModal, newTitle.trim(), newContent.trim(), { dataUrl: newFileDataUrl, mimeType: newFileMimeType }, newRelatedProjectId);
+    // 写真は任意にする（Phase「完成作品の保存不具合」対応）。以前はタイトル・写真の
+    // 両方が無いと保存できず、エラー表示も無いまま保存ボタンが押せないだけだったため、
+    // 「完成作品の保存ができない」という不具合報告につながっていた。写真無しでも
+    // タイトルだけで保存できるようにする（onAddのfileは元々任意引数）
+    if (!newTitle.trim()) return;
+    const file = newFileDataUrl && newFileMimeType ? { dataUrl: newFileDataUrl, mimeType: newFileMimeType } : undefined;
+    onAdd(activeModal, newTitle.trim(), newContent.trim(), file, newRelatedProjectId);
     showToast?.(activeModal === 'finished' ? '完成作品として保存しました🌱' : '画像を保存しました🌱');
     resetAddForm();
   };
@@ -482,14 +487,17 @@ export default function SavedItemsModal({
                 rows={2}
                 className="w-full border border-tanei-border rounded-tanei-control px-3 py-2 text-sm resize-none"
               />
-              <input
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                aria-label="画像ファイルを選択"
-                className="text-xs"
-              />
+              <label className="block text-xs text-tanei-ink-muted">
+                写真（任意）
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  aria-label="画像ファイルを選択"
+                  className="block text-xs mt-1"
+                />
+              </label>
               {fileError && <p className="text-xs text-red-500">{fileError}</p>}
               {newFileDataUrl && (
                 // base64のdata URL（外部URLではない一時プレビュー）のためnext/imageの最適化対象外。意図的にimgタグを使用
@@ -505,7 +513,7 @@ export default function SavedItemsModal({
                 </button>
                 <button
                   onClick={submitAdd}
-                  disabled={!newTitle.trim() || !newFileDataUrl}
+                  disabled={!newTitle.trim()}
                   className="text-xs font-bold px-3 py-1.5 rounded-tanei-control bg-tanei-accent text-white hover:bg-tanei-accent-dark disabled:opacity-40"
                 >
                   保存する
