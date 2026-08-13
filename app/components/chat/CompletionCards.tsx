@@ -168,7 +168,7 @@ function CompletionCards({
             <span className="text-lg flex-shrink-0">🖥</span>
             <span className="flex flex-col leading-tight min-w-0">
               <span className="text-xs font-bold">設計スタジオで開く</span>
-              <span className="text-[10px] text-tanei-ink-muted">PC専用／より本格的な完成イメージ向け</span>
+              <span className="text-[10px] text-tanei-ink-muted">PC専用／写真のようなリアルな完成イメージを見る</span>
             </span>
           </button>
         </div>

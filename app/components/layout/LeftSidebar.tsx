@@ -240,7 +240,7 @@ export default function LeftSidebar({
                 <span>🖥</span>
                 <span className="flex flex-col leading-tight min-w-0">
                   <span className="font-bold">設計スタジオ</span>
-                  <span className="text-[10px] font-normal text-tanei-ink-muted">PC専用／本格レンダリングで完成イメージを確認</span>
+                  <span className="text-[10px] font-normal text-tanei-ink-muted">PC専用／写真のようなリアルな完成イメージを見る</span>
                 </span>
               </Link>
 

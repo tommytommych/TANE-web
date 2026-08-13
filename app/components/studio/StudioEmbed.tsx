@@ -117,7 +117,7 @@ export default function StudioEmbed() {
         >
           ← チャットに戻る
         </Link>
-        <span className="text-sm font-black text-tanei-brand truncate">🌱 TANE:i 設計スタジオ</span>
+        <span className="text-sm font-black text-tanei-brand truncate">🌱 TANE:i 設計スタジオ（完成イメージ）</span>
 
         <button
           type="button"
@@ -141,7 +141,7 @@ export default function StudioEmbed() {
       </div>
 
       <p className="px-4 py-1.5 border-b border-tanei-border bg-amber-50 text-amber-800 text-[11px] text-center flex-shrink-0">
-        ⚠️ 設計スタジオはパソコン専用機能です。スマートフォンでご利用の場合は⚙️から接続先の設定が必要です。
+        ⚠️ 完成イメージ（設計スタジオ）はパソコン専用機能です。スマートフォンでご利用の場合は⚙️から接続先の設定が必要です。
       </p>
 
       {isSettingsOpen && (
