@@ -3,6 +3,7 @@ import fontkit from '@pdf-lib/fontkit';
 import QRCode from 'qrcode';
 import type { MaterialGroup } from './cutlist';
 import { packSheetLayout, type SheetLayout, type PackedSheet } from './sheetLayout';
+import type { CutListItem } from './cad/model';
 
 // 木取り図（カット図）のデモデータ。チャットに該当データが見つからない場合のフォールバック
 export const DEMO_MATERIAL_GROUPS: MaterialGroup[] = [
@@ -136,7 +137,11 @@ export const buildUniversalCutSheetPdf = async (
   sheetLayouts: SheetLayout[] = [],
   // ブラウザCAD（Phase 2-4）から呼ぶ場合のみ指定。家具名・使用材料・必要枚数を
   // ヘッダー直下に1行追加する（省略時は従来どおり何も表示しない＝既存呼び出し元は無変更）
-  furnitureInfo?: { name: string; material: string; sheetCount: number }
+  furnitureInfo?: { name: string; material: string; sheetCount: number },
+  // SPF材（2×4）等、板から切り出す対象外の規格材（getFurnitureMaterialTypeが
+  // 'dimensionalLumber'と判定する材料）のパーツ一覧。板取り図は作らず、材料ごとに
+  // 「パーツ名×数量・寸法」だけの軽量なテキストセクションとして表示する
+  dimensionalLumberItems: CutListItem[] = []
 ): Promise<Uint8Array> => {
   // 引数なし（デモ表示）の時だけデモデータを使い、シート材のみが渡された場合は
   // 1次元木取り図セクション自体を表示しない
@@ -610,6 +615,53 @@ export const buildUniversalCutSheetPdf = async (
     cursorY -= 4;
   }
 
+  // ---------- 規格材（板取り図の対象外の材料）の部材一覧 ----------
+  // SPF材（2×4）等は板から自動配置する対象ではないため、木取り図（板取り図）は作らず、
+  // 材料ごとに「パーツ名×数量・寸法」だけの軽量なテキストセクションとして表示する
+  // （新しい図形描画・パッキング計算は行わない）
+  if (dimensionalLumberItems.length > 0) {
+    const dimensionalLumberGroups = new Map<string, CutListItem[]>();
+    const dimensionalLumberGroupOrder: string[] = [];
+    dimensionalLumberItems.forEach((item) => {
+      const list = dimensionalLumberGroups.get(item.material);
+      if (list) {
+        list.push(item);
+      } else {
+        dimensionalLumberGroups.set(item.material, [item]);
+        dimensionalLumberGroupOrder.push(item.material);
+      }
+    });
+
+    ensureSpace(20 + dimensionalLumberGroupOrder.length * 16 + dimensionalLumberItems.length * 14);
+    page.drawText('■ 必要な部材（規格材）', { x: margin, y: cursorY, size: 13, font: fontBold, color: black });
+    cursorY -= 16;
+    wrapTextToWidth(
+      '板からの自動配置ではなく、決まった断面の材料（2×4材など）として購入・カットしてください。',
+      fontRegular,
+      8.5,
+      tableWidth
+    ).forEach((line) => {
+      page.drawText(line, { x: margin, y: cursorY, size: 8.5, font: fontRegular, color: gray });
+      cursorY -= 11;
+    });
+    cursorY -= 6;
+
+    dimensionalLumberGroupOrder.forEach((groupMaterial) => {
+      const items = dimensionalLumberGroups.get(groupMaterial) ?? [];
+      ensureSpace(18 + items.length * 14);
+      page.drawText(groupMaterial, { x: margin, y: cursorY, size: 11, font: fontBold, color: brand });
+      cursorY -= 15;
+      items.forEach((item) => {
+        ensureSpace(14);
+        const line = `・${item.name} × ${item.qty}　${item.widthMm} × ${item.heightMm} × ${item.thicknessMm} mm`;
+        page.drawText(line, { x: margin + 8, y: cursorY, size: 9, font: fontRegular, color: black });
+        cursorY -= 14;
+      });
+      cursorY -= 4;
+    });
+    cursorY -= 4;
+  }
+
   // ---------- カット依頼リスト ----------
   const flatCutList = [
     ...materialGroups.flatMap((group) =>
@@ -624,6 +676,13 @@ export const buildUniversalCutSheetPdf = async (
         note: part.label ?? '',
       }))
     ),
+    // 規格材（SPF材等）も、板材と同様にこの一覧表に載せて一貫させる
+    ...dimensionalLumberItems.map((item) => ({
+      material: item.material,
+      lengthMm: `${item.widthMm}×${item.heightMm}×${item.thicknessMm}`,
+      qty: item.qty,
+      note: item.name,
+    })),
   ];
 
   const columns = [

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { connectStudioSync } from '../../lib/studioSync';
-import { studioSpecToSheetLayout, type StudioSpec } from '../../lib/studioSpec';
+import { studioSpecToDimensionalLumberItems, studioSpecToSheetLayout, type StudioSpec } from '../../lib/studioSpec';
 import { buildUniversalCutSheetPdf } from '../../lib/cutSheetPdf';
 import { downloadPdfBytes } from '../../lib/download';
 import { consumeLocalUsage, getLocalRemainingCount, DAILY_IMAGE_LIMIT, IMAGE_USAGE_STORAGE_KEY } from '../../lib/localUsage';
@@ -95,9 +95,11 @@ export default function StudioEmbed() {
     try {
       // 材料ごとに分離された木取り図（複数の場合あり）をそのまま渡す。
       // buildUniversalCutSheetPdfは元々複数のSheetLayoutを材料ごとの別セクションとして
-      // 描画できるため、ここでの結合・変換は不要
+      // 描画できるため、ここでの結合・変換は不要。SPF材等の規格材は木取り図の対象外の
+      // ため、板取り図とは別に部材一覧として渡す
       const sheetLayouts = studioSpecToSheetLayout(latestSpec);
-      const pdfBytes = await buildUniversalCutSheetPdf([], sheetLayouts);
+      const dimensionalLumberItems = studioSpecToDimensionalLumberItems(latestSpec);
+      const pdfBytes = await buildUniversalCutSheetPdf([], sheetLayouts, undefined, dimensionalLumberItems);
       downloadPdfBytes(new Uint8Array(pdfBytes), 'TANEi_Universal_Cut_Sheet.pdf');
       consumeLocalUsage(IMAGE_USAGE_STORAGE_KEY, DAILY_IMAGE_LIMIT);
       showStatus('カット申込書PDFのダウンロードが完了しました！');

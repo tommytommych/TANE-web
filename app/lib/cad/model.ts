@@ -22,6 +22,18 @@ import { KOHNAN_WOOD_LIST } from '../constants';
 export const FURNITURE_MATERIALS = ['パイン集成材', 'シナベニヤ', 'ラワン合板', 'SPF材', 'OSB合板'] as const;
 export type FurnitureMaterial = (typeof FURNITURE_MATERIALS)[number];
 
+/** 木取り図の表示方法を左右する、材料の購入単位の区別。
+ * 'sheet'：サブロク板等の板から切り出す板材（天板・底板・側板・背板・棚板に使う一般的な材料）。
+ * 'dimensionalLumber'：2×4材等、板ではなく決まった断面の規格材・角材として購入する材料
+ * （KOHNAN_WOOD_LISTのSPF材の価格データも910/1820/2440mmの「長さ」表記であり、
+ * 910×1820mmの「板」としては売られていない）。判定はパーツ種類ではなく材料名そのもので
+ * 行う（同じ材料が箱型の天板等に使われた場合も同様に規格材として扱う） */
+export type FurnitureMaterialType = 'sheet' | 'dimensionalLumber';
+
+export function getFurnitureMaterialType(material: string): FurnitureMaterialType {
+  return material === 'SPF材' ? 'dimensionalLumber' : 'sheet';
+}
+
 const DEFAULT_THICKNESS_MM = 18;
 
 /** 新規のFurnitureModelを、寸法だけ指定して作成する（panelsは自動計算、棚板等は無し）。
@@ -298,6 +310,9 @@ export function furnitureModelToSheetLayout(model: FurnitureModel): SheetLayout 
  * 木取り図・カットリスト・PDFを表示するために使う（既存のfurnitureModelToSheetLayoutは
  * 単一のSheetLayoutしか返さず、Phase3（CadBuildChecklistView.tsx）が今も依存しているため
  * 変更していない。こちらは新規追加の別関数）。
+ * getFurnitureMaterialTypeが'dimensionalLumber'と判定する材料（SPF材等）は、板から
+ * 切り出す対象ではないため、そもそもグループを作らずサブロク板の木取り図を生成しない
+ * （代わりにfurnitureModelToDimensionalLumberItems()で部材一覧として扱う）。
  * どの定尺サイズにも収まらない材料グループは、そのグループだけを結果から除外する
  * （他の材料グループの木取りまで丸ごと計算不能にはしない） */
 export function furnitureModelToSheetLayoutsByMaterial(model: FurnitureModel): SheetLayout[] {
@@ -306,6 +321,7 @@ export function furnitureModelToSheetLayoutsByMaterial(model: FurnitureModel): S
   const groups = new Map<string, FurniturePanel[]>();
   model.panels.forEach((panel) => {
     const material = panel.material ?? model.material;
+    if (getFurnitureMaterialType(material) === 'dimensionalLumber') return;
     const list = groups.get(material);
     if (list) {
       list.push(panel);
@@ -554,6 +570,14 @@ export function buildCutListItems(model: FurnitureModel): CutListItem[] {
   });
 
   return Array.from(grouped.values());
+}
+
+/** buildCutListItems()の結果のうち、getFurnitureMaterialTypeが'dimensionalLumber'と
+ * 判定する材料（SPF材等）のパーツだけを取り出す。木取り図（サブロク板の対象外にした
+ * furnitureModelToSheetLayoutsByMaterial）で表示しきれない規格材を、「必要な部材一覧」
+ * として木取り図画面・PDFに表示するために使う。新しい集計ロジックは作らない */
+export function furnitureModelToDimensionalLumberItems(model: FurnitureModel): CutListItem[] {
+  return buildCutListItems(model).filter((item) => getFurnitureMaterialType(item.material) === 'dimensionalLumber');
 }
 
 /** マイページ（保存した設計一覧）で表示する、1プロジェクト分の制作進捗（Phase 2-8）。

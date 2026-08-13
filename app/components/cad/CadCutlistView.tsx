@@ -17,7 +17,10 @@ import type { FurnitureModel } from '../../lib/cad/types';
 import {
   CUT_LIST_KIND_NAME,
   FURNITURE_MATERIALS,
+  furnitureModelToDimensionalLumberItems,
+  furnitureModelToSheetLayout,
   furnitureModelToSheetLayoutsByMaterial,
+  type CutListItem,
   type PartMaterialLabel,
 } from '../../lib/cad/model';
 import CadBuildGuide from './CadBuildGuide';
@@ -75,21 +78,51 @@ export default function CadCutlistView({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // 材料ごとに分離した木取り図（「天板はパイン集成材、脚・幕板はSPF材」等の場合、
-  // 材料の種類だけ配列に並ぶ。全パーツ同じ材料なら要素数1になり、見た目は今まで通り）
+  // 材料の種類だけ配列に並ぶ。全パーツ同じ材料なら要素数1になり、見た目は今まで通り）。
+  // SPF材等の規格材（getFurnitureMaterialType参照）はここには含まれない
+  // （サブロク板から切り出す対象ではないため）
   const sheetLayouts = useMemo(() => furnitureModelToSheetLayoutsByMaterial(model), [model]);
   const packedByLayout = useMemo(() => sheetLayouts.map((layout) => packSheetLayout(layout)), [sheetLayouts]);
   const totalSheetCount = packedByLayout.reduce((sum, sheets) => sum + sheets.length, 0);
 
+  // 規格材（SPF材等）は板取り図を作らない代わりに、材料ごとの部材一覧として表示する
+  const dimensionalLumberItems = useMemo(() => furnitureModelToDimensionalLumberItems(model), [model]);
+  const dimensionalLumberGroups = useMemo(() => {
+    const order: string[] = [];
+    const groups = new Map<string, CutListItem[]>();
+    dimensionalLumberItems.forEach((item) => {
+      const list = groups.get(item.material);
+      if (list) {
+        list.push(item);
+      } else {
+        groups.set(item.material, [item]);
+        order.push(item.material);
+      }
+    });
+    return order.map((groupMaterial) => ({ material: groupMaterial, items: groups.get(groupMaterial) ?? [] }));
+  }, [dimensionalLumberItems]);
+
+  // 板材（sheetLayouts）が1件も無い場合（理論上、全パーツが規格材の場合のみ発生しうる
+  // 稀なケース）だけ、Phase3（CadBuildGuide.tsx、変更禁止）向けに既存のfurnitureModelToSheetLayout
+  // （全材料混在の単一板版、furnitureModelToSheetLayoutsByMaterial導入前から存在する関数）へ
+  // フォールバックする。CadBuildGuide自体の必須propsを満たすためだけの措置で、
+  // 板材が1件でもあれば従来通りそちらを使う
+  const fallbackLayout = useMemo(
+    () => (sheetLayouts.length === 0 ? furnitureModelToSheetLayout(model) : null),
+    [sheetLayouts, model]
+  );
+  const fallbackSheets = useMemo(() => (fallbackLayout ? packSheetLayout(fallbackLayout) : []), [fallbackLayout]);
+
   // Phase3（CadBuildGuide.tsx、変更禁止）は単一のsheetLayout/material/sheetCountという
   // 既存のprops形のまま。全体のmaterialに対応するレイアウトを代表として渡し、
   // 見つからない場合（全パーツが上書きされ、全体のmaterialを使うパーツが1つも無い場合）は
-  // 先頭のレイアウトにフォールバックする
+  // 先頭のレイアウトに、板材自体が無い場合はfallbackLayoutにフォールバックする
   const primaryLayoutIndex = Math.max(
     0,
     sheetLayouts.findIndex((layout) => layout.name.startsWith(material))
   );
-  const primaryLayout = sheetLayouts[primaryLayoutIndex] ?? null;
-  const primarySheetCount = packedByLayout[primaryLayoutIndex]?.length ?? 0;
+  const primaryLayout = sheetLayouts[primaryLayoutIndex] ?? fallbackLayout;
+  const primarySheetCount = packedByLayout[primaryLayoutIndex]?.length ?? fallbackSheets.length;
 
   // 実在するパーツ種類（天板・脚・幕板等、CUT_LIST_KIND_NAMEの値）だけを、登場順で重複無く
   // 列挙する。「パーツごとに材料を分ける」の選択肢一覧に使う
@@ -122,14 +155,19 @@ export default function CadCutlistView({
   };
 
   const handleDownloadPdf = async () => {
-    if (sheetLayouts.length === 0) return;
+    if (sheetLayouts.length === 0 && dimensionalLumberItems.length === 0) return;
     setIsGeneratingPdf(true);
     try {
-      const pdfBytes = await buildUniversalCutSheetPdf([], sheetLayouts, {
-        name: model.name,
-        material,
-        sheetCount: totalSheetCount,
-      });
+      const pdfBytes = await buildUniversalCutSheetPdf(
+        [],
+        sheetLayouts,
+        {
+          name: model.name,
+          material,
+          sheetCount: totalSheetCount,
+        },
+        dimensionalLumberItems
+      );
       downloadPdfBytes(new Uint8Array(pdfBytes), 'TANEi_CutSheet.pdf');
       showStatus('木取り図PDFのダウンロードが完了しました！');
     } catch (error) {
@@ -214,28 +252,76 @@ export default function CadCutlistView({
             </details>
           )}
 
-          {sheetLayouts.length > 0 && (
+          {(sheetLayouts.length > 0 || dimensionalLumberItems.length > 0) && (
             <div className="text-sm text-tanei-ink flex flex-wrap gap-x-4 gap-y-1">
-              <span>
-                必要枚数：<span className="font-black text-tanei-brand">{totalSheetCount}枚</span>
-              </span>
+              {sheetLayouts.length > 0 && (
+                <span>
+                  必要枚数：<span className="font-black text-tanei-brand">{totalSheetCount}枚</span>
+                </span>
+              )}
+              {dimensionalLumberItems.length > 0 && (
+                <span>
+                  規格材の部材：
+                  <span className="font-black text-tanei-brand">
+                    {dimensionalLumberItems.reduce((sum, item) => sum + item.qty, 0)}本
+                  </span>
+                </span>
+              )}
               {sheetLayouts.length > 1 && (
-                <span className="text-tanei-ink-muted text-xs">（{sheetLayouts.length}種類の材料）</span>
+                <span className="text-tanei-ink-muted text-xs">（板材{sheetLayouts.length}種類の材料）</span>
               )}
             </div>
           )}
         </div>
 
-        {sheetLayouts.length > 0 && primaryLayout ? (
+        {sheetLayouts.length > 0 || dimensionalLumberItems.length > 0 ? (
           <>
-            <div>
-              <h3 id={CUT_LAYOUT_ANCHOR_ID} className="text-sm font-bold text-tanei-ink mb-1 scroll-mt-4">木取り図</h3>
-              <div className="flex flex-col gap-3">
-                {sheetLayouts.map((layout) => (
-                  <SheetLayoutSvgView key={layout.name} layout={layout} showToast={showStatus} />
-                ))}
+            {sheetLayouts.length > 0 && (
+              <div>
+                <h3 id={CUT_LAYOUT_ANCHOR_ID} className="text-sm font-bold text-tanei-ink mb-1 scroll-mt-4">木取り図</h3>
+                <div className="flex flex-col gap-3">
+                  {sheetLayouts.map((layout) => (
+                    <SheetLayoutSvgView key={layout.name} layout={layout} showToast={showStatus} />
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* 規格材（SPF材等）は板から切り出す対象ではないため、木取り図（板取り図）を
+                作らず、材料ごとに「パーツ名×数量・寸法」だけをコンパクトに一覧表示する。
+                板取り図が無い分、SPF材だけの家具でも画面が縦に長くならない */}
+            {dimensionalLumberGroups.length > 0 && (
+              <div>
+                {!sheetLayouts.length && (
+                  <h3 className="text-sm font-bold text-tanei-ink mb-1 scroll-mt-4">木取り図</h3>
+                )}
+                <div className="flex flex-col gap-2">
+                  {dimensionalLumberGroups.map((group) => (
+                    <div
+                      key={group.material}
+                      className="bg-white rounded-tanei-control border border-tanei-border p-3"
+                    >
+                      <p className="text-xs font-bold text-tanei-brand mb-1.5">
+                        {group.material}（規格材・板取り図なし）
+                      </p>
+                      <ul className="flex flex-col gap-1">
+                        {group.items.map((item) => (
+                          <li key={item.id} className="flex items-center justify-between text-sm gap-2">
+                            <span className="font-bold text-tanei-ink">
+                              {item.name}
+                              <span className="text-tanei-ink-muted font-normal"> ×{item.qty}</span>
+                            </span>
+                            <span className="text-tanei-ink-muted text-xs text-right">
+                              {item.widthMm} × {item.heightMm} × {item.thicknessMm} mm
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div>
               <h3 className="text-sm font-bold text-tanei-ink mb-1">パーツ一覧</h3>
@@ -271,17 +357,19 @@ export default function CadCutlistView({
               </button>
             </div>
 
-            <div id={BUILD_GUIDE_ANCHOR_ID}>
-              <CadBuildGuide
-                model={model}
-                material={material}
-                sheetLayout={primaryLayout}
-                sheetCount={primarySheetCount}
-                onViewPanel={onViewPanel}
-                buildChecklist={buildChecklist}
-                onViewBuildCheck={onViewBuildCheck}
-              />
-            </div>
+            {primaryLayout && (
+              <div id={BUILD_GUIDE_ANCHOR_ID}>
+                <CadBuildGuide
+                  model={model}
+                  material={material}
+                  sheetLayout={primaryLayout}
+                  sheetCount={primarySheetCount}
+                  onViewPanel={onViewPanel}
+                  buildChecklist={buildChecklist}
+                  onViewBuildCheck={onViewBuildCheck}
+                />
+              </div>
+            )}
           </>
         ) : (
           <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-tanei-control px-4 py-3 text-sm">

@@ -3,7 +3,14 @@
 
 import type { SheetLayout } from './sheetLayout';
 import type { FurnitureDesign } from './cad/types';
-import { PART_MATERIAL_LABELS, type PartMaterialLabel, buildFurnitureModel, furnitureModelToSheetLayoutsByMaterial } from './cad/model';
+import {
+  PART_MATERIAL_LABELS,
+  type CutListItem,
+  type PartMaterialLabel,
+  buildFurnitureModel,
+  furnitureModelToDimensionalLumberItems,
+  furnitureModelToSheetLayoutsByMaterial,
+} from './cad/model';
 
 export type PanelFinish = 'clear' | 'walnut' | 'white' | 'black';
 
@@ -80,6 +87,21 @@ export const studioSpecToSheetLayout = (spec: StudioSpec): SheetLayout[] => {
     partMaterials: spec.partMaterials,
   });
   return furnitureModelToSheetLayoutsByMaterial(model);
+};
+
+// studioSpecToSheetLayout()と同じ委譲パイプラインで、SPF材（2×4）等の規格材
+// （板取り図の対象外、furnitureModelToSheetLayoutsByMaterialでは除外される材料）の
+// パーツ一覧だけを取り出す。完成イメージの「カット依頼用紙へ」PDFで、板取り図が無い
+// 材料の部材も欠落しないようにするために使う
+export const studioSpecToDimensionalLumberItems = (spec: StudioSpec): CutListItem[] => {
+  const design = studioSpecToFurnitureDesign(spec);
+  const model = buildFurnitureModel(design, {
+    projectId: 'studio-cutsheet',
+    name: spec.item,
+    material: spec.material,
+    partMaterials: spec.partMaterials,
+  });
+  return furnitureModelToDimensionalLumberItems(model);
 };
 
 // StudioSpecの寸法が、ブラウザCADの初期設計として安全に使える正の数値かどうかを確認する
