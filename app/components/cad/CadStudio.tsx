@@ -5,7 +5,7 @@
 // せず、常にFurnitureDesign（状態）→ FurnitureModel.panels（buildFurnitureModelで
 // 毎回再計算） → 3D表示、というデータ駆動の流れを維持している。
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CadViewport from './CadViewport';
 import CadControls from './CadControls';
 import CadPartsPanel from './CadPartsPanel';
@@ -60,6 +60,27 @@ interface CadStudioProps {
 // 「1ページ縦スクロール型」への変更で、以前は独立したviewMode='cutMaterials'画面
 // だったカットリストは、cutlist画面内のセクションとして統合した（別画面には戻さない）
 type CadViewMode = 'design' | 'cutlist' | 'buildCheck';
+
+// チャット（/app）へ「チャットに戻る」で移動してブラウザバックで/app/cadに戻ってきた場合や、
+// Next.jsがCadStudioを再マウントした場合でも、まだ保存していない編集内容が消えないよう、
+// タブを閉じるまで保持されるsessionStorageに現在の編集内容を退避する（app/page.tsxの
+// CHAT_SESSION_STORAGE_KEYと同じパターン）。保存済みプロジェクト（IndexedDB）を置き換える
+// ものではなく、「保存する」を押す前の一時的な下書きバッファという位置付け
+const CAD_SESSION_STORAGE_KEY = 'tanei-cad-session-v1';
+
+interface CadSessionDraft {
+  design: FurnitureDesign;
+  material: string;
+  partMaterials: Partial<Record<PartMaterialLabel, string>>;
+  partFinishes: Partial<Record<PartMaterialLabel, PanelFinish>>;
+  projectId: string | null;
+  projectCreatedAt: string | null;
+  projectName: string;
+  cutListChecked: Record<string, boolean>;
+  buildChecklist: Record<string, boolean>;
+  buildGuideChecked: Record<string, boolean>;
+  notes: string;
+}
 
 export default function CadStudio({
   initialDesign,
@@ -121,11 +142,46 @@ export default function CadStudio({
   // persistChecklistsの両方に必ず含める
   const [notes, setNotes] = useState('');
 
+  // 保存用effectが、読み込み用effectより先に「読み込み前の初期state」で発火して
+  // sessionStorageを上書きしてしまわないようにするためのガード（マウント直後の1回だけスキップする。
+  // app/page.tsxのskipNextSaveRefと同じパターン）
+  const skipNextSessionSaveRef = useRef(true);
+
   // マイページ「保存した設計」の「開く」から /app/cad?projectId=... で来た場合、
   // 保存済みのFurnitureDesignを読み込んで復元する（木取り図・パーツ一覧・制作情報は
-  // 保存していないため、復元後にPanel[]から毎回作り直す既存の仕組みでそのまま再生成される）
+  // 保存していないため、復元後にPanel[]から毎回作り直す既存の仕組みでそのまま再生成される）。
+  // それに加えて、AI相談からの提案（initialDesign）で来た場合を除き、直前のブラウザCAD
+  // セッションでまだ保存していなかった編集内容がsessionStorageに残っていれば、
+  // IndexedDBの保存内容より新しいためそちらを優先して復元する
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get('projectId');
+
+    if (!cameFromChat) {
+      try {
+        const raw = sessionStorage.getItem(CAD_SESSION_STORAGE_KEY);
+        if (raw) {
+          const draft = JSON.parse(raw) as CadSessionDraft;
+          if (draft.projectId === (id ?? null)) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setDesign(draft.design);
+            setMaterial(draft.material);
+            setPartMaterials(draft.partMaterials ?? {});
+            setPartFinishes(draft.partFinishes ?? {});
+            setProjectId(draft.projectId);
+            setProjectCreatedAt(draft.projectCreatedAt);
+            setProjectName(draft.projectName);
+            setCutListChecked(draft.cutListChecked ?? {});
+            setBuildChecklist(draft.buildChecklist ?? {});
+            setBuildGuideChecked(draft.buildGuideChecked ?? {});
+            setNotes(draft.notes ?? '');
+            return;
+          }
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
     if (!id) return;
 
     let cancelled = false;
@@ -159,7 +215,48 @@ export default function CadStudio({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [cameFromChat]);
+
+  // 未保存の編集内容を含む現在の状態をsessionStorageへ退避する（チャットへ移動して
+  // ブラウザバックで戻ってきても消えないようにするため）。app/page.tsxのCHAT_SESSION_STORAGE_KEY
+  // と同じく、マウント直後の1回（読み込み用effectがまだ復元できていない可能性がある状態）は
+  // skipNextSessionSaveRefでスキップする
+  useEffect(() => {
+    if (skipNextSessionSaveRef.current) {
+      skipNextSessionSaveRef.current = false;
+      return;
+    }
+    try {
+      const draft: CadSessionDraft = {
+        design,
+        material,
+        partMaterials,
+        partFinishes,
+        projectId,
+        projectCreatedAt,
+        projectName,
+        cutListChecked,
+        buildChecklist,
+        buildGuideChecked,
+        notes,
+      };
+      sessionStorage.setItem(CAD_SESSION_STORAGE_KEY, JSON.stringify(draft));
+    } catch (error) {
+      console.error(error);
+    }
+  }, [
+    design,
+    material,
+    partMaterials,
+    partFinishes,
+    projectId,
+    projectCreatedAt,
+    projectName,
+    cutListChecked,
+    buildChecklist,
+    buildGuideChecked,
+    notes,
+  ]);
 
   const handleSave = useCallback(async () => {
     setIsSaving(true);
