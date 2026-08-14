@@ -171,6 +171,10 @@ export function setDoors(design: FurnitureDesign, doors: boolean): FurnitureDesi
   return { ...design, doors };
 }
 
+export function setDoorCount(design: FurnitureDesign, count: 1 | 2): FurnitureDesign {
+  return { ...design, doorCount: count };
+}
+
 // 「＋/－」操作で無制限に増減できてしまうと、板厚に対して前板が薄くなりすぎ
 // （geometry.tsのbuildDrawerPanelsがMIN_SHELF_SIZE_MMで下限は守るが、隙間なく
 // 重なって見えるほど不自然になる）ため、UI操作としての上限を設ける
@@ -323,6 +327,7 @@ export function buildFurnitureModel(
       legHeightMm: design.legHeightMm,
       legCount: design.legCount ?? 4,
       doors: design.doors ?? false,
+      doorCount: design.doorCount ?? 1,
       drawerCount: design.drawerCount ?? 0,
       shelfCount: design.shelves.length,
     },
@@ -448,6 +453,9 @@ export function furnitureModelToSheetLayoutsByMaterial(model: FurnitureModel): S
  * Reactのkeyにはpanel.idではなくlabelを使わないよう、idを別途持たせている */
 export interface ViewerPanel {
   id: string;
+  /** パネルの種類（'door'/'drawer'等）。CadViewport.tsx側が取っ手の見た目を出し分ける
+   * 判定にのみ使う、表示専用の情報（木取り図・カットリストの計算には影響しない） */
+  kind: FurniturePanelKind;
   label: string;
   x: number;
   y: number;
@@ -477,7 +485,9 @@ const LEG_COLOR_HEX = '#6B5B4A';
 const FINISH_COLOR_HEX: Record<string, string> = {
   clear: DEFAULT_COLOR_HEX,
   walnut: '#5C3A21',
-  white: '#F5F1E8',
+  // 3D表示のシェーディング（陰影）で暗く見える分を見込み、実際の塗料の白より
+  // 明るめのほぼ純白にしている（CadViewport.tsxのライティング下で「しっかり白」に見えるよう調整）
+  white: '#FAFAFA',
   black: '#2B2B2B',
 };
 
@@ -491,6 +501,7 @@ function colorForPanel(panel: FurniturePanel, modelMaterial: string): string {
 export function furnitureModelToViewerPanels(model: FurnitureModel): ViewerPanel[] {
   return model.panels.map((panel) => ({
     id: panel.id,
+    kind: panel.kind,
     label: panel.label,
     x: panel.position.x,
     y: panel.position.y,

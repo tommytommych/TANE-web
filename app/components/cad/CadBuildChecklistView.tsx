@@ -59,7 +59,7 @@ const BUILD_NAV_ITEMS: { target: { viewMode: 'cutlist' | 'cutMaterials'; anchorI
   { target: { viewMode: 'cutlist', anchorId: CUT_LAYOUT_ANCHOR_ID }, label: '木取り図' },
   { target: { viewMode: 'cutMaterials' }, label: 'カットリスト' },
   { target: { viewMode: 'cutlist', anchorId: SHOPPING_LIST_ANCHOR_ID }, label: '買い物リスト' },
-  { target: { viewMode: 'cutlist', anchorId: PARTS_ANCHOR_ID }, label: '作るパーツ' },
+  { target: { viewMode: 'cutlist', anchorId: PARTS_ANCHOR_ID }, label: 'パーツ一覧' },
   { target: { viewMode: 'cutlist', anchorId: BUILD_STEPS_ANCHOR_ID }, label: '作り方' },
   { target: { viewMode: 'cutlist', anchorId: SAFETY_NOTES_ANCHOR_ID }, label: '安全ポイント' },
 ];

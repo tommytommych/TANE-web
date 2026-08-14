@@ -113,11 +113,13 @@ export interface FurnitureDesign {
   /** 脚の有無のみ（個別の脚ごとの編集はPhase 2-3以降の検討課題） */
   legs: boolean;
   shelves: ShelfEntry[];
-  /** 扉の有無（Phase C「パーツ追加」）。本体前面いっぱいを覆うシンプルな1枚扉のみ
-   * （観音開き等の複数枚・蝶番の向きはPhase C以降の拡張課題）。この機能より前に
-   * 保存されたプロジェクトには存在しないため、kindと同じ方針でoptionalにし、
-   * 省略時はfalse（扉なし）として扱う（isValidFurnitureDesign・geometry.ts参照） */
+  /** 扉の有無（Phase C「パーツ追加」）。この機能より前に保存されたプロジェクトには
+   * 存在しないため、kindと同じ方針でoptionalにし、省略時はfalse（扉なし）として扱う
+   * （isValidFurnitureDesign・geometry.ts参照） */
   doors?: boolean;
+  /** 扉の枚数（1枚、または観音開きの2枚）。doorsがtrueのときのみ使う。未指定時は
+   * 1枚（既存の見た目）として扱う。蝶番の向きなど、それ以上の細かい表現はスコープ外 */
+  doorCount?: 1 | 2;
   /** 引き出し前板の枚数（Phase C「パーツ追加」）。本体前面いっぱいの幅で、指定した枚数だけ
    * 縦に均等分割した前板を配置するシンプルな構成のみ（実際の引き出し本体・スライドレール・
    * 縦の列分割はPhase C以降の拡張課題）。0または未指定は「引き出しなし」として扱う。
@@ -146,6 +148,7 @@ export const isValidFurnitureDesign = (value: unknown): value is FurnitureDesign
     typeof v.backPanel === 'boolean' &&
     typeof v.legs === 'boolean' &&
     (v.doors === undefined || typeof v.doors === 'boolean') &&
+    (v.doorCount === undefined || v.doorCount === 1 || v.doorCount === 2) &&
     (v.drawerCount === undefined || (typeof v.drawerCount === 'number' && Number.isFinite(v.drawerCount) && v.drawerCount >= 0)) &&
     (v.legHeightMm === undefined || (typeof v.legHeightMm === 'number' && Number.isFinite(v.legHeightMm) && v.legHeightMm > 0)) &&
     (v.legCount === undefined || v.legCount === 4 || v.legCount === 6) &&

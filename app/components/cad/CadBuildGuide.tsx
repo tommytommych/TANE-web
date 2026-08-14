@@ -451,29 +451,6 @@ export default function CadBuildGuide({
       </div>
 
       <div>
-        <h3 id={PARTS_ANCHOR_ID} className="text-sm font-bold text-tanei-ink mb-1 scroll-mt-4">作るパーツ</h3>
-        <ul className="rounded-tanei-control border border-tanei-border divide-y divide-tanei-border overflow-hidden bg-white">
-          {model.panels.map((panel) => (
-            <li key={panel.id} className="flex flex-col gap-1.5 px-3 py-2.5 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-tanei-ink">{panel.label}</span>
-                <span className="text-tanei-ink-muted text-xs">
-                  {Math.round(panel.size.x)} × {Math.round(panel.size.y)} × {Math.round(panel.size.z)} mm
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => onViewPanel(panel.id)}
-                className="self-start text-xs font-bold text-tanei-brand border border-tanei-brand/40 hover:bg-tanei-brand-soft hover:border-tanei-brand rounded-full px-3 py-1 transition-colors"
-              >
-                👁 このパーツを見る
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div>
         <h3 id={TOOLS_ANCHOR_ID} className="text-sm font-bold text-tanei-ink mb-1 scroll-mt-4">必要な工具</h3>
         <ul className="flex flex-wrap gap-2">
           {FURNITURE_BUILD_TOOLS.map((tool) => (

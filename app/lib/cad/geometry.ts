@@ -173,30 +173,16 @@ function buildLegPanels(
   return panels;
 }
 
-// 扉と側板・天板・底板の間に空ける隙間（mm）。実際の家具でも扉と本体の間には
+// 扉・引き出し前板と側板・天板・底板の間に空ける隙間（mm）。実際の家具でも扉と本体の間には
 // 数mmの「隙（すき）」を設けるのが一般的で、隙間が無いと扉が枠に干渉して開閉できない。
-// 3D表示・木取り図上でも扉と側板を別々のパーツとしてはっきり見分けられるようにする効果もある
+// 3D表示・木取り図上でも別々のパーツとしてはっきり見分けられるようにする効果もある
 const DOOR_GAP_MM = 2;
-
-/** 本体前面（開口部）いっぱいを覆う、シンプルな1枚扉を配置する
- * （tanei-studio/freecad_scripts/generate_model.pyの_option_door、count=1の場合と
- * 同じ考え方：観音開き等の複数枚・蝶番の向きはPhase C以降の拡張課題とし、
- * まずは幅・高さいっぱいの1枚板だけを作る）。y座標を負にする（本体の手前側、
- * 開口部より外側）ことで、扉が本体の中に埋まらず前面に取り付いているように見える */
-function buildDoorPanel({ width, height, thickness: t }: BoxDimensions): FurniturePanel {
-  const doorWidth = Math.max(MIN_SHELF_SIZE_MM, width - t * 2 - DOOR_GAP_MM * 2);
-  const doorHeight = Math.max(MIN_SHELF_SIZE_MM, height - t * 2 - DOOR_GAP_MM * 2);
-  return {
-    id: 'door',
-    kind: 'door',
-    label: '扉',
-    position: vec3(t + DOOR_GAP_MM, -t, t + DOOR_GAP_MM),
-    size: vec3(doorWidth, t, doorHeight),
-  };
-}
-
-// 引き出し前板と本体の間に空ける隙間（mm）。扉と同じ考え方（DOOR_GAP_MM参照）
 const DRAWER_GAP_MM = 2;
+
+// 扉を2枚（観音開き）にする場合の、2枚の間に空ける隙間（mm）。引き出しを縦に積む際の
+// DRAWER_STACK_GAP_MMと同じ理由（隙間が無いと1枚の板に見えてしまう）で、扉本体の
+// DOOR_GAP_MMより少し広めに取り、2枚の境目がレンダリング上もはっきり見分けられるようにする
+const DOOR_SPLIT_GAP_MM = 3;
 
 // 複数の引き出し前板を縦に積む際、前板どうしの間に空ける隙間（mm）。tanei-studio/
 // freecad_scripts/generate_model.pyのPANEL_GAP_MM（同じ理由：隙間が無いと1枚の板に
@@ -209,6 +195,25 @@ function splitWithGap(total: number, count: number, gap: number): { offset: numb
   if (count <= 1) return [{ offset: 0, size: total }];
   const size = (total - gap * (count - 1)) / count;
   return Array.from({ length: count }, (_, i) => ({ offset: i * (size + gap), size }));
+}
+
+/** 本体前面（開口部）を覆う扉を配置する。count=1はいっぱいの1枚扉、count=2は
+ * 横方向に均等分割した観音開き（tanei-studio/freecad_scripts/generate_model.pyの
+ * _option_doorと同じ考え方）。蝶番の向きなど、それ以上の細かい表現はスコープ外とし、
+ * まずは枚数（1枚／2枚）だけを扱う。y座標を負にする（本体の手前側、開口部より外側）
+ * ことで、扉が本体の中に埋まらず前面に取り付いているように見える */
+function buildDoorPanels({ width, height, thickness: t }: BoxDimensions, count: 1 | 2): FurniturePanel[] {
+  const doorHeight = Math.max(MIN_SHELF_SIZE_MM, height - t * 2 - DOOR_GAP_MM * 2);
+  const innerWidth = Math.max(MIN_SHELF_SIZE_MM, width - t * 2 - DOOR_GAP_MM * 2);
+  const ids = count === 2 ? ['door-left', 'door-right'] : ['door'];
+  const labels = count === 2 ? ['扉（左）', '扉（右）'] : ['扉'];
+  return splitWithGap(innerWidth, count, DOOR_SPLIT_GAP_MM).map(({ offset, size }, i) => ({
+    id: ids[i],
+    kind: 'door',
+    label: labels[i],
+    position: vec3(t + DOOR_GAP_MM + offset, -t, t + DOOR_GAP_MM),
+    size: vec3(Math.max(MIN_SHELF_SIZE_MM, size), t, doorHeight),
+  }));
 }
 
 /** 本体前面いっぱいの幅で、指定した枚数の引き出し前板を縦に均等分割して配置する
@@ -416,7 +421,7 @@ export function buildFurniturePanels(design: FurnitureDesign, materials?: TableM
   }
 
   if (design.doors) {
-    panels = [...panels, buildDoorPanel(dims)];
+    panels = [...panels, ...buildDoorPanels(dims, design.doorCount ?? 1)];
   }
 
   if (design.drawerCount && design.drawerCount > 0) {

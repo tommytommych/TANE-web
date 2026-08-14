@@ -31,6 +31,62 @@ interface CadViewportProps {
 // 既定値と桁が合わないため、1/1000して扱いやすいスケールに揃える
 const MM_TO_SCENE = 1 / 1000;
 
+// 取っ手（ハンドル）の見た目用の色。木材のどの色とも被らない、金属パーツらしい
+// 暗いグレーにすることで、扉・引き出しどうしを見分けやすくする（Phase D追加要望：
+// 引き出し=1個のときに扉と全く同じ見た目になってしまう問題への対応）
+const HANDLE_COLOR = '#2b2b2b';
+
+// 取っ手はFurnitureDesign/FurniturePanelには一切持たせない、CadViewport.tsxだけの
+// 表示専用パーツ（金具はDIYでは購入するものであり、木取り図・カットリストの対象では
+// ないため）。扉の取っ手は蝶番と反対側の縦の縁に、引き出しの取っ手は前板上端寄りの
+// 横棒に配置する、という単純なルールだけを持たせる
+const DOOR_HANDLE_WIDTH_MM = 8;
+const DOOR_HANDLE_LENGTH_MM = 120;
+const DOOR_HANDLE_PROTRUSION_MM = 7;
+const DOOR_HANDLE_INSET_MM = 22;
+
+const DRAWER_HANDLE_HEIGHT_MM = 8;
+const DRAWER_HANDLE_PROTRUSION_MM = 7;
+const DRAWER_HANDLE_WIDTH_RATIO = 0.4;
+const DRAWER_HANDLE_INSET_FROM_TOP_MM = 18;
+
+/** 扉の取っ手。1枚扉は右端、観音開き（2枚）は互いに向き合う内側の縁（中央寄り）に
+ * 配置し、「扉が2枚に分かれて開く」ことが一目で分かるようにする */
+function DoorHandle({ panelId, widthMm, heightMm, thicknessMm }: { panelId: string; widthMm: number; heightMm: number; thicknessMm: number }) {
+  const isLeftOfPair = panelId === 'door-left';
+  const isRightOfPair = panelId === 'door-right';
+  // door-left（左側の扉）は自分の右端、door-right（右側の扉）は自分の左端、
+  // 単独の扉（id==='door'）は右端に取っ手を置く
+  const sign = isLeftOfPair || !isRightOfPair ? 1 : -1;
+  const handleLengthMm = Math.min(DOOR_HANDLE_LENGTH_MM, heightMm * 0.5);
+  const xMm = sign * (widthMm / 2 - DOOR_HANDLE_INSET_MM);
+  const zMm = -(thicknessMm / 2 + DOOR_HANDLE_PROTRUSION_MM / 2);
+  return (
+    <mesh position={[xMm * MM_TO_SCENE, 0, zMm * MM_TO_SCENE]}>
+      <boxGeometry
+        args={[DOOR_HANDLE_WIDTH_MM * MM_TO_SCENE, handleLengthMm * MM_TO_SCENE, DOOR_HANDLE_PROTRUSION_MM * MM_TO_SCENE]}
+      />
+      <meshStandardMaterial color={HANDLE_COLOR} roughness={0.4} metalness={0.3} />
+    </mesh>
+  );
+}
+
+/** 引き出しの取っ手。前板の上端寄りに、幅の一部を使った横棒として配置する
+ * （扉の縦向きの取っ手とはっきり区別できる形にする） */
+function DrawerHandle({ widthMm, heightMm, thicknessMm }: { widthMm: number; heightMm: number; thicknessMm: number }) {
+  const handleWidthMm = widthMm * DRAWER_HANDLE_WIDTH_RATIO;
+  const yMm = heightMm / 2 - DRAWER_HANDLE_INSET_FROM_TOP_MM;
+  const zMm = -(thicknessMm / 2 + DRAWER_HANDLE_PROTRUSION_MM / 2);
+  return (
+    <mesh position={[0, yMm * MM_TO_SCENE, zMm * MM_TO_SCENE]}>
+      <boxGeometry
+        args={[handleWidthMm * MM_TO_SCENE, DRAWER_HANDLE_HEIGHT_MM * MM_TO_SCENE, DRAWER_HANDLE_PROTRUSION_MM * MM_TO_SCENE]}
+      />
+      <meshStandardMaterial color={HANDLE_COLOR} roughness={0.4} metalness={0.3} />
+    </mesh>
+  );
+}
+
 function PanelMesh({
   panel,
   isSelected,
@@ -40,7 +96,7 @@ function PanelMesh({
   isSelected: boolean;
   onSelect: (id: string) => void;
 }) {
-  const { x, y, z, dx, dy, dz, color, id, isPainted } = panel;
+  const { x, y, z, dx, dy, dz, color, id, isPainted, kind } = panel;
   // tanei-studioの座標系（原点=本体の左手前下、y=奥行方向で背板側が大きい値）を、
   // Three.jsの座標系（X=幅, Y=高さ, Z=奥行）へ変換するため、パネル位置にサイズの
   // 半分を足して「箱の中心座標」にしている
@@ -69,23 +125,40 @@ function PanelMesh({
   };
 
   return (
-    <mesh position={position} name={panel.label} onClick={handleClick}>
-      <boxGeometry args={size} />
-      <meshStandardMaterial
-        // 木目テクスチャは下絵の時点で既にcolorHexで塗りつぶしているため、ここで
-        // さらにcolorを掛け合わせると二重に色が乗ってしまう。テクスチャ使用時は
-        // 白（無着色）にし、テクスチャの色をそのまま見せる
-        color={woodTexture ? '#ffffff' : color}
-        map={woodTexture ?? undefined}
-        roughness={0.85}
-        emissive={isSelected ? '#5F8D69' : '#000000'}
-        emissiveIntensity={isSelected ? 0.45 : 0}
-      />
-      {/* tanei-studio/static/index.htmlの素のThree.js実装（LineSegments+EdgesGeometry、
-          色0x3a2f27）と同じ考え方：パーツの輪郭を暗い線で強調することで、扉・引き出しの
-          隙間（2〜3mm）のような狭いギャップでも別パーツだと視認しやすくする */}
-      <Edges color="#3a2f27" threshold={15} />
-    </mesh>
+    <group position={position}>
+      <mesh name={panel.label} onClick={handleClick}>
+        <boxGeometry args={size} />
+        <meshStandardMaterial
+          // 木目テクスチャは下絵の時点で既にcolorHexで塗りつぶしているため、ここで
+          // さらにcolorを掛け合わせると二重に色が乗ってしまう。テクスチャ使用時は
+          // 白（無着色）にし、テクスチャの色をそのまま見せる
+          color={woodTexture ? '#ffffff' : color}
+          map={woodTexture}
+          roughness={0.85}
+          emissive={isSelected ? '#5F8D69' : '#000000'}
+          emissiveIntensity={isSelected ? 0.45 : 0}
+          // 【重要】mapがTexture→nullへ切り替わる際（例: 木目テクスチャ表示のパーツに
+          // ホワイト/ブラック塗装を選んだ場合）、Three.jsはシェーダーの再コンパイルを
+          // 自動検知しないことがあり、material.mapがnullになった後もGPU側は直前の
+          // テクスチャを参照し続けてしまう不具合を実機確認した（ホワイトを選んでも
+          // 直前の木目テクスチャの色味が残ってしまい、しっかり白にならなかった）。
+          // onUpdateでmaterial.needsUpdateを明示的に立てることでシェーダーを
+          // 再コンパイルさせ、mapの有無の切り替えを確実に反映させる
+          onUpdate={(m) => {
+            m.needsUpdate = true;
+          }}
+        />
+        {/* tanei-studio/static/index.htmlの素のThree.js実装（LineSegments+EdgesGeometry、
+            色0x3a2f27）と同じ考え方：パーツの輪郭を暗い線で強調することで、扉・引き出しの
+            隙間（2〜3mm）のような狭いギャップでも別パーツだと視認しやすくする */}
+        <Edges color="#3a2f27" threshold={15} />
+      </mesh>
+      {/* 取っ手（表示専用、FurnitureDesign/FurniturePanelには持たせない）。扉と引き出しの
+          前板は形状だけだと見分けが付きにくいため、縦の取っ手（扉）・横の取っ手（引き出し）
+          で視覚的に区別できるようにする */}
+      {kind === 'door' && <DoorHandle panelId={id} widthMm={dx} heightMm={dz} thicknessMm={dy} />}
+      {kind === 'drawer' && <DrawerHandle widthMm={dx} heightMm={dz} thicknessMm={dy} />}
+    </group>
   );
 }
 
@@ -133,7 +206,10 @@ export default function CadViewport({ model, className, selectedPanelId, onSelec
         // 側板が正面から見える角度（X軸方向の真横）にカメラを置く
         controls.object.position.set(cx + distance, cy, cz);
       } else {
-        controls.object.position.set(cx + distance, cy + distance * 0.8, cz + distance);
+        // 「斜めから見る」は正面と同じZがマイナス側（手前）に置き、右斜め上から見下ろす
+        // アングルにする。以前はZがプラス側（背面寄り）になっており、意図と異なり
+        // 背後寄りの視点になっていた
+        controls.object.position.set(cx + distance, cy + distance * 0.8, cz - distance);
       }
     }
     controls.target.set(cx, cy, cz);

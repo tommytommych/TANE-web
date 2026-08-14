@@ -23,6 +23,7 @@ import {
   removeShelfFromDesign,
   resizeFurnitureDesign,
   setBackPanel,
+  setDoorCount,
   setDoors,
   setDrawerCount,
   setLegCount,
@@ -374,6 +375,10 @@ export default function CadStudio({
     setDesign((prev) => setDoors(prev, !(prev.doors ?? false)));
   }, []);
 
+  const handleDoorCountChange = useCallback((count: 1 | 2) => {
+    setDesign((prev) => setDoorCount(prev, count));
+  }, []);
+
   const handleIncrementDrawerCount = useCallback(() => {
     setDesign((prev) => setDrawerCount(prev, (prev.drawerCount ?? 0) + 1));
   }, []);
@@ -589,6 +594,7 @@ export default function CadStudio({
             legHeightMm={design.legHeightMm ?? DEFAULT_LEG_HEIGHT_MM}
             legCount={design.legCount ?? 4}
             doors={design.doors ?? false}
+            doorCount={design.doorCount ?? 1}
             drawerCount={design.drawerCount ?? 0}
             kind={design.kind}
             selectedPanelId={selectedPanelId}
@@ -598,6 +604,7 @@ export default function CadStudio({
             onLegHeightChange={handleLegHeightChange}
             onLegCountChange={handleLegCountChange}
             onToggleDoors={handleToggleDoors}
+            onDoorCountChange={handleDoorCountChange}
             onIncrementDrawerCount={handleIncrementDrawerCount}
             onDecrementDrawerCount={handleDecrementDrawerCount}
             onSelectPanel={handleSelectPanel}

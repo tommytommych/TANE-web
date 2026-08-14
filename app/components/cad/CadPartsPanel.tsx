@@ -15,6 +15,7 @@ interface CadPartsPanelProps {
   legHeightMm: number;
   legCount: 4 | 6;
   doors: boolean;
+  doorCount: 1 | 2;
   drawerCount: number;
   /** 家具の構造の種類。'table'のときは棚板・背板・脚・扉・引き出しの切り替えUIを表示しない
    * （テーブルは天板+脚+幕板という固定構成のため）。省略時は既存どおり箱型として扱う */
@@ -26,6 +27,7 @@ interface CadPartsPanelProps {
   onLegHeightChange: (heightMm: number) => void;
   onLegCountChange: (count: 4 | 6) => void;
   onToggleDoors: () => void;
+  onDoorCountChange: (count: 1 | 2) => void;
   onIncrementDrawerCount: () => void;
   onDecrementDrawerCount: () => void;
   onSelectPanel: (panelId: string) => void;
@@ -38,6 +40,7 @@ export default function CadPartsPanel({
   legHeightMm,
   legCount,
   doors,
+  doorCount,
   drawerCount,
   kind,
   selectedPanelId,
@@ -47,6 +50,7 @@ export default function CadPartsPanel({
   onLegHeightChange,
   onLegCountChange,
   onToggleDoors,
+  onDoorCountChange,
   onIncrementDrawerCount,
   onDecrementDrawerCount,
   onSelectPanel,
@@ -123,6 +127,28 @@ export default function CadPartsPanel({
             <input type="checkbox" checked={doors} onChange={onToggleDoors} className="h-4 w-4 accent-tanei-brand" />
             <span className="text-tanei-ink">扉あり</span>
           </label>
+
+          {doors && (
+            <div className="flex items-center justify-between gap-2 pl-6 -mt-1">
+              <span className="text-xs text-tanei-ink-muted">扉の枚数</span>
+              <div className="flex gap-1.5">
+                {([1, 2] as const).map((count) => (
+                  <button
+                    key={count}
+                    type="button"
+                    onClick={() => onDoorCountChange(count)}
+                    className={`px-3 py-1 rounded-tanei-control text-xs font-bold border transition-colors ${
+                      doorCount === count
+                        ? 'bg-tanei-brand-soft border-tanei-brand text-tanei-ink'
+                        : 'bg-tanei-surface hover:bg-white border-tanei-border text-tanei-ink'
+                    }`}
+                  >
+                    {count}枚
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-between gap-2">
             <span className="text-tanei-ink">引き出し</span>

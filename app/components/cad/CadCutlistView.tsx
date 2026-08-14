@@ -31,6 +31,14 @@ import CadBuildGuide from './CadBuildGuide';
 const BUILD_GUIDE_ANCHOR_ID = 'cad-build-guide';
 // 制作チェックの「木取り図を確認した」からの確認導線（Phase 3-10）のスクロール先
 const CUT_LAYOUT_ANCHOR_ID = 'cad-cut-layout';
+// 「パーツを見る」導線（CadBuildGuide.tsx・CadBuildChecklistView.tsxの複数箇所）の
+// スクロール先id。以前はCadBuildGuide.tsx内の「作るパーツ」セクション独自の一覧が
+// この役割を持っていたが、この画面の「パーツ一覧」と内容が重複していたため、
+// 「作るパーツ」は削除しこちらのパーツ一覧をその代わりのスクロール先にする
+// （CadBuildGuide.tsx・CadBuildChecklistView.tsxのPARTS_ANCHOR_IDと同じ文字列を使う。
+// importで結合を強めるのではなく、既存のfreecad-integration/STANDARD_BOARD_SIZESと
+// 同様に値だけを再利用する既存の方針を踏襲する）
+const PARTS_LIST_ANCHOR_ID = 'cad-parts';
 
 interface CadCutlistViewProps {
   model: FurnitureModel;
@@ -339,7 +347,7 @@ export default function CadCutlistView({
             )}
 
             <div>
-              <h3 className="text-sm font-bold text-tanei-ink mb-1">パーツ一覧</h3>
+              <h3 id={PARTS_LIST_ANCHOR_ID} className="text-sm font-bold text-tanei-ink mb-1 scroll-mt-4">パーツ一覧</h3>
               <ul className="rounded-tanei-control border border-tanei-border divide-y divide-tanei-border overflow-hidden bg-white">
                 {model.panels.map((panel) => {
                   // panel.materialは、buildFurnitureModel()が「パーツごとに材料を分ける」の
