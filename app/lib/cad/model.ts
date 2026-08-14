@@ -480,20 +480,23 @@ const MATERIAL_COLOR_HEX: Record<string, string> = {
   OSB合板: '#B8926A',
 };
 const DEFAULT_COLOR_HEX = '#D9C29A';
-const LEG_COLOR_HEX = '#6B5B4A';
 
 const FINISH_COLOR_HEX: Record<string, string> = {
   clear: DEFAULT_COLOR_HEX,
-  walnut: '#5C3A21',
-  // 3D表示のシェーディング（陰影）で暗く見える分を見込み、実際の塗料の白より
-  // 明るめのほぼ純白にしている（CadViewport.tsxのライティング下で「しっかり白」に見えるよう調整）
+  // 3D表示のシェーディング（陰影）で実際の色より暗く見える分を見込み、実際の塗料・
+  // 塗装より明るめの値にしている（CadViewport.tsxのライティング下で意図した色に
+  // 見えるよう調整。white・walnutともに同じ理由の調整）
+  walnut: '#8B5E3C',
   white: '#FAFAFA',
   black: '#2B2B2B',
 };
 
 function colorForPanel(panel: FurniturePanel, modelMaterial: string): string {
   if (panel.finish && panel.finish in FINISH_COLOR_HEX) return FINISH_COLOR_HEX[panel.finish];
-  if (panel.kind === 'leg') return LEG_COLOR_HEX;
+  // 脚は専用の固定色（LEG_COLOR_HEX、実際の材料と無関係の暗い茶色）を使っていたが、
+  // 「クリア塗装」選択時は他のパーツと同じく選択中の材料の色をそのまま使うのが自然
+  // なため撤廃した（脚だけ黒っぽく見える不具合の原因だった）。パーツごとに脚の材料を
+  // 変更した場合（partMaterials）は、下のpanel.materialがそれを正しく反映する
   const material = panel.material ?? modelMaterial;
   return MATERIAL_COLOR_HEX[material] ?? DEFAULT_COLOR_HEX;
 }
