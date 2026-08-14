@@ -171,7 +171,7 @@ export default function LeftSidebar({
 
               {/* TANE:iの設計入口は「TANE:i 3D家具設計」（/app/cad）1つだけにする。
                   家具設計・3D確認・材料設定・木取り・カット申込書までをすべてここで
-                  行うため、完成イメージ（旧/app/studio）への別導線は置かない */}
+                  行う（Phase E：旧設計スタジオ／FreeCAD+POV-Ray版の/app/studioは廃止済み） */}
               <p className="px-3 text-[11px] font-bold text-tanei-ink-muted">設計</p>
               <Link
                 href="/app/cad"

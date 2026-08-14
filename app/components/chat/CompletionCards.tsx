@@ -110,7 +110,7 @@ function CompletionCards({
       {/* 天板・底板・側板・背板からなる箱型の家具のみ、AIがtanei-studio-specブロックを
           出力する。TANE:iの設計入口は「TANE:i 3D家具設計」（/app/cad）1つだけで、
           家具設計・3D確認・材料設定・木取り・カット申込書までをすべてここで行う
-          （完成イメージ（旧/app/studio）への別導線は廃止した） */}
+          （Phase E：旧設計スタジオ／FreeCAD+POV-Ray版の/app/studioは廃止済み） */}
       {studioSpec && (
         <div className="flex flex-col gap-1.5 mb-2">
           {/* Phase 4-07：クリック時、既存のstudioSpec（AIが提案した確定仕様、変更しない）を

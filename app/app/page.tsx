@@ -30,7 +30,6 @@ import {
   DAILY_IMAGE_LIMIT,
   IMAGE_USAGE_STORAGE_KEY,
 } from '../lib/localUsage';
-import { connectStudioSync } from '../lib/studioSync';
 
 import TopBar from '../components/layout/TopBar';
 import LeftSidebar from '../components/layout/LeftSidebar';
@@ -44,8 +43,7 @@ import StartCards from '../components/chat/StartCards';
 const DAILY_MESSAGE_LIMIT = 10;
 const MESSAGE_USAGE_STORAGE_KEY = 'tanei-message-usage-v1';
 // DAILY_IMAGE_LIMIT・IMAGE_USAGE_STORAGE_KEYはapp/lib/localUsage.tsからimport
-// （StudioEmbed.tsxからも同じ値を参照するため一元管理）
-// チャットとTANE:i設計スタジオ（/app/studio）を行き来しても会話が消えないよう、
+// チャットと/app/cad（TANE:i 3D家具設計）を行き来しても会話が消えないよう、
 // タブを閉じるまで保持されるsessionStorageに会話状態を退避する（詳細は下のuseEffect参照）
 const CHAT_SESSION_STORAGE_KEY = 'tanei-chat-session-v1';
 
@@ -102,7 +100,7 @@ export default function Home() {
   const skipNextSaveRef = useRef(true);
 
   useEffect(() => {
-    // 「設計スタジオ（/app/studio）」へ画面遷移して戻ってきた際にNext.jsがこのページを
+    // /app/cad（TANE:i 3D家具設計）へ画面遷移して戻ってきた際にNext.jsがこのページを
     // 再マウントしても会話が消えないよう、sessionStorageから復元する。タブを閉じれば
     // 自然に消える（会話を無期限に残したいわけではないため、localStorageではなくこちらを使う）
     try {
@@ -169,7 +167,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    // AI機能利用回数（カット申込書PDF・完成イメージ・写真AI空間診断・外部Gemini画像生成）は
+    // AI機能利用回数（カット申込書PDF・写真AI空間診断・外部Gemini画像生成）は
     // サーバー側で管理していないため、localStorageの値のみでマウント時に同期する
     // （初期値5のままだとリロードで毎回リセットされてしまうため）。
     // 意図的なクライアント専用の外部システム同期のため、react-hooks/set-state-in-effectを明示的に抑制する
@@ -223,17 +221,6 @@ export default function Home() {
   const handleAutoOpenFinishedAddHandled = useCallback(() => {
     setAutoOpenFinishedAdd(false);
   }, []);
-
-  useEffect(() => {
-    // TANE:i Studio(freecad-studio/、ローカルのFreeCAD+POV-Rayスタジオ)側でオペレーターが
-    // 寸法・パーツごとの塗装を微調整して保存すると、ここに最新仕様が届く（双方向同期の
-    // 「Studio→チャット」方向）。Studioを起動していない環境では単に接続されないだけで、
-    // エラーにはならない
-    const disconnect = connectStudioSync((spec) => {
-      showToast(`TANE:i Studioで仕様が更新されました🔧（${spec.item} / 幅${spec.width}×奥行${spec.depth}×高さ${spec.height}mm）`);
-    });
-    return disconnect;
-  }, [showToast]);
 
   const handleNewConversation = useCallback(() => {
     if (messages.length > 1 && !window.confirm('現在の会話をリセットして、新しい相談を始めますか？\n（これまでの相談内容は「相談履歴」に保存されています）')) {
@@ -339,7 +326,7 @@ export default function Home() {
     [showToast]
   );
 
-  // カット申込書PDF・完成イメージ（設計スタジオ）・写真AI空間診断・シルエットカメオ用の外部Gemini画像生成は、
+  // カット申込書PDF・写真AI空間診断・シルエットカメオ用の外部Gemini画像生成は、
   // いずれも通常のテキスト相談より負荷の大きいAI機能のため、「本日のAI機能利用」として共通の1日5回の
   // 上限で管理する（本日の無料相談＝テキストチャットの回数制限とは別枠）
   const consumeImageUsage = useCallback((): boolean => {

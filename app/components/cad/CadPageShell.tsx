@@ -1,10 +1,8 @@
 'use client';
 
-// /app/cad のページ本体。既存の設計スタジオ（app/components/studio/StudioEmbed.tsx）と
-// 同じヘッダーの見た目（← チャットに戻るリンク＋タイトル）にして、TANE:iの中の別画面だと
-// 分かるようにしている（設計スタジオだけ別アプリのような見た目にしない）。
-// FreeCAD版の設計スタジオ（/app/studio、PC専用）とは別の独立実装で、
-// こちらはPCを起動しておく必要がなく、ブラウザだけで完結する。
+// /app/cad のページ本体。TANE:iの唯一の家具設計・3D確認画面（「TANE:i 3D家具設計」）。
+// FreeCAD+POV-Ray依存だった旧設計スタジオ（Phase Eで廃止済み）と異なり、PCを起動して
+// おく必要がなく、ブラウザだけで完結する。
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
