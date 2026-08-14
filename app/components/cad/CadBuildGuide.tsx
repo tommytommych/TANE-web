@@ -93,7 +93,24 @@ interface CadBuildGuideProps {
   onToggleBuildGuideStep: (step: number) => void;
   /** 「制作チェックを見る」から、既存のviewMode切り替えでCadBuildChecklistViewへ戻る */
   onViewBuildCheck: () => void;
+  /** 「制作準備」（Phase「1ページ縦スクロール型」）のチェックボックスから呼ばれる。
+   * buildChecklistの特定キーを直接トグルする、CadCutlistView.tsxと同じ仕組み */
+  onToggleBuildChecklistKey: (key: string) => void;
 }
+
+// 「制作準備」（材料・工具・安全）の3項目。チェックがすべて揃うまで「作り方」を
+// ロックする（指示⑦⑧）。保存先はbuildChecklistの既存キー・新規キーを混在させる
+// （案A：既存の「1. 材料を用意した」はそのまま流用し、対応項目の無い工具・安全だけ
+// 新しい文字列キーを追加する。Record<string,boolean>のため既存データへの影響はない）
+const PREP_MATERIAL_KEY = '1';
+const PREP_TOOLS_KEY = 'tools_ready';
+const PREP_SAFETY_KEY = 'safety_confirmed';
+const PREP_CHECKLIST_ITEMS = [
+  { key: PREP_MATERIAL_KEY, label: '材料を用意した' },
+  { key: PREP_TOOLS_KEY, label: '工具を用意した' },
+  { key: PREP_SAFETY_KEY, label: '安全確認をした（保護メガネ・作業場所の確保など）' },
+] as const;
+const PREP_ANCHOR_ID = 'cad-build-prep';
 
 const SAFETY_NOTES = [
   '作業を始める前に、工具の取扱説明書を確認してください。',
@@ -114,7 +131,9 @@ export default function CadBuildGuide({
   buildGuideChecked,
   onToggleBuildGuideStep,
   onViewBuildCheck,
+  onToggleBuildChecklistKey,
 }: CadBuildGuideProps) {
+  const isPrepComplete = PREP_CHECKLIST_ITEMS.every((item) => Boolean(buildChecklist[item.key]));
   const steps = buildFurnitureSteps(model.panels, model.thickness);
   // 制作チェック（Phase 2-7）と全く同じ関数・同じデータを使い、進捗表示が食い違わないようにする。
   // この「制作進捗」カード自体は10項目の制作チェックの全体進捗を示すもので、
@@ -482,9 +501,56 @@ export default function CadBuildGuide({
         </div>
       </div>
 
-      <div>
-        <h3 id={BUILD_STEPS_ANCHOR_ID} className="text-sm font-bold text-tanei-ink mb-2 scroll-mt-4">作り方</h3>
+      {/* 「制作準備」（指示⑦⑧）。材料・工具・安全の3項目をすべてチェックするまで、
+          下の「作り方」をロックする。既存の「必要な材料」「必要な工具」「買い物リスト」
+          セクションは削除せず、詳しい情報はそのまま残しつつ、ここではチェックボックス
+          だけに絞ったシンプルな確認欄にする */}
+      <div id={PREP_ANCHOR_ID} className="scroll-mt-4">
+        <h3 className="text-sm font-bold text-tanei-ink mb-1">③ 制作準備</h3>
+        <p className="text-xs text-tanei-ink-muted mb-2">作り始める前に、材料・工具・安全を確認してください。</p>
+        <ul className="rounded-tanei-control border border-tanei-border divide-y divide-tanei-border overflow-hidden bg-white">
+          {PREP_CHECKLIST_ITEMS.map((item) => {
+            const isItemChecked = Boolean(buildChecklist[item.key]);
+            return (
+              <li key={item.key}>
+                <label
+                  className={`flex items-center gap-2.5 px-3 py-2.5 cursor-pointer transition-colors ${
+                    isItemChecked ? 'bg-tanei-brand-soft' : 'bg-white hover:bg-tanei-surface'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isItemChecked}
+                    onChange={() => onToggleBuildChecklistKey(item.key)}
+                    className="h-4 w-4 accent-tanei-brand flex-shrink-0"
+                  />
+                  <span className={`text-sm font-bold ${isItemChecked ? 'text-tanei-ink line-through' : 'text-tanei-ink'}`}>
+                    {item.label}
+                  </span>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+        {isPrepComplete && <p className="text-xs font-bold text-tanei-brand mt-1.5">✓ 制作準備完了！</p>}
+      </div>
 
+      <div>
+        <h3 id={BUILD_STEPS_ANCHOR_ID} className="text-sm font-bold text-tanei-ink mb-2 scroll-mt-4">④ 作り方</h3>
+
+        {!isPrepComplete ? (
+          <div className="rounded-tanei-control border border-tanei-border bg-tanei-surface-muted px-4 py-6 text-center">
+            <p className="text-sm font-bold text-tanei-ink-muted">🔒 制作準備が完了すると作り方を開始できます</p>
+            <button
+              type="button"
+              onClick={() => scrollToSection(PREP_ANCHOR_ID)}
+              className="mt-2 text-xs font-bold text-tanei-brand hover:text-tanei-brand-dark underline"
+            >
+              ↑ 制作準備を確認する
+            </button>
+          </div>
+        ) : (
+          <>
         {/* 「作り方の進捗」サマリー（Phase 3-34）。既存のisBuildStepDone・
             currentBuildStepNumberから毎回算出するだけの表示・ナビゲーション専用ブロック。
             新しい保存データ・新しいSTEP↔チェック項目対応表は一切作らない */}
@@ -932,6 +998,18 @@ export default function CadBuildGuide({
             );
           })}
         </ol>
+
+        {/* 「9STEP完了」（指示⑪）。全STEP完了時だけ表示する、はっきりした完了バナー。
+            既存の各所の「✓ すべてのSTEPが完了しています」という控えめな表示は変更せず、
+            ここに1箇所、最終地点として分かりやすい見た目のものを追加するだけにとどめる */}
+        {completedStepCount === steps.length && (
+          <div className="rounded-tanei-control border-2 border-tanei-brand bg-tanei-brand-soft px-4 py-4 text-center mt-3">
+            <p className="text-base font-black text-tanei-brand">🎉 制作完了！</p>
+            <p className="text-xs text-tanei-ink mt-1">✓ すべてのSTEPが完了しています。</p>
+          </div>
+        )}
+          </>
+        )}
       </div>
 
       <div>

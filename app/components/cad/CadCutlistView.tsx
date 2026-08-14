@@ -129,6 +129,23 @@ export default function CadCutlistView({
   // 保存される）。設計を変更してこの画面を開き直した場合は未生成のまま扱われる
   const [hasGeneratedCutSheet, setHasGeneratedCutSheet] = useState(false);
 
+  // 画面上部の簡易進捗表示（指示⑫）。新しい保存データは作らず、既存のbuildChecklist・
+  // buildGuideCheckedから毎回算出するだけ。「設計」はこの画面を開いている時点で常に
+  // 完了扱いにする（design→cutlistへ進んだ、という既存のviewMode遷移をそのまま使う）。
+  // 「制作準備」はCadBuildGuide.tsxのPREP_CHECKLIST_ITEMSと同じキーを直接参照する
+  // （importで結合を強めず、値だけを再利用する既存の方針を踏襲）
+  const isPrepDone = Boolean(buildChecklist['1'] && buildChecklist['tools_ready'] && buildChecklist['safety_confirmed']);
+  const isBuildGuideDone = Array.from({ length: 9 }, (_, i) => String(i + 1)).every((k) => buildGuideChecked[k]);
+  const progressSteps = [
+    { label: '設計', done: true },
+    { label: '木取り', done: Boolean(buildChecklist[CUT_LAYOUT_CONFIRMED_KEY]) },
+    { label: 'カット', done: Boolean(buildChecklist[CUT_MATERIALS_CONFIRMED_KEY]) },
+    { label: '準備', done: isPrepDone },
+    { label: '制作', done: isBuildGuideDone },
+    { label: '完成', done: isBuildGuideDone },
+  ];
+  const currentProgressIndex = progressSteps.findIndex((s) => !s.done);
+
   // 材料ごとに分離した木取り図（「天板はパイン集成材、脚・幕板はSPF材」等の場合、
   // 材料の種類だけ配列に並ぶ。全パーツ同じ材料なら要素数1になり、見た目は今まで通り）。
   // SPF材等の規格材（getFurnitureMaterialType参照）はここには含まれない
@@ -274,6 +291,27 @@ export default function CadCutlistView({
         >
           ← 設計に戻る
         </button>
+
+        {/* 画面上部の簡易進捗表示（指示⑫）。「次へ」ボタンを大量に作らず、今どこまで
+            進んだかだけを一目で分かるようにする、表示専用の軽量なバー */}
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] font-bold">
+          {progressSteps.map((step, i) => (
+            <span key={step.label} className="flex items-center gap-1.5">
+              <span
+                className={
+                  step.done
+                    ? 'text-tanei-brand'
+                    : i === currentProgressIndex
+                      ? 'text-tanei-accent'
+                      : 'text-tanei-ink-muted'
+                }
+              >
+                {step.label} {step.done ? '✓' : i === currentProgressIndex ? '●' : '○'}
+              </span>
+              {i < progressSteps.length - 1 && <span className="text-tanei-ink-muted">→</span>}
+            </span>
+          ))}
+        </div>
 
         <div>
           <h2 className="text-lg font-black text-tanei-ink">木取り図</h2>
@@ -569,6 +607,7 @@ export default function CadCutlistView({
                   sheetCount={primarySheetCount}
                   onViewPanel={onViewPanel}
                   buildChecklist={buildChecklist}
+                  onToggleBuildChecklistKey={onToggleBuildChecklistKey}
                   buildGuideChecked={buildGuideChecked}
                   onToggleBuildGuideStep={onToggleBuildGuideStep}
                   onViewBuildCheck={onViewBuildCheck}
