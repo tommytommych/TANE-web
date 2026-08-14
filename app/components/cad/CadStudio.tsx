@@ -66,7 +66,7 @@ type CadViewMode = 'design' | 'cutlist' | 'buildCheck';
 // タブを閉じるまで保持されるsessionStorageに現在の編集内容を退避する（app/page.tsxの
 // CHAT_SESSION_STORAGE_KEYと同じパターン）。保存済みプロジェクト（IndexedDB）を置き換える
 // ものではなく、「保存する」を押す前の一時的な下書きバッファという位置付け
-const CAD_SESSION_STORAGE_KEY = 'tanei-cad-session-v1';
+export const CAD_SESSION_STORAGE_KEY = 'tanei-cad-session-v1';
 
 interface CadSessionDraft {
   design: FurnitureDesign;

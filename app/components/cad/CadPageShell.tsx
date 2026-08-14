@@ -6,7 +6,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import CadStudio from './CadStudio';
+import CadStudio, { CAD_SESSION_STORAGE_KEY } from './CadStudio';
 import type { FurnitureDesign, PanelFinish } from '../../lib/cad/types';
 import { FURNITURE_MATERIALS, PART_MATERIAL_LABELS, type PartMaterialLabel } from '../../lib/cad/model';
 
@@ -17,6 +17,14 @@ import {
   isValidStudioSpec,
   studioSpecToFurnitureDesign,
 } from '../../lib/studioSpec';
+
+// チャット欄の「🌿 TANE:i 3D家具設計」を一度使ってCADで編集した後、同じチャット
+// メッセージから同じボタンをもう一度押すと、これまでは毎回AIの元の提案（studioSpec）で
+// 上書きしてしまい、CAD側で行った変更（色・パーツ追加など）が消えていた。直前に
+// 反映したAI提案のJSON（正規化前の生データ）をここに控えておき、次回以降は「同じ提案か」
+// を比較する。同じであれば新規提案として扱わず、initialDesignを渡さない（CadStudio.tsx
+// 自身が持つセッション下書き（未保存編集）の復元に任せる）ことで、変更点を保持する
+const CAD_LAST_HANDOFF_SPEC_SESSION_KEY = 'tanei-cad-last-handoff-spec-v1';
 
 // AI提案から反映された寸法を、ユーザーへの確認表示にそのまま使うための最小限の型
 // （Phase 4-10）。FurnitureDesign変換後の値ではなく、StudioSpecの生の値（変換前）を
@@ -88,6 +96,33 @@ export default function CadPageShell() {
       // CadStudio.tsx側の保護されていない初期化処理でページ全体がクラッシュする
       // （Phase 4-08監査で発見）ため、isSafeStudioSpecDimensionsで追加確認する
       if (isValidStudioSpec(parsed) && isSafeStudioSpecDimensions(parsed)) {
+        // 直前に反映したAI提案と完全に同じ内容であり、かつCadStudio.tsx側にまだ保存して
+        // いない編集内容（セッション下書き、projectIdが無いもの＝今回と同じ「チャット発の
+        // 未保存設計」）が残っている場合だけ、「同じ家具をもう一度チャット欄のボタンから
+        // 開いた」＝続きを編集したいだけとみなし、AI提案での上書きをスキップする。
+        // CadStudioへinitialDesignを渡さないことで、CadStudio.tsx自身のセッション下書き
+        // 復元がそのまま働く。下書きが無い（一度もCADを触っていない、または既に「保存する」
+        // 済みで別のprojectIdを持つ）場合は、これまで通りAI提案をそのまま適用する
+        // （そうしないと、下書きが無いのにAI提案も適用されず、真っ白なデフォルト設計に
+        // なってしまう）
+        let isSameAsLastHandoff = false;
+        try {
+          let hasRestorableDraft = false;
+          const draftRaw = sessionStorage.getItem(CAD_SESSION_STORAGE_KEY);
+          if (draftRaw) {
+            const draft = JSON.parse(draftRaw) as { projectId?: string | null };
+            hasRestorableDraft = draft.projectId == null;
+          }
+          isSameAsLastHandoff =
+            hasRestorableDraft && sessionStorage.getItem(CAD_LAST_HANDOFF_SPEC_SESSION_KEY) === raw;
+          sessionStorage.setItem(CAD_LAST_HANDOFF_SPEC_SESSION_KEY, raw);
+        } catch (e) {
+          console.error(e);
+        }
+        if (isSameAsLastHandoff) {
+          return;
+        }
+
         // itemはisValidStudioSpecで型（string）までは保証済みだが、空文字・空白のみの
         // 場合は「作品名なし」とみなし、CadStudio.tsx側の既存デフォルト（「新しい設計」）へ
         // フォールバックする（Phase 5-02。寸法とは独立して判定するため、itemだけが不正でも
