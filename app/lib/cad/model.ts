@@ -12,7 +12,7 @@
 // panels（延いては3D表示）は毎回buildFurnitureModel()で再計算される。
 
 import type { SheetLayout, SheetPart } from '../sheetLayout';
-import type { FurnitureDesign, FurnitureModel, FurniturePanel, FurniturePanelKind, ShelfEntry } from './types';
+import type { FurnitureDesign, FurnitureModel, FurniturePanel, FurniturePanelKind, PanelFinish, ShelfEntry } from './types';
 import { buildFurniturePanels, clampShelfEntry, defaultShelfSize, panelToCutSizeMm } from './geometry';
 import { DEMO_ASSEMBLY_MANUAL } from '../assemblyManual';
 import { KOHNAN_WOOD_LIST } from '../constants';
@@ -245,10 +245,14 @@ export function buildFurnitureModel(
     /** 「天板だけパイン集成材、脚・幕板はSPF材」のような、パーツ単位の材料指定（任意）。
      * 省略時・キーが無いパーツは、今まで通りmaterial（家具全体の材料）を使う */
     partMaterials?: Partial<Record<PartMaterialLabel, string>>;
+    /** 「天板だけウォルナット調」のような、パーツ単位の色・仕上げ指定（任意）。
+     * 省略時・キーが無いパーツは、材料そのものの色（クリア塗装）のまま扱う */
+    partFinishes?: Partial<Record<PartMaterialLabel, PanelFinish>>;
   }
 ): FurnitureModel {
   const material = overrides?.material ?? FURNITURE_MATERIALS[0];
   const partMaterials = overrides?.partMaterials;
+  const partFinishes = overrides?.partFinishes;
 
   // テーブルの脚・幕板は、材料としてSPF材が選ばれている場合のみ実寸2×4断面
   // （38×89mm、geometry.tsのresolveLegCrossSection/resolveApronCrossSection参照）になる。
@@ -257,14 +261,20 @@ export function buildFurnitureModel(
   const legMaterial = partMaterials?.['脚'] ?? material;
   const apronMaterial = partMaterials?.['幕板'] ?? material;
 
-  // 既存のFurniturePanel.material（元々あるが、これまで書き込み元が無かったフィールド）へ、
-  // パーツ種類ごとの上書き材料を反映する。該当する上書きが無いパネルはそのまま返す
-  // （新しい配列参照にはなるが、内容は既存のbuildFurniturePanels(design)の結果と同一）
+  // 既存のFurniturePanel.material・finish（元々あるが、これまで書き込み元が無かった
+  // フィールド）へ、パーツ種類ごとの上書き材料・色を反映する。該当する上書きが無い
+  // パネルはそのまま返す（新しい配列参照にはなるが、内容は既存のbuildFurniturePanels(design)
+  // の結果と同一）
   const panels = buildFurniturePanels(design, { legMaterial, apronMaterial }).map((panel) => {
-    if (!partMaterials) return panel;
     const label = CUT_LIST_KIND_NAME[panel.kind] as PartMaterialLabel | undefined;
-    const overrideMaterial = label ? partMaterials[label] : undefined;
-    return overrideMaterial ? { ...panel, material: overrideMaterial } : panel;
+    const overrideMaterial = label ? partMaterials?.[label] : undefined;
+    const overrideFinish = label ? partFinishes?.[label] : undefined;
+    if (!overrideMaterial && !overrideFinish) return panel;
+    return {
+      ...panel,
+      ...(overrideMaterial ? { material: overrideMaterial } : {}),
+      ...(overrideFinish ? { finish: overrideFinish } : {}),
+    };
   });
 
   return {
@@ -617,6 +627,17 @@ export function getAllowedMaterialsForPartLabel(label: PartMaterialLabel): reado
     : 'sheet';
   return FURNITURE_MATERIALS.filter((m) => getFurnitureMaterialType(m) === wantType);
 }
+
+// パーツ単位の色・仕上げ選択肢（PanelFinish、app/lib/cad/types.ts）のUI向け日本語ラベル。
+// tanei-studio（旧設計スタジオ）のFINISH_OPTIONS（generate_model.py）・systemPrompt.tsの
+// panelFinishes説明と同じ語彙・同じ4種類に揃えている。'clear'（クリア塗装）の場合は
+// 材料そのものの色（MATERIAL_COLOR_HEX）がそのまま使われる（colorForPanel参照）
+export const FURNITURE_FINISHES: { value: PanelFinish; label: string }[] = [
+  { value: 'clear', label: 'クリア塗装（木目のまま）' },
+  { value: 'walnut', label: 'ウォルナット調' },
+  { value: 'white', label: 'ホワイト' },
+  { value: 'black', label: 'ブラック' },
+];
 
 export interface CutListItem {
   /** name・寸法（材料混在時はmaterialも）から作る安定したキー。同じ寸法・同じ名称・同じ

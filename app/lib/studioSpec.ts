@@ -214,19 +214,38 @@ export const studioSpecToFurnitureDesign = (spec: StudioSpec): FurnitureDesign =
 // 将来また非対応のkindが増えた場合に安全に拡張できるようにしている）
 export const furnitureDesignToStudioSpec = (
   design: FurnitureDesign,
-  opts: { item: string; material: string; partMaterials?: Partial<Record<PartMaterialLabel, string>> }
-): StudioSpec | null => ({
-  item: opts.item,
-  kind: design.kind === 'table' ? 'table' : 'box',
-  width: design.width,
-  depth: design.depth,
-  height: design.height,
-  thickness: design.thickness,
-  material: opts.material,
-  ...(opts.partMaterials && Object.keys(opts.partMaterials).length > 0
-    ? { partMaterials: opts.partMaterials }
-    : {}),
-  // 棚板の枚数だけを引き継ぐ（テーブルには棚板が無いためbox限定）。0件も明示的に送ることで、
-  // ブラウザCAD側で棚板を全て削除した場合も完成イメージ側に正しく反映される
-  ...(design.kind !== 'table' ? { options: { shelf_h: { tier1: design.shelves.length } } } : {}),
-});
+  opts: {
+    item: string;
+    material: string;
+    partMaterials?: Partial<Record<PartMaterialLabel, string>>;
+    /** 「天板だけウォルナット調」等の色・仕上げ指定（任意、Phase B「色・仕上げ」）。
+     * StudioSpec.panelFinishesは天板・底板・側板・背板の4パーツだけに対応しているため
+     * （tanei-studio側のPANEL_LABELS）、それ以外のキー（棚板・脚・幕板）は自動的に無視される */
+    partFinishes?: Partial<Record<PartMaterialLabel, PanelFinish>>;
+  }
+): StudioSpec | null => {
+  const panelFinishes = opts.partFinishes
+    ? (Object.fromEntries(
+        Object.entries(opts.partFinishes).filter(([label]) =>
+          (['天板', '底板', '側板', '背板'] as const).includes(label as '天板' | '底板' | '側板' | '背板')
+        )
+      ) as StudioSpec['panelFinishes'])
+    : undefined;
+
+  return {
+    item: opts.item,
+    kind: design.kind === 'table' ? 'table' : 'box',
+    width: design.width,
+    depth: design.depth,
+    height: design.height,
+    thickness: design.thickness,
+    material: opts.material,
+    ...(opts.partMaterials && Object.keys(opts.partMaterials).length > 0
+      ? { partMaterials: opts.partMaterials }
+      : {}),
+    ...(panelFinishes && Object.keys(panelFinishes).length > 0 ? { panelFinishes } : {}),
+    // 棚板の枚数だけを引き継ぐ（テーブルには棚板が無いためbox限定）。0件も明示的に送ることで、
+    // ブラウザCAD側で棚板を全て削除した場合も完成イメージ側に正しく反映される
+    ...(design.kind !== 'table' ? { options: { shelf_h: { tier1: design.shelves.length } } } : {}),
+  };
+};

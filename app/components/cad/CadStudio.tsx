@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import CadViewport from './CadViewport';
 import CadControls from './CadControls';
 import CadPartsPanel from './CadPartsPanel';
+import CadAppearancePanel from './CadAppearancePanel';
 import CadSelectedPartPanel from './CadSelectedPartPanel';
 import CadCutlistView from './CadCutlistView';
 import CadCutMaterialsView from './CadCutMaterialsView';
@@ -27,7 +28,7 @@ import {
   updateShelfInDesign,
   type PartMaterialLabel,
 } from '../../lib/cad/model';
-import type { FurnitureDesign } from '../../lib/cad/types';
+import type { FurnitureDesign, PanelFinish } from '../../lib/cad/types';
 import {
   createNewFurnitureProjectId,
   DEFAULT_FURNITURE_PROJECT_NAME,
@@ -49,6 +50,9 @@ interface CadStudioProps {
   // AI提案のpartMaterials（「天板だけパイン集成材、脚・幕板はSPF材」等）を、initialMaterialと
   // 同じ仕組みでuseStateの初期値として一度だけ使う（Phase「パーツごとの材料」）
   initialPartMaterials?: Partial<Record<PartMaterialLabel, string>>;
+  // AI提案のpanelFinishes（「天板だけウォルナット調」等）を、initialPartMaterialsと同じ
+  // 仕組みでuseStateの初期値として一度だけ使う（Phase B「色・仕上げ」）
+  initialPartFinishes?: Partial<Record<PartMaterialLabel, PanelFinish>>;
 }
 
 type CadViewMode = 'design' | 'cutlist' | 'cutMaterials' | 'buildCheck';
@@ -58,6 +62,7 @@ export default function CadStudio({
   initialProjectName,
   initialMaterial,
   initialPartMaterials,
+  initialPartFinishes,
 }: CadStudioProps) {
   const router = useRouter();
   const [design, setDesign] = useState<FurnitureDesign>(initialDesign ?? createDefaultFurnitureDesign());
@@ -75,6 +80,11 @@ export default function CadStudio({
   // materialのまま、という既存の挙動と完全に一致する
   const [partMaterials, setPartMaterials] = useState<Partial<Record<PartMaterialLabel, string>>>(
     initialPartMaterials ?? {}
+  );
+  // パーツ単位の色・仕上げ上書き（「天板だけウォルナット調」等）。キーが無いパーツは
+  // クリア塗装（材料そのものの色）のまま扱う。partMaterialsと全く同じ考え方・同じ形
+  const [partFinishes, setPartFinishes] = useState<Partial<Record<PartMaterialLabel, PanelFinish>>>(
+    initialPartFinishes ?? {}
   );
   const [viewMode, setViewMode] = useState<CadViewMode>('design');
   // 制作チェック画面の「制作へ進む」から木取り図画面（cutlist）へ戻ったときだけ、
@@ -127,6 +137,7 @@ export default function CadStudio({
         setDesign(project.design);
         setMaterial(project.material);
         setPartMaterials(project.partMaterials ?? {});
+        setPartFinishes(project.partFinishes ?? {});
         setProjectId(project.id);
         setProjectCreatedAt(project.createdAt);
         setProjectName(project.projectName);
@@ -160,6 +171,7 @@ export default function CadStudio({
       design,
       material,
       partMaterials: Object.keys(partMaterials).length > 0 ? partMaterials : undefined,
+      partFinishes: Object.keys(partFinishes).length > 0 ? partFinishes : undefined,
       cutListChecked,
       buildChecklist,
       buildGuideChecked,
@@ -191,6 +203,7 @@ export default function CadStudio({
     design,
     material,
     partMaterials,
+    partFinishes,
     cutListChecked,
     buildChecklist,
     buildGuideChecked,
@@ -217,6 +230,7 @@ export default function CadStudio({
         design,
         material,
         partMaterials: Object.keys(partMaterials).length > 0 ? partMaterials : undefined,
+        partFinishes: Object.keys(partFinishes).length > 0 ? partFinishes : undefined,
         cutListChecked: patch.cutListChecked ?? cutListChecked,
         buildChecklist: patch.buildChecklist ?? buildChecklist,
         buildGuideChecked: patch.buildGuideChecked ?? buildGuideChecked,
@@ -236,6 +250,7 @@ export default function CadStudio({
       design,
       material,
       partMaterials,
+      partFinishes,
       cutListChecked,
       buildChecklist,
       buildGuideChecked,
@@ -298,18 +313,23 @@ export default function CadStudio({
 
   const { model, errorMessage } = useMemo(() => {
     try {
-      return { model: buildFurnitureModel(design, { material, partMaterials }), errorMessage: null as string | null };
+      return {
+        model: buildFurnitureModel(design, { material, partMaterials, partFinishes }),
+        errorMessage: null as string | null,
+      };
     } catch (error) {
       // 板厚に対して高さが小さすぎる等、生成できない寸法の組み合わせを入力中でも
       // アプリを落とさず、直前まで有効だったモデルは保持しつつエラー文だけ表示する
       const message = error instanceof Error ? error.message : '寸法の組み合わせが正しくありません。';
       return { model: null, errorMessage: message };
     }
-  }, [design, material, partMaterials]);
+  }, [design, material, partMaterials, partFinishes]);
 
   // 直前に有効だった3Dモデルを保持し、入力途中の一時的な不正値（例: 高さを消して
   // まだ何も入力していない一瞬）でビューアが空白にならないようにする
-  const [lastValidModel, setLastValidModel] = useState(() => buildFurnitureModel(design, { material, partMaterials }));
+  const [lastValidModel, setLastValidModel] = useState(() =>
+    buildFurnitureModel(design, { material, partMaterials, partFinishes })
+  );
   if (model && model !== lastValidModel) {
     // レンダー中に直接更新することで、余分な再レンダーなしに「直前の有効なモデル」を
     // 常に最新化する（Reactが公式に認めているderived state更新パターンの一つ）
@@ -360,13 +380,14 @@ export default function CadStudio({
       item: projectName.trim() || DEFAULT_FURNITURE_PROJECT_NAME,
       material,
       partMaterials,
+      partFinishes,
     });
     if (!spec) return;
     pushSpecToStudio(spec);
     const query = new URLSearchParams({ from: 'cad' });
     if (projectId) query.set('projectId', projectId);
     router.push(`/app/studio?${query.toString()}`);
-  }, [design, projectName, material, partMaterials, projectId, router]);
+  }, [design, projectName, material, partMaterials, partFinishes, projectId, router]);
 
   const handleUpdateShelf = useCallback(
     (patch: { zAtMm?: number; widthMm?: number; depthMm?: number }) => {
@@ -393,6 +414,19 @@ export default function CadStudio({
       if (!value) {
         return Object.fromEntries(Object.entries(prev).filter(([key]) => key !== label)) as Partial<
           Record<PartMaterialLabel, string>
+        >;
+      }
+      return { ...prev, [label]: value };
+    });
+  }, []);
+
+  // パーツ単位の色・仕上げ変更（「見た目」パネルから呼ばれる）。handlePartMaterialChangeと
+  // 全く同じ考え方：labelに対応する上書きだけを追加・削除し、他のキーには触れない
+  const handlePartFinishChange = useCallback((label: PartMaterialLabel, value: PanelFinish | '') => {
+    setPartFinishes((prev) => {
+      if (!value) {
+        return Object.fromEntries(Object.entries(prev).filter(([key]) => key !== label)) as Partial<
+          Record<PartMaterialLabel, PanelFinish>
         >;
       }
       return { ...prev, [label]: value };
@@ -566,6 +600,11 @@ export default function CadStudio({
             onToggleBackPanel={handleToggleBackPanel}
             onToggleLegs={handleToggleLegs}
             onSelectPanel={handleSelectPanel}
+          />
+          <CadAppearancePanel
+            model={lastValidModel}
+            partFinishes={partFinishes}
+            onPartFinishChange={handlePartFinishChange}
           />
           <CadSelectedPartPanel
             design={design}

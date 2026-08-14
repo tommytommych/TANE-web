@@ -12,8 +12,10 @@
 
 import type { SavedItem } from '../types';
 import { deleteSavedItem, loadAllSavedItems, putSavedItem } from '../savedItemsStore';
-import { isValidFurnitureDesign, type FurnitureDesign } from './types';
+import { isValidFurnitureDesign, type FurnitureDesign, type PanelFinish } from './types';
 import { PART_MATERIAL_LABELS, type PartMaterialLabel } from './model';
+
+const PANEL_FINISH_VALUES: readonly PanelFinish[] = ['clear', 'walnut', 'white', 'black'];
 
 export interface SavedFurnitureProject {
   id: string;
@@ -27,6 +29,11 @@ export interface SavedFurnitureProject {
    * この機能より前に保存されたプロジェクトには存在しないため、undefinedのまま
    * 「全パーツmaterialを使う」という既存の挙動にフォールバックする */
   partMaterials?: Partial<Record<PartMaterialLabel, string>>;
+  /** 「天板だけウォルナット調」のような、パーツ単位の色・仕上げ指定（任意、Phase B「色・
+   * 仕上げ」）。partMaterialsと同じ方針で、この機能より前に保存されたプロジェクトには
+   * 存在しないため、undefinedのまま「クリア塗装（材質の木目）のまま」という既存の挙動に
+   * フォールバックする */
+  partFinishes?: Partial<Record<PartMaterialLabel, PanelFinish>>;
   /** カットリスト（Phase 2-7）のチェック状態。キーはCutListItem.id。任意項目のため、
    * Phase 2-6以前に保存されたプロジェクトには存在しない（undefinedのまま扱う） */
   cutListChecked?: Record<string, boolean>;
@@ -85,6 +92,23 @@ const parseOptionalPartMaterials = (value: unknown): Partial<Record<PartMaterial
   return Object.fromEntries(entries) as Partial<Record<PartMaterialLabel, string>>;
 };
 
+// partFinishes（Phase B「色・仕上げ」）も同じ方針：形が不正なら無視してundefinedとして
+// 扱う。キーはPART_MATERIAL_LABELSの語彙、値はPanelFinishの4種類のみ許可する
+const parseOptionalPartFinishes = (value: unknown): Partial<Record<PartMaterialLabel, PanelFinish>> | undefined => {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (
+    !entries.every(
+      ([label, finish]) =>
+        PART_MATERIAL_LABELS.includes(label as PartMaterialLabel) &&
+        PANEL_FINISH_VALUES.includes(finish as PanelFinish)
+    )
+  ) {
+    return undefined;
+  }
+  return Object.fromEntries(entries) as Partial<Record<PartMaterialLabel, PanelFinish>>;
+};
+
 // content（JSON文字列）は他バージョンのデータ・ブラウザ保存領域の破損等で壊れている
 // 可能性があるため、必ず構造を検証してから使う（不正な場合はnullを返し、呼び出し側で
 // 「読み込めませんでした」という初心者向けメッセージを出す。アプリを落とさない）。
@@ -115,6 +139,7 @@ export const parseSavedItem = (item: SavedItem): SavedFurnitureProject | null =>
       design: p.design,
       material: p.material,
       partMaterials: parseOptionalPartMaterials(p.partMaterials),
+      partFinishes: parseOptionalPartFinishes(p.partFinishes),
       cutListChecked: parseOptionalBooleanRecord(p.cutListChecked),
       buildChecklist: parseOptionalBooleanRecord(p.buildChecklist),
       buildGuideChecked: parseOptionalBooleanRecord(p.buildGuideChecked),
@@ -166,5 +191,6 @@ export const duplicateFurnitureProject = (project: SavedFurnitureProject): Saved
     design: structuredClone(project.design),
     material: project.material,
     partMaterials: project.partMaterials ? structuredClone(project.partMaterials) : undefined,
+    partFinishes: project.partFinishes ? structuredClone(project.partFinishes) : undefined,
   };
 };
