@@ -503,6 +503,8 @@ export default function CadStudio({
             className="flex items-center gap-1.5 bg-white hover:bg-tanei-brand-soft text-tanei-ink border border-tanei-border text-sm font-bold px-3 py-1.5 rounded-tanei-control shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
           >
             ✨ この家具の完成イメージを見る
+            {/* titleのホバー表示だけではスマホ等で気づけないため、常時見える表記として追加する */}
+            <span className="text-[10px] font-bold text-tanei-ink-muted">（PC専用）</span>
           </button>
         </div>
         {saveMessage && <p className="text-xs font-bold text-tanei-brand">{saveMessage}</p>}
