@@ -5,13 +5,15 @@
 // 専門用語（フィーチャーツリー等）を避け、DIY初心者が触ってすぐ分かる言葉にしている。
 
 import type { FurnitureModel } from '../../lib/cad/types';
+import { MAX_DRAWER_COUNT } from '../../lib/cad/model';
 
 interface CadPartsPanelProps {
   model: FurnitureModel;
   backPanel: boolean;
   legs: boolean;
   doors: boolean;
-  /** 家具の構造の種類。'table'のときは棚板・背板・脚・扉の切り替えUIを表示しない
+  drawerCount: number;
+  /** 家具の構造の種類。'table'のときは棚板・背板・脚・扉・引き出しの切り替えUIを表示しない
    * （テーブルは天板+脚+幕板という固定構成のため）。省略時は既存どおり箱型として扱う */
   kind?: 'box' | 'table';
   selectedPanelId: string | null;
@@ -19,6 +21,8 @@ interface CadPartsPanelProps {
   onToggleBackPanel: () => void;
   onToggleLegs: () => void;
   onToggleDoors: () => void;
+  onIncrementDrawerCount: () => void;
+  onDecrementDrawerCount: () => void;
   onSelectPanel: (panelId: string) => void;
 }
 
@@ -27,12 +31,15 @@ export default function CadPartsPanel({
   backPanel,
   legs,
   doors,
+  drawerCount,
   kind,
   selectedPanelId,
   onAddShelf,
   onToggleBackPanel,
   onToggleLegs,
   onToggleDoors,
+  onIncrementDrawerCount,
+  onDecrementDrawerCount,
   onSelectPanel,
 }: CadPartsPanelProps) {
   const shelves = model.panels.filter((p) => p.kind === 'shelf');
@@ -72,6 +79,31 @@ export default function CadPartsPanel({
             <input type="checkbox" checked={doors} onChange={onToggleDoors} className="h-4 w-4 accent-tanei-brand" />
             <span className="text-tanei-ink">扉あり</span>
           </label>
+
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-tanei-ink">引き出し</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onDecrementDrawerCount}
+                disabled={drawerCount <= 0}
+                aria-label="引き出しを減らす"
+                className="h-7 w-7 flex items-center justify-center rounded-tanei-control border border-tanei-border bg-tanei-surface hover:bg-white text-tanei-ink font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                −
+              </button>
+              <span className="w-6 text-center font-bold text-tanei-ink">{drawerCount}</span>
+              <button
+                type="button"
+                onClick={onIncrementDrawerCount}
+                disabled={drawerCount >= MAX_DRAWER_COUNT}
+                aria-label="引き出しを増やす"
+                className="h-7 w-7 flex items-center justify-center rounded-tanei-control border border-tanei-border bg-tanei-surface hover:bg-white text-tanei-ink font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                ＋
+              </button>
+            </div>
+          </div>
         </>
       )}
 

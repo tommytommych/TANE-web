@@ -24,6 +24,7 @@ import {
   resizeFurnitureDesign,
   setBackPanel,
   setDoors,
+  setDrawerCount,
   setLegs,
   updateShelfInDesign,
   type PartMaterialLabel,
@@ -361,6 +362,14 @@ export default function CadStudio({
     setDesign((prev) => setDoors(prev, !(prev.doors ?? false)));
   }, []);
 
+  const handleIncrementDrawerCount = useCallback(() => {
+    setDesign((prev) => setDrawerCount(prev, (prev.drawerCount ?? 0) + 1));
+  }, []);
+
+  const handleDecrementDrawerCount = useCallback(() => {
+    setDesign((prev) => setDrawerCount(prev, (prev.drawerCount ?? 0) - 1));
+  }, []);
+
   // 家具の種類（箱型／テーブル）の切り替え。CadViewport.tsxの「正面から見る／斜めから見る」
   // と同じ、明示的なボタン操作による切り替えという考え方を踏襲する。切り替えると
   // 該当する種類の既定寸法へリセットする（別構造への切り替えのため、現在の寸法・
@@ -566,12 +575,15 @@ export default function CadStudio({
             backPanel={design.backPanel}
             legs={design.legs}
             doors={design.doors ?? false}
+            drawerCount={design.drawerCount ?? 0}
             kind={design.kind}
             selectedPanelId={selectedPanelId}
             onAddShelf={handleAddShelf}
             onToggleBackPanel={handleToggleBackPanel}
             onToggleLegs={handleToggleLegs}
             onToggleDoors={handleToggleDoors}
+            onIncrementDrawerCount={handleIncrementDrawerCount}
+            onDecrementDrawerCount={handleDecrementDrawerCount}
             onSelectPanel={handleSelectPanel}
           />
           <CadAppearancePanel

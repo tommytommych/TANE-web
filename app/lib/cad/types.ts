@@ -37,6 +37,7 @@ export type FurniturePanelKind =
   | 'leg'
   | 'apron'
   | 'door'
+  | 'drawer'
   | 'custom';
 
 /** パネルの仕上げ（tanei-studio/app/lib/studioSpec.tsのPanelFinishと同じ語彙で揃えている） */
@@ -117,6 +118,11 @@ export interface FurnitureDesign {
    * 保存されたプロジェクトには存在しないため、kindと同じ方針でoptionalにし、
    * 省略時はfalse（扉なし）として扱う（isValidFurnitureDesign・geometry.ts参照） */
   doors?: boolean;
+  /** 引き出し前板の枚数（Phase C「パーツ追加」）。本体前面いっぱいの幅で、指定した枚数だけ
+   * 縦に均等分割した前板を配置するシンプルな構成のみ（実際の引き出し本体・スライドレール・
+   * 縦の列分割はPhase C以降の拡張課題）。0または未指定は「引き出しなし」として扱う。
+   * doorsと同じ方針でoptionalにし、この機能より前に保存されたプロジェクトとの互換性を保つ */
+  drawerCount?: number;
 }
 
 /** 保存データ（IndexedDB）から読み込んだFurnitureDesignの構造検証。ブラウザの保存領域が
@@ -133,6 +139,7 @@ export const isValidFurnitureDesign = (value: unknown): value is FurnitureDesign
     typeof v.backPanel === 'boolean' &&
     typeof v.legs === 'boolean' &&
     (v.doors === undefined || typeof v.doors === 'boolean') &&
+    (v.drawerCount === undefined || (typeof v.drawerCount === 'number' && Number.isFinite(v.drawerCount) && v.drawerCount >= 0)) &&
     Array.isArray(v.shelves) &&
     v.shelves.every((s) => {
       if (typeof s !== 'object' || s === null) return false;

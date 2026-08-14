@@ -155,6 +155,16 @@ export function setDoors(design: FurnitureDesign, doors: boolean): FurnitureDesi
   return { ...design, doors };
 }
 
+// 「＋/－」操作で無制限に増減できてしまうと、板厚に対して前板が薄くなりすぎ
+// （geometry.tsのbuildDrawerPanelsがMIN_SHELF_SIZE_MMで下限は守るが、隙間なく
+// 重なって見えるほど不自然になる）ため、UI操作としての上限を設ける
+export const MAX_DRAWER_COUNT = 8;
+
+export function setDrawerCount(design: FurnitureDesign, count: number): FurnitureDesign {
+  const clamped = Math.min(MAX_DRAWER_COUNT, Math.max(0, Math.round(count)));
+  return { ...design, drawerCount: clamped };
+}
+
 let shelfIdCounter = 0;
 function nextShelfId(): string {
   shelfIdCounter += 1;
@@ -295,6 +305,7 @@ export function buildFurnitureModel(
       backPanel: design.backPanel,
       legs: design.legs,
       doors: design.doors ?? false,
+      drawerCount: design.drawerCount ?? 0,
       shelfCount: design.shelves.length,
     },
   };
@@ -615,13 +626,14 @@ export const CUT_LIST_KIND_NAME: Partial<Record<FurniturePanelKind, string>> = {
   leg: '脚',
   apron: '幕板',
   door: '扉',
+  drawer: '引き出し',
 };
 
 // パーツ単位で材料を指定する際のキー。CUT_LIST_KIND_NAMEの値と同じ語彙を使うことで、
 // 「天板だからパイン」「脚だからSPF」のような指定を、AIの提案（StudioSpec.partMaterials）・
 // ブラウザCADの編集状態（buildFurnitureModelのoverrides.partMaterials）・保存データ
 // （SavedFurnitureProject.partMaterials）のどこでも同じ形で扱えるようにする
-export type PartMaterialLabel = '天板' | '底板' | '側板' | '背板' | '棚板' | '脚' | '幕板' | '扉';
+export type PartMaterialLabel = '天板' | '底板' | '側板' | '背板' | '棚板' | '脚' | '幕板' | '扉' | '引き出し';
 export const PART_MATERIAL_LABELS: PartMaterialLabel[] = [
   '天板',
   '底板',
@@ -631,6 +643,7 @@ export const PART_MATERIAL_LABELS: PartMaterialLabel[] = [
   '脚',
   '幕板',
   '扉',
+  '引き出し',
 ];
 
 // 脚・幕板は現実には規格材（SPF材等の角材）で作るパーツのため、パーツごとの材料選択で

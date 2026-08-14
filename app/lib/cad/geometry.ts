@@ -171,6 +171,38 @@ function buildDoorPanel({ width, height, thickness: t }: BoxDimensions): Furnitu
   };
 }
 
+// 引き出し前板と本体の間に空ける隙間（mm）。扉と同じ考え方（DOOR_GAP_MM参照）
+const DRAWER_GAP_MM = 2;
+
+// 複数の引き出し前板を縦に積む際、前板どうしの間に空ける隙間（mm）。tanei-studio/
+// freecad_scripts/generate_model.pyのPANEL_GAP_MM（同じ理由：隙間が無いと1枚の板に
+// 見えてしまい、レンダリング上も木取り図上も別々の引き出しとして見分けられない）と同じ値
+const DRAWER_STACK_GAP_MM = 3;
+
+/** total(mm)をcount個に、隙間gapを挟んで均等に分割し、[{開始位置, サイズ}, ...] を返す
+ * （tanei-studio/freecad_scripts/generate_model.pyの_split_with_gapと同じ考え方） */
+function splitWithGap(total: number, count: number, gap: number): { offset: number; size: number }[] {
+  if (count <= 1) return [{ offset: 0, size: total }];
+  const size = (total - gap * (count - 1)) / count;
+  return Array.from({ length: count }, (_, i) => ({ offset: i * (size + gap), size }));
+}
+
+/** 本体前面いっぱいの幅で、指定した枚数の引き出し前板を縦に均等分割して配置する
+ * （tanei-studio/freecad_scripts/generate_model.pyの_option_drawer_front、縦仕切り無し
+ * （1列）の場合と同じ考え方）。扉と同様、引き出し本体・スライドレール等は表現せず、
+ * 前板だけを配置するシンプルな構成にとどめる（DIY初心者に複雑なCAD操作を要求しないため） */
+function buildDrawerPanels({ width, height, thickness: t }: BoxDimensions, count: number): FurniturePanel[] {
+  const drawerWidth = Math.max(MIN_SHELF_SIZE_MM, width - t * 2 - DRAWER_GAP_MM * 2);
+  const innerHeight = Math.max(MIN_SHELF_SIZE_MM, height - t * 2 - DRAWER_GAP_MM * 2);
+  return splitWithGap(innerHeight, count, DRAWER_STACK_GAP_MM).map(({ offset, size }, i) => ({
+    id: `drawer-${i + 1}`,
+    kind: 'drawer',
+    label: `引き出し${i + 1}`,
+    position: vec3(t + DRAWER_GAP_MM, -t, t + DRAWER_GAP_MM + offset),
+    size: vec3(drawerWidth, t, size),
+  }));
+}
+
 // テーブル（天板+脚+幕板）専用の寸法定数。箱型のLEG_SIZE_MM/LEG_HEIGHT_MMとは別に持つ
 // （箱型の脚は本体の下にぶら下がる短い飾り脚、テーブルの脚は床から天板下面まで届く
 // 構造材のため、太さ・高さの考え方がそもそも異なる）
@@ -361,6 +393,10 @@ export function buildFurniturePanels(design: FurnitureDesign, materials?: TableM
 
   if (design.doors) {
     panels = [...panels, buildDoorPanel(dims)];
+  }
+
+  if (design.drawerCount && design.drawerCount > 0) {
+    panels = [...panels, ...buildDrawerPanels(dims, design.drawerCount)];
   }
 
   return [...panels, ...shelfPanels];
