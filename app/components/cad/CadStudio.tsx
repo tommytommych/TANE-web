@@ -12,7 +12,6 @@ import CadPartsPanel from './CadPartsPanel';
 import CadAppearancePanel from './CadAppearancePanel';
 import CadSelectedPartPanel from './CadSelectedPartPanel';
 import CadCutlistView from './CadCutlistView';
-import CadCutMaterialsView from './CadCutMaterialsView';
 import CadBuildChecklistView from './CadBuildChecklistView';
 import {
   addShelfToDesign,
@@ -58,7 +57,9 @@ interface CadStudioProps {
   initialPartFinishes?: Partial<Record<PartMaterialLabel, PanelFinish>>;
 }
 
-type CadViewMode = 'design' | 'cutlist' | 'cutMaterials' | 'buildCheck';
+// 「1ページ縦スクロール型」への変更で、以前は独立したviewMode='cutMaterials'画面
+// だったカットリストは、cutlist画面内のセクションとして統合した（別画面には戻さない）
+type CadViewMode = 'design' | 'cutlist' | 'buildCheck';
 
 export default function CadStudio({
   initialDesign,
@@ -269,14 +270,23 @@ export default function CadStudio({
     [cutListChecked, persistChecklists]
   );
 
-  const handleToggleBuildStep = useCallback(
-    (step: number) => {
-      const key = String(step);
+  // 「1ページ縦スクロール型」への変更で、木取り図画面内の「木取り図/カット寸法/
+  // カット申込書を確認しました」チェック（CadCutlistView.tsx）も、番号ではなく
+  // 文字列キーで直接buildChecklistをトグルできるようにする。制作チェック画面
+  // （CadBuildChecklistView.tsx）の既存の番号ベースの10項目チェックは、この関数を
+  // String(step)経由で呼ぶことで同じ保存先を引き続き使う
+  const handleToggleBuildChecklistKey = useCallback(
+    (key: string) => {
       const next = { ...buildChecklist, [key]: !buildChecklist[key] };
       setBuildChecklist(next);
       void persistChecklists({ buildChecklist: next });
     },
     [buildChecklist, persistChecklists]
+  );
+
+  const handleToggleBuildStep = useCallback(
+    (step: number) => handleToggleBuildChecklistKey(String(step)),
+    [handleToggleBuildChecklistKey]
   );
 
   // 「作り方」9STEPそれぞれのチェック（buildChecklist・10項目とは独立）
@@ -296,18 +306,15 @@ export default function CadStudio({
     setScrollToBuildGuide(false);
   }, []);
 
-  // 制作チェックの各項目の「確認する」導線（Phase 3-10）。cutMaterials（カットリスト）へは
-  // そのまま画面ごと切り替え、cutlist内の特定セクションへはpendingCutlistAnchorを
-  // 立ててから切り替える。buildChecklist自体は一切読み書きしない（表示・遷移のみ）
-  const handleConfirmChecklistSection = useCallback(
-    (target: { viewMode: 'cutlist' | 'cutMaterials'; anchorId?: string }) => {
-      if (target.anchorId) {
-        setPendingCutlistAnchor(target.anchorId);
-      }
-      setViewMode(target.viewMode);
-    },
-    []
-  );
+  // 制作チェックの各項目の「確認する」導線（Phase 3-10）。カットリストも木取り図画面に
+  // 統合された（Phase「1ページ縦スクロール型」）ため、遷移先は常にcutlist画面内の
+  // 特定セクションへのスクロールになる。buildChecklist自体は一切読み書きしない（表示・遷移のみ）
+  const handleConfirmChecklistSection = useCallback((target: { anchorId?: string }) => {
+    if (target.anchorId) {
+      setPendingCutlistAnchor(target.anchorId);
+    }
+    setViewMode('cutlist');
+  }, []);
 
   const handleScrolledToPendingAnchor = useCallback(() => {
     setPendingCutlistAnchor(null);
@@ -448,25 +455,19 @@ export default function CadStudio({
     setViewMode('design');
   }, []);
 
-  if (viewMode === 'cutMaterials') {
-    return (
-      <CadCutMaterialsView
-        model={lastValidModel}
-        checked={cutListChecked}
-        onToggle={handleToggleCutListItem}
-        onBack={() => setViewMode('cutlist')}
-        onNext={() => setViewMode('buildCheck')}
-      />
-    );
-  }
-
   if (viewMode === 'buildCheck') {
     return (
       <CadBuildChecklistView
         checked={buildChecklist}
         onToggle={handleToggleBuildStep}
         projectName={projectName.trim() || DEFAULT_FURNITURE_PROJECT_NAME}
-        onBack={() => setViewMode('cutMaterials')}
+        onBack={() => {
+          // カットリストが木取り図画面（cutlist）内のセクションに統合されたため、
+          // 「← カットリストに戻る」は同じcutlist画面内のカットリストのセクションへ
+          // スクロールする（CadCutlistView.tsxのCUT_MATERIALS_ANCHOR_IDと同じ文字列）
+          setPendingCutlistAnchor('cad-cut-materials');
+          setViewMode('cutlist');
+        }}
         onNext={() => {
           setScrollToBuildGuide(true);
           setViewMode('cutlist');
@@ -488,11 +489,14 @@ export default function CadStudio({
         partMaterials={partMaterials}
         onPartMaterialChange={handlePartMaterialChange}
         onBack={() => setViewMode('design')}
-        onOpenCutList={() => setViewMode('cutMaterials')}
+        onOpenBuildCheck={() => setViewMode('buildCheck')}
         scrollToBuildGuide={scrollToBuildGuide}
         onScrolledToBuildGuide={handleScrolledToBuildGuide}
         onViewPanel={handleViewPanel}
         buildChecklist={buildChecklist}
+        onToggleBuildChecklistKey={handleToggleBuildChecklistKey}
+        cutListChecked={cutListChecked}
+        onToggleCutListItem={handleToggleCutListItem}
         buildGuideChecked={buildGuideChecked}
         onToggleBuildGuideStep={handleToggleBuildGuideStep}
         onViewBuildCheck={() => setViewMode('buildCheck')}

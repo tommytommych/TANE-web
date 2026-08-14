@@ -43,9 +43,11 @@ const SAFETY_NOTES_ANCHOR_ID = 'cad-safety-notes';
 // 「🛒 買い物リスト」（Phase 3-4で追加済みのCadBuildGuide.tsx内セクション）への
 // スクロール先id（Phase 3-23）
 const SHOPPING_LIST_ANCHOR_ID = 'cad-shopping-list';
+// カットリスト（以前は別画面のviewMode='cutMaterials'だったが、「1ページ縦スクロール型」
+// への変更でCadCutlistView.tsx内のセクションに統合された）と同じid文字列
+const CUT_MATERIALS_ANCHOR_ID = 'cad-cut-materials';
 
 interface ConfirmTarget {
-  viewMode: 'cutlist' | 'cutMaterials';
   anchorId?: string;
   label: string;
 }
@@ -54,30 +56,30 @@ interface ConfirmTarget {
 // 必要な情報へ戻れるようにするための導線。遷移先はPhase 3-10のCONFIRM_TARGETSと
 // 同じ既存セクション・同じonConfirmSection（handleConfirmChecklistSection）を再利用し、
 // 新しい画面遷移の仕組みは作らない
-const BUILD_NAV_ITEMS: { target: { viewMode: 'cutlist' | 'cutMaterials'; anchorId?: string }; label: string }[] = [
-  { target: { viewMode: 'cutlist', anchorId: MATERIALS_ANCHOR_ID }, label: '必要な材料' },
-  { target: { viewMode: 'cutlist', anchorId: CUT_LAYOUT_ANCHOR_ID }, label: '木取り図' },
-  { target: { viewMode: 'cutMaterials' }, label: 'カットリスト' },
-  { target: { viewMode: 'cutlist', anchorId: SHOPPING_LIST_ANCHOR_ID }, label: '買い物リスト' },
-  { target: { viewMode: 'cutlist', anchorId: PARTS_ANCHOR_ID }, label: 'パーツ一覧' },
-  { target: { viewMode: 'cutlist', anchorId: BUILD_STEPS_ANCHOR_ID }, label: '作り方' },
-  { target: { viewMode: 'cutlist', anchorId: SAFETY_NOTES_ANCHOR_ID }, label: '安全ポイント' },
+const BUILD_NAV_ITEMS: { target: { anchorId?: string }; label: string }[] = [
+  { target: { anchorId: MATERIALS_ANCHOR_ID }, label: '必要な材料' },
+  { target: { anchorId: CUT_LAYOUT_ANCHOR_ID }, label: '木取り図' },
+  { target: { anchorId: CUT_MATERIALS_ANCHOR_ID }, label: 'カットリスト' },
+  { target: { anchorId: SHOPPING_LIST_ANCHOR_ID }, label: '買い物リスト' },
+  { target: { anchorId: PARTS_ANCHOR_ID }, label: 'パーツ一覧' },
+  { target: { anchorId: BUILD_STEPS_ANCHOR_ID }, label: '作り方' },
+  { target: { anchorId: SAFETY_NOTES_ANCHOR_ID }, label: '安全ポイント' },
 ];
 
 // 各制作チェック項目（BUILD_CHECKLIST_STEPSと同じ順番）から、確認先として自然な
 // 既存セクションへの対応表。存在しない・不適切な確認先がある項目はnullにして
 // ボタン自体を出さない（無理なリンクを作らない）
 const CONFIRM_TARGETS: (ConfirmTarget | null)[] = [
-  { viewMode: 'cutlist', anchorId: MATERIALS_ANCHOR_ID, label: '材料を見る' }, // 1. 材料を用意した
-  { viewMode: 'cutlist', anchorId: CUT_LAYOUT_ANCHOR_ID, label: '木取り図を見る' }, // 2. 木取り図を確認した
-  { viewMode: 'cutMaterials', label: 'カットリストを見る' }, // 3. 材料に寸法を書いた
-  { viewMode: 'cutlist', anchorId: PARTS_ANCHOR_ID, label: 'パーツを見る' }, // 4. パーツをカットした
-  { viewMode: 'cutMaterials', label: 'カットリストを見る' }, // 5. カット寸法を確認した
-  { viewMode: 'cutlist', anchorId: BUILD_STEPS_ANCHOR_ID, label: '作り方を見る' }, // 6. 組み立て位置を確認した
-  { viewMode: 'cutlist', anchorId: BUILD_STEPS_ANCHOR_ID, label: '作り方を見る' }, // 7. 下穴を確認した
-  { viewMode: 'cutlist', anchorId: BUILD_STEPS_ANCHOR_ID, label: '作り方を見る' }, // 8. 組み立てた
-  { viewMode: 'cutlist', anchorId: BUILD_STEPS_ANCHOR_ID, label: '作り方を見る' }, // 9. ガタつきを確認した
-  { viewMode: 'cutlist', anchorId: SAFETY_NOTES_ANCHOR_ID, label: '安全ポイントを見る' }, // 10. 仕上げを行った
+  { anchorId: MATERIALS_ANCHOR_ID, label: '材料を見る' }, // 1. 材料を用意した
+  { anchorId: CUT_LAYOUT_ANCHOR_ID, label: '木取り図を見る' }, // 2. 木取り図を確認した
+  { anchorId: CUT_MATERIALS_ANCHOR_ID, label: 'カットリストを見る' }, // 3. 材料に寸法を書いた
+  { anchorId: PARTS_ANCHOR_ID, label: 'パーツを見る' }, // 4. パーツをカットした
+  { anchorId: CUT_MATERIALS_ANCHOR_ID, label: 'カットリストを見る' }, // 5. カット寸法を確認した
+  { anchorId: BUILD_STEPS_ANCHOR_ID, label: '作り方を見る' }, // 6. 組み立て位置を確認した
+  { anchorId: BUILD_STEPS_ANCHOR_ID, label: '作り方を見る' }, // 7. 下穴を確認した
+  { anchorId: BUILD_STEPS_ANCHOR_ID, label: '作り方を見る' }, // 8. 組み立てた
+  { anchorId: BUILD_STEPS_ANCHOR_ID, label: '作り方を見る' }, // 9. ガタつきを確認した
+  { anchorId: SAFETY_NOTES_ANCHOR_ID, label: '安全ポイントを見る' }, // 10. 仕上げを行った
 ];
 
 interface CadBuildChecklistViewProps {
@@ -87,8 +89,9 @@ interface CadBuildChecklistViewProps {
   onNext: () => void;
   projectName: string;
   /** 各項目の「確認する」導線から呼ばれる（Phase 3-10）。buildChecklistは一切変更せず、
-   * 既存の画面（cutlist内の該当セクション、またはcutMaterials画面）へ移動するだけ */
-  onConfirmSection: (target: { viewMode: 'cutlist' | 'cutMaterials'; anchorId?: string }) => void;
+   * 木取り図画面（cutlist、カットリストも含めて統合済み）内の該当セクションへ
+   * スクロールするだけ */
+  onConfirmSection: (target: { anchorId?: string }) => void;
   /** 保存済みプロジェクトのid（CadStudio.tsxのprojectId）。まだ一度も保存していない
    * 設計の場合はnull。完成作品として保存する際、元の設計へ戻れるようにするための
    * 関連付けに使うだけで、それ以外の用途では一切使わない（Phase 3-14） */
@@ -138,11 +141,7 @@ export default function CadBuildChecklistView({
   // （分かりやすい表示名）を突き合わせて1件だけ取り出すだけ。二重管理を避けている
   const currentConfirmTarget = nextStep ? CONFIRM_TARGETS[nextStep.stepNumber - 1] : null;
   const currentNavItem = currentConfirmTarget
-    ? BUILD_NAV_ITEMS.find(
-        (item) =>
-          item.target.viewMode === currentConfirmTarget.viewMode &&
-          item.target.anchorId === currentConfirmTarget.anchorId
-      ) ?? null
+    ? BUILD_NAV_ITEMS.find((item) => item.target.anchorId === currentConfirmTarget.anchorId) ?? null
     : null;
 
   // 「↑ 制作ナビへ戻る」（Phase 3-24）。制作前チェックカード等の追加で画面が長くなった分、
@@ -240,21 +239,21 @@ export default function CadBuildChecklistView({
           <div className="flex flex-wrap gap-1.5 mt-1">
             <button
               type="button"
-              onClick={() => onConfirmSection({ viewMode: 'cutlist', anchorId: SHOPPING_LIST_ANCHOR_ID })}
+              onClick={() => onConfirmSection({ anchorId: SHOPPING_LIST_ANCHOR_ID })}
               className="text-xs font-bold text-white bg-tanei-brand px-3 py-1.5 rounded-tanei-control hover:bg-tanei-brand-dark transition-colors"
             >
               🛒 買い物リストを見る
             </button>
             <button
               type="button"
-              onClick={() => onConfirmSection({ viewMode: 'cutlist', anchorId: CUT_LAYOUT_ANCHOR_ID })}
+              onClick={() => onConfirmSection({ anchorId: CUT_LAYOUT_ANCHOR_ID })}
               className="text-xs font-bold text-tanei-ink bg-white border border-tanei-border px-3 py-1.5 rounded-tanei-control hover:bg-tanei-brand-soft hover:border-tanei-brand transition-colors"
             >
               木取り図を確認する
             </button>
             <button
               type="button"
-              onClick={() => onConfirmSection({ viewMode: 'cutMaterials' })}
+              onClick={() => onConfirmSection({ anchorId: CUT_MATERIALS_ANCHOR_ID })}
               className="text-xs font-bold text-tanei-ink bg-white border border-tanei-border px-3 py-1.5 rounded-tanei-control hover:bg-tanei-brand-soft hover:border-tanei-brand transition-colors"
             >
               カットリストを確認する
@@ -369,7 +368,7 @@ export default function CadBuildChecklistView({
                   <div className="px-3 pb-2 pl-10">
                     <button
                       type="button"
-                      onClick={() => onConfirmSection({ viewMode: confirmTarget.viewMode, anchorId: confirmTarget.anchorId })}
+                      onClick={() => onConfirmSection({ anchorId: confirmTarget.anchorId })}
                       className="text-[11px] font-bold text-tanei-brand hover:text-tanei-brand-dark underline"
                     >
                       {confirmTarget.label}

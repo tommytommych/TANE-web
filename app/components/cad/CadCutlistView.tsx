@@ -15,6 +15,7 @@ import { buildUniversalCutSheetPdf } from '../../lib/cutSheetPdf';
 import { downloadPdfBytes } from '../../lib/download';
 import type { FurnitureModel } from '../../lib/cad/types';
 import {
+  buildCutListItems,
   CUT_LIST_KIND_NAME,
   FURNITURE_MATERIALS,
   furnitureModelToDimensionalLumberItems,
@@ -39,6 +40,22 @@ const CUT_LAYOUT_ANCHOR_ID = 'cad-cut-layout';
 // importで結合を強めるのではなく、既存のfreecad-integration/STANDARD_BOARD_SIZESと
 // 同様に値だけを再利用する既存の方針を踏襲する）
 const PARTS_LIST_ANCHOR_ID = 'cad-parts';
+// 「1ページ縦スクロール型」への変更（制作導線UI指示）：以前は別画面（CadCutMaterialsView.tsx、
+// viewMode='cutMaterials'）だった「カットリスト」を、この木取り図画面の続きとして
+// 同じページ内に埋め込む。CadBuildChecklistView.tsxの「カットリストを確認する」等の
+// 導線からのスクロール先として、他のanchor idと同じ命名・共有方針で定義する
+const CUT_MATERIALS_ANCHOR_ID = 'cad-cut-materials';
+// 「木取り図を確認しました」チェックの保存先キー。新しいチェック状態を追加するのではなく、
+// 既存のbuildChecklist（10項目、Phase 2-7）の2番目「木取り図を確認した」をそのまま流用する
+// （旧データとの互換性を保つ「案A」方針）
+const CUT_LAYOUT_CONFIRMED_KEY = '2';
+// 「カット寸法を確認しました」チェックの保存先キー。同じ方針で、buildChecklistの5番目
+// 「カット寸法を確認した」を流用する
+const CUT_MATERIALS_CONFIRMED_KEY = '5';
+// 「カット申込書を確認しました」チェックの保存先キー。buildChecklistの既存10項目には
+// 対応する項目が無いため、新しい文字列キーを追加する（buildChecklistはRecord<string,boolean>
+// なので、数字以外のキーを増やしても既存データ・既存の10項目の判定ロジックは壊れない）
+const CUT_SHEET_CONFIRMED_KEY = 'cutsheet_confirmed';
 
 interface CadCutlistViewProps {
   model: FurnitureModel;
@@ -49,16 +66,29 @@ interface CadCutlistViewProps {
   partMaterials: Partial<Record<PartMaterialLabel, string>>;
   onPartMaterialChange: (label: PartMaterialLabel, value: string) => void;
   onBack: () => void;
-  onOpenCutList: () => void;
+  /** カットリストの下、制作チェック画面（buildCheck）へ進むボタンから呼ばれる。
+   * 以前は「次へ：カットリストを見る」として別画面（cutMaterials）へ画面を切り替える
+   * ボタンだったが、カットリストをこの画面に統合したため、「次へ：制作チェックへ」として
+   * viewMode='buildCheck'へ進む役割に変わった（onOpenCutListから改称） */
+  onOpenBuildCheck: () => void;
   /** trueのとき、マウント時に「制作する」セクションまで自動スクロールする
    * （Phase 2-7の通常の「🪚 木取り図を見る」からの遷移では常にfalse／未指定） */
   scrollToBuildGuide?: boolean;
   onScrolledToBuildGuide?: () => void;
   /** 「作るパーツ」の「このパーツを見る」から呼ばれる（Phase 3-2） */
   onViewPanel: (panelId: string) => void;
-  /** 制作チェック（Phase 2-7）のチェック状態。CadBuildGuideの制作進捗表示にそのまま渡す
-   * だけで、ここでは読み書きしない（Phase 3-5） */
+  /** 制作チェック（Phase 2-7）のチェック状態。CadBuildGuideの制作進捗表示に渡すほか、
+   * この画面自身の「木取り図/カット寸法/カット申込書を確認しました」チェックの
+   * 現在値の読み取りにも使う */
   buildChecklist: Record<string, boolean>;
+  /** buildChecklistの特定キー（木取り図確認・カット寸法確認・カット申込書確認）を
+   * トグルする（Phase「1ページ縦スクロール型」）。CadStudio.tsxの既存の
+   * handleToggleBuildStepと同じ保存先を、文字列キーで直接指定できるようにしたもの */
+  onToggleBuildChecklistKey: (key: string) => void;
+  /** カットリスト（Phase 2-7の旧cutMaterials画面）のパーツ単位チェック状態。
+   * キーはCutListItem.id */
+  cutListChecked: Record<string, boolean>;
+  onToggleCutListItem: (itemId: string) => void;
   /** 「作り方」9STEPそれぞれのチェック状態（buildChecklistとは独立）。CadBuildGuideへ
    * そのまま中継するだけで、ここでは読み書きしない */
   buildGuideChecked: Record<string, boolean>;
@@ -78,11 +108,14 @@ export default function CadCutlistView({
   partMaterials,
   onPartMaterialChange,
   onBack,
-  onOpenCutList,
+  onOpenBuildCheck,
   scrollToBuildGuide,
   onScrolledToBuildGuide,
   onViewPanel,
   buildChecklist,
+  onToggleBuildChecklistKey,
+  cutListChecked,
+  onToggleCutListItem,
   buildGuideChecked,
   onToggleBuildGuideStep,
   onViewBuildCheck,
@@ -91,6 +124,10 @@ export default function CadCutlistView({
 }: CadCutlistViewProps) {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  // 「✓ カット申込書を作成しました」の表示・下の確認チェックボックスの解放に使う、
+  // このセッション内だけの一時的な状態（保存はしない。チェック自体はbuildChecklist側で
+  // 保存される）。設計を変更してこの画面を開き直した場合は未生成のまま扱われる
+  const [hasGeneratedCutSheet, setHasGeneratedCutSheet] = useState(false);
 
   // 材料ごとに分離した木取り図（「天板はパイン集成材、脚・幕板はSPF材」等の場合、
   // 材料の種類だけ配列に並ぶ。全パーツ同じ材料なら要素数1になり、見た目は今まで通り）。
@@ -150,6 +187,29 @@ export default function CadCutlistView({
     return labels;
   }, [model.panels]);
 
+  // カットリスト（Phase 2-7、以前は別画面のCadCutMaterialsView.tsxにあったロジックを
+  // そのまま移設）。木取り図が作れない設計（どの定尺サイズにも収まらない）では、
+  // 架空のカットリストを作らず案内文だけを出す既存の方針をそのまま踏襲する
+  const cutListItems = useMemo(
+    () => (sheetLayouts.length > 0 || dimensionalLumberItems.length > 0 ? buildCutListItems(model) : []),
+    [model, sheetLayouts, dimensionalLumberItems]
+  );
+  const cutListGroupedByMaterial = useMemo(() => {
+    const order: string[] = [];
+    const groups = new Map<string, CutListItem[]>();
+    cutListItems.forEach((item) => {
+      const list = groups.get(item.material);
+      if (list) {
+        list.push(item);
+      } else {
+        groups.set(item.material, [item]);
+        order.push(item.material);
+      }
+    });
+    return order.map((groupMaterial) => ({ material: groupMaterial, items: groups.get(groupMaterial) ?? [] }));
+  }, [cutListItems]);
+  const cutListDoneCount = cutListItems.filter((item) => cutListChecked[item.id]).length;
+
   useEffect(() => {
     if (!scrollToBuildGuide) return;
     document.getElementById(BUILD_GUIDE_ANCHOR_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -185,6 +245,7 @@ export default function CadCutlistView({
       );
       downloadPdfBytes(new Uint8Array(pdfBytes), 'TANEi_CutSheet.pdf');
       showStatus('カット申込書のダウンロードが完了しました！');
+      setHasGeneratedCutSheet(true);
     } catch (error) {
       console.error(error);
       showStatus('カット申込書の生成に失敗しました。時間をおいて再度お試しください。');
@@ -381,25 +442,122 @@ export default function CadCutlistView({
               </ul>
             </div>
 
-            {/* 「カット申込書をダウンロード」はこの画面に留まったまま完結する操作、
-                「カットリストを見る」は画面自体が切り替わる次のステップへの移動のため、
-                同じ横並びの2択に見せると「押したら想定外に先へ進んでしまった」と
-                感じやすい（実際にユーザーから報告あり）。見た目・並び順を分けて、
-                後者が「次へ進むボタン」だとひと目で分かるようにする */}
+            {/* 「制作導線UI」指示①：木取り図を確認したら、チェックを入れてから
+                下（カットリスト）へ進む、という自然なスクロール体験にする。
+                保存先はbuildChecklistの既存2番目の項目をそのまま流用する（案A） */}
+            <label className="flex items-center gap-2.5 rounded-tanei-control border border-tanei-border bg-white px-3 py-2.5 cursor-pointer hover:bg-tanei-surface transition-colors">
+              <input
+                type="checkbox"
+                checked={Boolean(buildChecklist[CUT_LAYOUT_CONFIRMED_KEY])}
+                onChange={() => onToggleBuildChecklistKey(CUT_LAYOUT_CONFIRMED_KEY)}
+                className="h-4 w-4 accent-tanei-brand flex-shrink-0"
+              />
+              <span className="text-sm font-bold text-tanei-ink">木取り図を確認しました</span>
+            </label>
+
+            {/* 「制作導線UI」指示②：以前は別画面（cutMaterials）だったカットリストを、
+                この木取り図の続きとして同じページ内に表示する。別ページへは移動しない */}
+            <div className="border-t border-tanei-border pt-4">
+              <h3 id={CUT_MATERIALS_ANCHOR_ID} className="text-sm font-bold text-tanei-ink mb-1 scroll-mt-4">
+                ② カットリスト
+              </h3>
+              <p className="text-xs text-tanei-ink-muted mb-2">この寸法で木材をカットしてください。</p>
+
+              {cutListItems.length === 0 ? (
+                <p className="text-xs text-tanei-ink-muted">カットリストを作成するための設計情報が不足しています。</p>
+              ) : (
+                <>
+                  <p className="text-xs text-tanei-ink mb-2">
+                    進捗：<span className="font-black text-tanei-brand">{cutListDoneCount} / {cutListItems.length}</span> 完了
+                  </p>
+                  <div className="flex flex-col gap-3">
+                    {cutListGroupedByMaterial.map((group) => (
+                      <div key={group.material}>
+                        <p className="text-xs font-bold text-tanei-brand mb-1.5">■ {group.material}</p>
+                        <ul className="flex flex-col gap-2">
+                          {group.items.map((item) => {
+                            const isItemChecked = Boolean(cutListChecked[item.id]);
+                            return (
+                              <li key={item.id}>
+                                <label
+                                  className={`flex items-start gap-3 rounded-tanei-control border px-3 py-2.5 cursor-pointer transition-colors ${
+                                    isItemChecked
+                                      ? 'bg-tanei-brand-soft border-tanei-brand'
+                                      : 'bg-white border-tanei-border hover:bg-tanei-surface'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isItemChecked}
+                                    onChange={() => onToggleCutListItem(item.id)}
+                                    className="mt-0.5 h-4 w-4 accent-tanei-brand flex-shrink-0"
+                                  />
+                                  <span className="flex-1">
+                                    <span
+                                      className={`block font-bold text-sm ${isItemChecked ? 'text-tanei-ink line-through' : 'text-tanei-ink'}`}
+                                    >
+                                      {item.name}
+                                    </span>
+                                    <span className="block text-xs text-tanei-ink-muted mt-0.5">
+                                      {item.widthMm} × {item.heightMm} × {item.thicknessMm} mm　×{item.qty}
+                                    </span>
+                                  </span>
+                                </label>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <label className="flex items-center gap-2.5 rounded-tanei-control border border-tanei-border bg-white px-3 py-2.5 cursor-pointer hover:bg-tanei-surface transition-colors">
+              <input
+                type="checkbox"
+                checked={Boolean(buildChecklist[CUT_MATERIALS_CONFIRMED_KEY])}
+                onChange={() => onToggleBuildChecklistKey(CUT_MATERIALS_CONFIRMED_KEY)}
+                className="h-4 w-4 accent-tanei-brand flex-shrink-0"
+              />
+              <span className="text-sm font-bold text-tanei-ink">カット寸法を確認しました</span>
+            </label>
+
+            {/* 「制作導線UI」指示③：カット申込書もこの画面内で完結する操作のまま
+                （既存どおりPDFはブラウザのダウンロードのみで別ページへは移動しない）。
+                生成後は「✓ 作成しました」の確認表示と確認チェックを続けて表示する */}
+            <div className="border-t border-tanei-border pt-4 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={isGeneratingPdf}
+                className="w-full bg-tanei-brand text-white px-4 py-3 rounded-tanei-control text-sm font-bold hover:bg-tanei-brand-dark transition-colors disabled:opacity-50"
+              >
+                {isGeneratingPdf ? 'カット申込書を作成中…' : '📝 カット申込書を作る'}
+              </button>
+              {hasGeneratedCutSheet && (
+                <>
+                  <p className="text-xs font-bold text-tanei-brand">✓ カット申込書を作成しました</p>
+                  <label className="flex items-center gap-2.5 rounded-tanei-control border border-tanei-border bg-white px-3 py-2.5 cursor-pointer hover:bg-tanei-surface transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(buildChecklist[CUT_SHEET_CONFIRMED_KEY])}
+                      onChange={() => onToggleBuildChecklistKey(CUT_SHEET_CONFIRMED_KEY)}
+                      className="h-4 w-4 accent-tanei-brand flex-shrink-0"
+                    />
+                    <span className="text-sm font-bold text-tanei-ink">カット申込書を確認しました</span>
+                  </label>
+                </>
+              )}
+            </div>
+
             <button
               type="button"
-              onClick={handleDownloadPdf}
-              disabled={isGeneratingPdf}
-              className="w-full bg-tanei-brand text-white px-4 py-3 rounded-tanei-control text-sm font-bold hover:bg-tanei-brand-dark transition-colors disabled:opacity-50"
-            >
-              {isGeneratingPdf ? 'カット申込書を作成中…' : '📝 カット申込書をダウンロード'}
-            </button>
-            <button
-              type="button"
-              onClick={onOpenCutList}
+              onClick={onOpenBuildCheck}
               className="w-full flex items-center justify-center gap-1.5 bg-white border border-tanei-border text-tanei-ink px-4 py-3 rounded-tanei-control text-sm font-bold hover:border-tanei-brand hover:text-tanei-brand transition-colors"
             >
-              次へ：📋 カットリストを見る →
+              次へ：制作チェックへ →
             </button>
 
             {primaryLayout && (
