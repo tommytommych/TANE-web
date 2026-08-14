@@ -25,10 +25,13 @@ import {
   setBackPanel,
   setDoors,
   setDrawerCount,
+  setLegCount,
+  setLegHeight,
   setLegs,
   updateShelfInDesign,
   type PartMaterialLabel,
 } from '../../lib/cad/model';
+import { DEFAULT_LEG_HEIGHT_MM } from '../../lib/cad/geometry';
 import type { FurnitureDesign, PanelFinish } from '../../lib/cad/types';
 import {
   createNewFurnitureProjectId,
@@ -358,6 +361,15 @@ export default function CadStudio({
     setDesign((prev) => setLegs(prev, !prev.legs));
   }, []);
 
+  const handleLegHeightChange = useCallback((heightMm: number) => {
+    if (!Number.isFinite(heightMm)) return;
+    setDesign((prev) => setLegHeight(prev, heightMm));
+  }, []);
+
+  const handleLegCountChange = useCallback((count: 4 | 6) => {
+    setDesign((prev) => setLegCount(prev, count));
+  }, []);
+
   const handleToggleDoors = useCallback(() => {
     setDesign((prev) => setDoors(prev, !(prev.doors ?? false)));
   }, []);
@@ -574,6 +586,8 @@ export default function CadStudio({
             model={lastValidModel}
             backPanel={design.backPanel}
             legs={design.legs}
+            legHeightMm={design.legHeightMm ?? DEFAULT_LEG_HEIGHT_MM}
+            legCount={design.legCount ?? 4}
             doors={design.doors ?? false}
             drawerCount={design.drawerCount ?? 0}
             kind={design.kind}
@@ -581,6 +595,8 @@ export default function CadStudio({
             onAddShelf={handleAddShelf}
             onToggleBackPanel={handleToggleBackPanel}
             onToggleLegs={handleToggleLegs}
+            onLegHeightChange={handleLegHeightChange}
+            onLegCountChange={handleLegCountChange}
             onToggleDoors={handleToggleDoors}
             onIncrementDrawerCount={handleIncrementDrawerCount}
             onDecrementDrawerCount={handleDecrementDrawerCount}

@@ -128,25 +128,49 @@ function shelfEntryToPanel(
 }
 
 const LEG_SIZE_MM = 30;
-const LEG_HEIGHT_MM = 80;
+// design.legHeightMmが未指定（この機能より前に保存されたプロジェクト等）の場合の既定値。
+// 既存の見た目を変えないよう、Phase 2-2以来ずっと使ってきた80mmをそのまま既定値にする
+// （tanei-studio/freecad_scripts/generate_model.py側の既定値100mmとは異なるが、
+// あちらは元々別実装であり、ここで既存のブラウザCADの見た目を変える理由にはならない）
+export const DEFAULT_LEG_HEIGHT_MM = 80;
+export const MIN_LEG_HEIGHT_MM = 30;
+export const MAX_LEG_HEIGHT_MM = 400;
 
-/** 4本脚（左前・右前・左奥・右奥）を、本体底面のすぐ下に配置する。
- * 個別の脚の高さ調整・本数変更はPhase 2-3以降の検討課題とし、今回はON/OFFのみ */
-function buildLegPanels({ width, depth, thickness: t }: BoxDimensions): FurniturePanel[] {
-  const positions: { id: string; label: string; x: number; y: number }[] = [
-    { id: 'leg-front-left', label: '脚（前左）', x: t, y: t },
-    { id: 'leg-front-right', label: '脚（前右）', x: width - t - LEG_SIZE_MM, y: t },
-    { id: 'leg-back-left', label: '脚（奥左）', x: t, y: depth - t - LEG_SIZE_MM },
-    { id: 'leg-back-right', label: '脚（奥右）', x: width - t - LEG_SIZE_MM, y: depth - t - LEG_SIZE_MM },
+/** 4本脚（左前・右前・左奥・右奥）、または6本脚（4本+前後中央）を、本体底面の
+ * すぐ下に配置する（tanei-studio/freecad_scripts/generate_model.pyの_option_legsと
+ * 同じ考え方：6本目・7本目ではなく、中央の1本を前後それぞれに追加して6本にする）。
+ * x/y位置は既存の4本脚の配置（側板の厚みぶんだけ内側に入れる、t基準のinset）を
+ * そのまま踏襲し、既存プロジェクトの見た目を変えない */
+function buildLegPanels(
+  { width, depth, thickness: t }: BoxDimensions,
+  legHeightMm: number = DEFAULT_LEG_HEIGHT_MM,
+  legCount: 4 | 6 = 4
+): FurniturePanel[] {
+  const xPositions =
+    legCount <= 4
+      ? [t, width - t - LEG_SIZE_MM]
+      : [t, (width - LEG_SIZE_MM) / 2, width - t - LEG_SIZE_MM];
+  const yPositions: { suffix: string; y: number }[] = [
+    { suffix: '前', y: t },
+    { suffix: '奥', y: depth - t - LEG_SIZE_MM },
   ];
+  const xLabels = legCount <= 4 ? ['左', '右'] : ['左', '中央', '右'];
+  const xIds = legCount <= 4 ? ['left', 'right'] : ['left', 'center', 'right'];
 
-  return positions.map((p) => ({
-    id: p.id,
-    kind: 'leg',
-    label: p.label,
-    position: vec3(p.x, p.y, -LEG_HEIGHT_MM),
-    size: vec3(LEG_SIZE_MM, LEG_SIZE_MM, LEG_HEIGHT_MM),
-  }));
+  const panels: FurniturePanel[] = [];
+  yPositions.forEach(({ suffix, y }) => {
+    const ySuffixId = suffix === '前' ? 'front' : 'back';
+    xPositions.forEach((x, xi) => {
+      panels.push({
+        id: `leg-${ySuffixId}-${xIds[xi]}`,
+        kind: 'leg',
+        label: `脚（${suffix}${xLabels[xi]}）`,
+        position: vec3(x, y, -legHeightMm),
+        size: vec3(LEG_SIZE_MM, LEG_SIZE_MM, legHeightMm),
+      });
+    });
+  });
+  return panels;
 }
 
 // 扉と側板・天板・底板の間に空ける隙間（mm）。実際の家具でも扉と本体の間には
@@ -388,7 +412,7 @@ export function buildFurniturePanels(design: FurnitureDesign, materials?: TableM
   );
 
   if (design.legs) {
-    panels = [...panels, ...buildLegPanels(dims)];
+    panels = [...panels, ...buildLegPanels(dims, design.legHeightMm, design.legCount)];
   }
 
   if (design.doors) {

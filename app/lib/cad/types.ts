@@ -123,6 +123,13 @@ export interface FurnitureDesign {
    * 縦の列分割はPhase C以降の拡張課題）。0または未指定は「引き出しなし」として扱う。
    * doorsと同じ方針でoptionalにし、この機能より前に保存されたプロジェクトとの互換性を保つ */
   drawerCount?: number;
+  /** 脚の高さ（mm、Phase C「パーツ追加」）。legsがtrueのときのみ使う。未指定時は
+   * geometry.tsのDEFAULT_LEG_HEIGHT_MM（80mm、Phase 2-2以来の既存の見た目）にフォールバック
+   * するため、この機能より前に保存されたプロジェクトの見た目は変わらない */
+  legHeightMm?: number;
+  /** 脚の本数（Phase C「パーツ追加」）。4=四隅、6=四隅+前後中央。未指定時は4本
+   * （既存の見た目）として扱う */
+  legCount?: 4 | 6;
 }
 
 /** 保存データ（IndexedDB）から読み込んだFurnitureDesignの構造検証。ブラウザの保存領域が
@@ -140,6 +147,8 @@ export const isValidFurnitureDesign = (value: unknown): value is FurnitureDesign
     typeof v.legs === 'boolean' &&
     (v.doors === undefined || typeof v.doors === 'boolean') &&
     (v.drawerCount === undefined || (typeof v.drawerCount === 'number' && Number.isFinite(v.drawerCount) && v.drawerCount >= 0)) &&
+    (v.legHeightMm === undefined || (typeof v.legHeightMm === 'number' && Number.isFinite(v.legHeightMm) && v.legHeightMm > 0)) &&
+    (v.legCount === undefined || v.legCount === 4 || v.legCount === 6) &&
     Array.isArray(v.shelves) &&
     v.shelves.every((s) => {
       if (typeof s !== 'object' || s === null) return false;

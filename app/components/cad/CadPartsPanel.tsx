@@ -6,11 +6,14 @@
 
 import type { FurnitureModel } from '../../lib/cad/types';
 import { MAX_DRAWER_COUNT } from '../../lib/cad/model';
+import { MAX_LEG_HEIGHT_MM, MIN_LEG_HEIGHT_MM } from '../../lib/cad/geometry';
 
 interface CadPartsPanelProps {
   model: FurnitureModel;
   backPanel: boolean;
   legs: boolean;
+  legHeightMm: number;
+  legCount: 4 | 6;
   doors: boolean;
   drawerCount: number;
   /** 家具の構造の種類。'table'のときは棚板・背板・脚・扉・引き出しの切り替えUIを表示しない
@@ -20,6 +23,8 @@ interface CadPartsPanelProps {
   onAddShelf: () => void;
   onToggleBackPanel: () => void;
   onToggleLegs: () => void;
+  onLegHeightChange: (heightMm: number) => void;
+  onLegCountChange: (count: 4 | 6) => void;
   onToggleDoors: () => void;
   onIncrementDrawerCount: () => void;
   onDecrementDrawerCount: () => void;
@@ -30,6 +35,8 @@ export default function CadPartsPanel({
   model,
   backPanel,
   legs,
+  legHeightMm,
+  legCount,
   doors,
   drawerCount,
   kind,
@@ -37,6 +44,8 @@ export default function CadPartsPanel({
   onAddShelf,
   onToggleBackPanel,
   onToggleLegs,
+  onLegHeightChange,
+  onLegCountChange,
   onToggleDoors,
   onIncrementDrawerCount,
   onDecrementDrawerCount,
@@ -74,6 +83,41 @@ export default function CadPartsPanel({
             <input type="checkbox" checked={legs} onChange={onToggleLegs} className="h-4 w-4 accent-tanei-brand" />
             <span className="text-tanei-ink">脚あり</span>
           </label>
+
+          {legs && (
+            <div className="flex flex-col gap-2 pl-6 -mt-1">
+              <label className="flex items-center justify-between gap-2">
+                <span className="text-xs text-tanei-ink-muted">脚の高さ（mm）</span>
+                <input
+                  type="number"
+                  min={MIN_LEG_HEIGHT_MM}
+                  max={MAX_LEG_HEIGHT_MM}
+                  value={legHeightMm}
+                  onChange={(e) => onLegHeightChange(Number(e.target.value))}
+                  className="w-20 border border-tanei-border rounded-tanei-control px-2 py-1 text-xs text-tanei-ink font-bold bg-white focus:outline-none focus:ring-2 focus:ring-tanei-brand"
+                />
+              </label>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-tanei-ink-muted">脚の本数</span>
+                <div className="flex gap-1.5">
+                  {([4, 6] as const).map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      onClick={() => onLegCountChange(count)}
+                      className={`px-3 py-1 rounded-tanei-control text-xs font-bold border transition-colors ${
+                        legCount === count
+                          ? 'bg-tanei-brand-soft border-tanei-brand text-tanei-ink'
+                          : 'bg-tanei-surface hover:bg-white border-tanei-border text-tanei-ink'
+                      }`}
+                    >
+                      {count}本
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={doors} onChange={onToggleDoors} className="h-4 w-4 accent-tanei-brand" />

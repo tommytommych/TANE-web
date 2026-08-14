@@ -13,7 +13,14 @@
 
 import type { SheetLayout, SheetPart } from '../sheetLayout';
 import type { FurnitureDesign, FurnitureModel, FurniturePanel, FurniturePanelKind, PanelFinish, ShelfEntry } from './types';
-import { buildFurniturePanels, clampShelfEntry, defaultShelfSize, panelToCutSizeMm } from './geometry';
+import {
+  buildFurniturePanels,
+  clampShelfEntry,
+  defaultShelfSize,
+  MAX_LEG_HEIGHT_MM,
+  MIN_LEG_HEIGHT_MM,
+  panelToCutSizeMm,
+} from './geometry';
 import { DEMO_ASSEMBLY_MANUAL } from '../assemblyManual';
 import { KOHNAN_WOOD_LIST } from '../constants';
 
@@ -149,6 +156,15 @@ export function setBackPanel(design: FurnitureDesign, backPanel: boolean): Furni
 
 export function setLegs(design: FurnitureDesign, legs: boolean): FurnitureDesign {
   return { ...design, legs };
+}
+
+export function setLegHeight(design: FurnitureDesign, heightMm: number): FurnitureDesign {
+  const clamped = Math.min(MAX_LEG_HEIGHT_MM, Math.max(MIN_LEG_HEIGHT_MM, Math.round(heightMm)));
+  return { ...design, legHeightMm: clamped };
+}
+
+export function setLegCount(design: FurnitureDesign, count: 4 | 6): FurnitureDesign {
+  return { ...design, legCount: count };
 }
 
 export function setDoors(design: FurnitureDesign, doors: boolean): FurnitureDesign {
@@ -304,6 +320,8 @@ export function buildFurnitureModel(
     options: {
       backPanel: design.backPanel,
       legs: design.legs,
+      legHeightMm: design.legHeightMm,
+      legCount: design.legCount ?? 4,
       doors: design.doors ?? false,
       drawerCount: design.drawerCount ?? 0,
       shelfCount: design.shelves.length,
