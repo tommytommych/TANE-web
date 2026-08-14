@@ -125,7 +125,10 @@ export default function CadViewport({ model, className, selectedPanelId, onSelec
       )}
 
       <Canvas
-        camera={{ position: [center[0] + distance, center[1] + distance * 0.8, center[2] + distance], fov: 45 }}
+        // 初期表示は「正面から見る」ボタン（setView('front')）と同じ計算式にする。
+        // 以前はここだけ斜め視点の式のままになっており、開いた直後は常に斜めから
+        // 始まってしまっていた
+        camera={{ position: [center[0], center[1], center[2] - distance], fov: 45 }}
         style={{ touchAction: 'none' }}
         onPointerMissed={() => onSelectPanel(null)}
       >
