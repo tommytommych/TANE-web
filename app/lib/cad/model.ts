@@ -456,6 +456,10 @@ export interface ViewerPanel {
   dy: number;
   dz: number;
   color: string;
+  /** true: ホワイト/ブラックの塗装仕上げ（不透明な塗料で木目が隠れる）。
+   * false: クリア塗装・ウォルナット調・無指定（木地や着色ステインで木目が見える）。
+   * Phase D「木材表現」でCadViewport.tsx側が木目テクスチャを出すかどうかの判定に使う */
+  isPainted: boolean;
 }
 
 const MATERIAL_COLOR_HEX: Record<string, string> = {
@@ -495,6 +499,7 @@ export function furnitureModelToViewerPanels(model: FurnitureModel): ViewerPanel
     dy: panel.size.y,
     dz: panel.size.z,
     color: colorForPanel(panel, model.material),
+    isPainted: panel.finish === 'white' || panel.finish === 'black',
   }));
 }
 

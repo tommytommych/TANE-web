@@ -7,12 +7,17 @@
 // React Three Fiberへ移植した構成。FreeCAD版と違いネイティブアプリ・サーバーに
 // 一切依存せず、ブラウザだけで完結する。
 
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { ContactShadows, Edges, OrbitControls } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import type { FurnitureModel } from '../../lib/cad/types';
 import { furnitureModelToViewerPanels } from '../../lib/cad/model';
+import { createWoodGrainTexture } from './woodGrainTexture';
+
+// 木目の見た目の密度（mm）。板の長辺がおおよそこの長さごとに1回、木目模様が
+// 繰り返されるようにする（値が小さいほど木目が細かく、大きいほど粗く見える）
+const WOOD_GRAIN_PERIOD_MM = 140;
 
 interface CadViewportProps {
   model: FurnitureModel;
@@ -35,7 +40,7 @@ function PanelMesh({
   isSelected: boolean;
   onSelect: (id: string) => void;
 }) {
-  const { x, y, z, dx, dy, dz, color, id } = panel;
+  const { x, y, z, dx, dy, dz, color, id, isPainted } = panel;
   // tanei-studioの座標系（原点=本体の左手前下、y=奥行方向で背板側が大きい値）を、
   // Three.jsの座標系（X=幅, Y=高さ, Z=奥行）へ変換するため、パネル位置にサイズの
   // 半分を足して「箱の中心座標」にしている
@@ -45,6 +50,16 @@ function PanelMesh({
     (y + dy / 2) * MM_TO_SCENE,
   ];
   const size: [number, number, number] = [dx * MM_TO_SCENE, dz * MM_TO_SCENE, dy * MM_TO_SCENE];
+
+  // Phase D「木材表現」：ホワイト/ブラックの塗装仕上げ（不透明な塗料）は木目を隠すため
+  // テクスチャを使わず単色のまま、それ以外（無指定・クリア塗装・ウォルナット調）は木目
+  // テクスチャを重ねる。板のサイズに応じてrepeatを変え、大きい板でも小さい板でも
+  // 木目の粗さが揃って見えるようにする
+  const woodTexture = useMemo(() => {
+    if (isPainted) return null;
+    return createWoodGrainTexture(color, dx / WOOD_GRAIN_PERIOD_MM, dz / WOOD_GRAIN_PERIOD_MM);
+  }, [isPainted, color, dx, dz]);
+  useEffect(() => () => woodTexture?.dispose(), [woodTexture]);
 
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
     // 手前のパネルだけを選択する（クリック位置の奥にある他パネルまで連鎖して
@@ -57,11 +72,19 @@ function PanelMesh({
     <mesh position={position} name={panel.label} onClick={handleClick}>
       <boxGeometry args={size} />
       <meshStandardMaterial
-        color={color}
+        // 木目テクスチャは下絵の時点で既にcolorHexで塗りつぶしているため、ここで
+        // さらにcolorを掛け合わせると二重に色が乗ってしまう。テクスチャ使用時は
+        // 白（無着色）にし、テクスチャの色をそのまま見せる
+        color={woodTexture ? '#ffffff' : color}
+        map={woodTexture ?? undefined}
         roughness={0.85}
         emissive={isSelected ? '#5F8D69' : '#000000'}
         emissiveIntensity={isSelected ? 0.45 : 0}
       />
+      {/* tanei-studio/static/index.htmlの素のThree.js実装（LineSegments+EdgesGeometry、
+          色0x3a2f27）と同じ考え方：パーツの輪郭を暗い線で強調することで、扉・引き出しの
+          隙間（2〜3mm）のような狭いギャップでも別パーツだと視認しやすくする */}
+      <Edges color="#3a2f27" threshold={15} />
     </mesh>
   );
 }
@@ -81,17 +104,37 @@ export default function CadViewport({ model, className, selectedPanelId, onSelec
   const maxDimMm = Math.max(model.width, model.depth, model.height, 1);
   const distance = maxDimMm * MM_TO_SCENE * 1.8;
 
-  const setView = (mode: 'front' | 'oblique') => {
+  // 接地シャドウ（ContactShadows）を置くY座標。脚ありの場合、脚の分だけ本体底面より
+  // 下（マイナス側）が実際の設置面になるため、0（本体底面）ではなく全パネルの最小z値
+  // （furnitureModelToViewerPanels基準、脚があれば負の値）を使う
+  const floorY = Math.min(0, ...panels.map((p) => p.z)) * MM_TO_SCENE;
+
+  const setView = (mode: 'front' | 'oblique' | 'side' | 'top') => {
     const controls = controlsRef.current;
     if (!controls) return;
     const [cx, cy, cz] = center;
-    if (mode === 'front') {
-      // モデルのZ座標は奥行方向（tanei-studio座標系のy）に対応し、Z=0側が手前＝正面、
-      // Zが大きいほど背板側＝背面になる（PanelMeshのposition変換を参照）。
-      // カメラを正面側（Zが小さい側）に置いてモデル中心を見ることで、正しく正面が映る
-      controls.object.position.set(cx, cy, cz - distance);
+    if (mode === 'top') {
+      // 真上から見下ろす。カメラのup方向（既定は(0,1,0)＝Y軸）が視線方向
+      // （こちらもほぼ真下=Y軸方向）とほぼ平行になり、カメラのroll（画面の回転）が
+      // 数学的に不定になる「ジンバルロック」が起きる。これによりOrbitControls・
+      // レンダリングが不安定になり、キャンバスの隅に前フレームの残像のような
+      // 描画崩れが出ることを確認したため、upを視線と直交する(0,0,-1)へ明示的に
+      // 変更してから真上に配置する（真上ビュー以外に切り替える際は元の(0,1,0)に戻す）
+      controls.object.up.set(0, 0, -1);
+      controls.object.position.set(cx, cy + distance, cz);
     } else {
-      controls.object.position.set(cx + distance, cy + distance * 0.8, cz + distance);
+      controls.object.up.set(0, 1, 0);
+      if (mode === 'front') {
+        // モデルのZ座標は奥行方向（tanei-studio座標系のy）に対応し、Z=0側が手前＝正面、
+        // Zが大きいほど背板側＝背面になる（PanelMeshのposition変換を参照）。
+        // カメラを正面側（Zが小さい側）に置いてモデル中心を見ることで、正しく正面が映る
+        controls.object.position.set(cx, cy, cz - distance);
+      } else if (mode === 'side') {
+        // 側板が正面から見える角度（X軸方向の真横）にカメラを置く
+        controls.object.position.set(cx + distance, cy, cz);
+      } else {
+        controls.object.position.set(cx + distance, cy + distance * 0.8, cz + distance);
+      }
     }
     controls.target.set(cx, cy, cz);
     controls.update();
@@ -100,14 +143,30 @@ export default function CadViewport({ model, className, selectedPanelId, onSelec
   return (
     <div className={`relative ${className ?? 'h-full w-full'}`}>
       {/* 初心者向けのカメラプリセット。OrbitControlsでも同じ視点に手動で回せるが、
-          「正面」「斜め」というボタンにしておくと、3D操作に不慣れな人でも迷わない */}
-      <div className="absolute top-3 left-3 z-10 flex gap-1.5">
+          「正面」「側面」「上面」「斜め」というボタンにしておくと、3D操作に不慣れな人でも
+          迷わない（Phase D：完成イメージ機能をブラウザCADへ統合するにあたり、
+          旧完成イメージが持っていなかった視点の選びやすさをむしろ強化する） */}
+      <div className="absolute top-3 left-3 right-3 z-10 flex flex-wrap gap-1.5">
         <button
           type="button"
           onClick={() => setView('front')}
           className="bg-white/90 hover:bg-white text-tanei-ink text-xs font-bold px-3 py-1.5 rounded-full border border-tanei-border shadow-sm transition-colors"
         >
           正面から見る
+        </button>
+        <button
+          type="button"
+          onClick={() => setView('side')}
+          className="bg-white/90 hover:bg-white text-tanei-ink text-xs font-bold px-3 py-1.5 rounded-full border border-tanei-border shadow-sm transition-colors"
+        >
+          側面から見る
+        </button>
+        <button
+          type="button"
+          onClick={() => setView('top')}
+          className="bg-white/90 hover:bg-white text-tanei-ink text-xs font-bold px-3 py-1.5 rounded-full border border-tanei-border shadow-sm transition-colors"
+        >
+          上面から見る
         </button>
         <button
           type="button"
@@ -119,7 +178,7 @@ export default function CadViewport({ model, className, selectedPanelId, onSelec
       </div>
 
       {selectedLabel && (
-        <div className="absolute top-3 right-3 z-10 bg-tanei-brand text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">
+        <div className="absolute bottom-3 right-3 z-10 bg-tanei-brand text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">
           {selectedLabel}を選択中
         </div>
       )}
@@ -133,11 +192,28 @@ export default function CadViewport({ model, className, selectedPanelId, onSelec
         onPointerMissed={() => onSelectPanel(null)}
       >
         <color attach="background" args={['#FAF8F4']} />
-        <ambientLight intensity={0.7} />
-        <directionalLight position={[3, 5, 2]} intensity={0.8} />
+        {/* Phase D：照明を単一のambientLight+directionalLightから、空側／地面側で
+            色味が変わるhemisphereLightへ変更し、平坦になりがちだった陰影に自然な
+            グラデーションを持たせる。地面に接地している立体感は、下のContactShadows
+            （常にscene全体を毎フレーム再計算する柔らかい落ち影）で表現する。
+            【注意】directionalLightのpositionのZは奥行方向（PanelMeshのposition変換
+            参照：Z=0側が正面、Zが大きいほど背面）。「正面から見る」が既定の初期視点で
+            あるため、Zをマイナス（正面寄り）にして主光源が正面をきちんと照らすように
+            している（以前はZがプラスで背面側から照らしていたため、初期表示の正面が
+            暗く見えてしまっていた）。
+            【castShadowは意図的に使わない】directionalLightのshadow-mapは既定の
+            シャドウカメラ範囲が固定サイズで、脚（本体底面より下に伸びる）・扉
+            （本体前面より手前に飛び出す）のように本体の基本サイズを超えて配置される
+            パーツがあると、真上から見た際にシャドウマップの範囲外になり、キャンバスの
+            隅に本来存在しないはずの黒い矩形が描画される不具合を実機確認した。
+            毎回モデル寸法に応じてシャドウカメラ範囲を追従させる実装は複雑になるため、
+            今回はcastShadowを使わず、ContactShadowsだけで陰影表現を担う方針にする */}
+        <hemisphereLight args={['#FFF6E8', '#8C7A66', 0.65]} />
+        <directionalLight position={[2, 6, -2]} intensity={1.1} />
         {panels.map((panel) => (
           <PanelMesh key={panel.id} panel={panel} isSelected={panel.id === selectedPanelId} onSelect={onSelectPanel} />
         ))}
+        <ContactShadows position={[center[0], floorY, center[2]]} opacity={0.35} scale={maxDimMm * MM_TO_SCENE * 3} blur={2.2} far={distance * 4} />
         <OrbitControls
           ref={controlsRef}
           makeDefault
