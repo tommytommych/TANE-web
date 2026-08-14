@@ -724,9 +724,33 @@ function collectPayloadFromForm() {
   };
 }
 
+// 土台パーツ（脚・幕板・キャスター・本体2段重ね）・段パーツ（扉・引き出し前板・支柱・
+// 縦仕切り・横棚板・背面補強桟）を、追加パーツなしの初期状態へ戻す。
+// StudioSpecにはこれらを表す項目が無い（shelf_hだけは例外、下記参照）ため、以前は
+// 「チャットから別の家具の仕様が届いても、前に別の家具を手動編集していた際の追加パーツが
+// 消えずに残ってしまう」不具合があった（例：別の家具で脚や本体2段重ねを試しに有効にした後、
+// 別の設計を開くと、その追加パーツが混ざったまま完成イメージが崩れて見える）。
+// 新しい仕様を反映する前に必ずこれを呼び、まっさらな状態から反映し直す
+function resetOptionPartsToDefault() {
+  for (const name of ['opt-legs-enabled', 'opt-apron-enabled', 'opt-caster_block-enabled']) {
+    const el = form.elements.namedItem(name);
+    if (el) el.checked = false;
+  }
+  if (stackCheckbox) stackCheckbox.checked = false;
+  for (const part of Object.keys(tierPartState)) {
+    tierPartState[part].tier1 = 0;
+    tierPartState[part].tier2 = 0;
+  }
+  renderTierZones();
+}
+
 // チャット側から届いた仕様(spec)をフォームの各入力欄に反映する。
-// 未指定の項目（thickness/panelFinishes等、チャット側が省略した場合）は既存の値を保持する
+// 未指定の項目（thickness/panelFinishes等、チャット側が省略した場合）は既存の値を保持する。
+// ただし土台パーツ・段パーツ（上記resetOptionPartsToDefault参照）は、届いた仕様と無関係に
+// 前の状態が混ざらないよう、毎回いったんリセットしてから反映し直す
 function applySpecToForm(spec) {
+  resetOptionPartsToDefault();
+
   if (spec.kind === 'table' || spec.kind === 'box') currentKind = spec.kind;
   if (spec.item != null) form.item.value = spec.item;
   if (spec.width != null) form.width.value = spec.width;
@@ -748,14 +772,13 @@ function applySpecToForm(spec) {
   currentPartMaterials = (spec.partMaterials && typeof spec.partMaterials === 'object') ? spec.partMaterials : {};
 
   // ブラウザCADの棚板の枚数（options.shelf_h.tier1）をtier1ゾーンの横棚板の個数へ反映する。
-  // 「未指定の項目は既存の値を保持する」という上記の方針どおり、spec.options.shelf_hが
-  // 無い場合（AIチャット由来のspec等）は、tanei-studio側で手動編集した棚板の状態をそのまま
-  // 保持し、上書きしない
+  // resetOptionPartsToDefault()で一旦0にした後、spec側に枚数の指定があればそれで上書きする
+  // （0件・未指定のどちらも「棚板なし」として扱われるため、明示的な分岐は不要）
   const shelfH = spec.options && typeof spec.options === 'object' ? spec.options.shelf_h : null;
   if (shelfH && typeof shelfH === 'object' && typeof shelfH.tier1 === 'number') {
     tierPartState.shelf_h.tier1 = Math.max(0, Math.min(TIER_PART_MAX.shelf_h, Math.round(shelfH.tier1)));
-    renderTierZones();
   }
+  renderTierZones();
 }
 
 // /api/renderを呼び出し、結果を画面に反映する（フォーム送信・チャットからの自動反映の両方から使う共通処理）
