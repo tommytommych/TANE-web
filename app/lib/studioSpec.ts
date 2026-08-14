@@ -30,6 +30,13 @@ export interface StudioSpec {
    * （実在する材料名かどうかは、消費側＝CadPageShell.tsxが既存のsafeMaterialと同じ
    * 考え方でチェックする） */
   partMaterials?: Partial<Record<PartMaterialLabel, string>>;
+  /** tanei-studio（完成イメージ）側の追加パーツ（扉・脚・棚板など）指定のうち、ブラウザCADの
+   * 「棚板」を完成イメージにも反映するためだけに使う最小限のフィールド。tanei-studioの
+   * 棚板（横棚板/shelf_h）はブラウザCADのような自由な高さ指定ではなく、本体内を指定した枚数で
+   * 均等割りする方式のため、正確な位置までは再現できず「枚数」だけを引き継ぐ（無いよりは
+   * 近い見た目になる、という割り切り）。扉・脚・キャスターなど他の追加パーツはブラウザCAD側に
+   * 対応する概念が無いため、ここでは扱わない */
+  options?: { shelf_h?: { tier1?: number } };
 }
 
 const PANEL_LABELS = ['天板', '底板', '側板', '背板'];
@@ -51,6 +58,16 @@ const isValidPartMaterials = (value: unknown): value is StudioSpec['partMaterial
   );
 };
 
+const isValidStudioSpecOptions = (value: unknown): value is StudioSpec['options'] => {
+  if (value === undefined) return true;
+  if (typeof value !== 'object' || value === null) return false;
+  const shelfH = (value as Record<string, unknown>).shelf_h;
+  if (shelfH === undefined) return true;
+  if (typeof shelfH !== 'object' || shelfH === null) return false;
+  const tier1 = (shelfH as Record<string, unknown>).tier1;
+  return tier1 === undefined || typeof tier1 === 'number';
+};
+
 export const isValidStudioSpec = (value: unknown): value is StudioSpec => {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
@@ -63,7 +80,8 @@ export const isValidStudioSpec = (value: unknown): value is StudioSpec => {
     (v.thickness === undefined || typeof v.thickness === 'number') &&
     typeof v.material === 'string' &&
     isValidPanelFinishes(v.panelFinishes) &&
-    isValidPartMaterials(v.partMaterials)
+    isValidPartMaterials(v.partMaterials) &&
+    isValidStudioSpecOptions(v.options)
   );
 };
 
@@ -183,4 +201,7 @@ export const furnitureDesignToStudioSpec = (
   ...(opts.partMaterials && Object.keys(opts.partMaterials).length > 0
     ? { partMaterials: opts.partMaterials }
     : {}),
+  // 棚板の枚数だけを引き継ぐ（テーブルには棚板が無いためbox限定）。0件も明示的に送ることで、
+  // ブラウザCAD側で棚板を全て削除した場合も完成イメージ側に正しく反映される
+  ...(design.kind !== 'table' ? { options: { shelf_h: { tier1: design.shelves.length } } } : {}),
 });

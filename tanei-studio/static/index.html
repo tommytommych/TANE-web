@@ -746,6 +746,16 @@ function applySpecToForm(spec) {
     }
   }
   currentPartMaterials = (spec.partMaterials && typeof spec.partMaterials === 'object') ? spec.partMaterials : {};
+
+  // ブラウザCADの棚板の枚数（options.shelf_h.tier1）をtier1ゾーンの横棚板の個数へ反映する。
+  // 「未指定の項目は既存の値を保持する」という上記の方針どおり、spec.options.shelf_hが
+  // 無い場合（AIチャット由来のspec等）は、tanei-studio側で手動編集した棚板の状態をそのまま
+  // 保持し、上書きしない
+  const shelfH = spec.options && typeof spec.options === 'object' ? spec.options.shelf_h : null;
+  if (shelfH && typeof shelfH === 'object' && typeof shelfH.tier1 === 'number') {
+    tierPartState.shelf_h.tier1 = Math.max(0, Math.min(TIER_PART_MAX.shelf_h, Math.round(shelfH.tier1)));
+    renderTierZones();
+  }
 }
 
 // /api/renderを呼び出し、結果を画面に反映する（フォーム送信・チャットからの自動反映の両方から使う共通処理）
