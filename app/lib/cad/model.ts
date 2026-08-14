@@ -165,9 +165,16 @@ export function addShelfToDesign(design: FurnitureDesign): FurnitureDesign {
   const maxZ = Math.max(minZ, design.height - t);
   const sortedZ = [minZ, ...design.shelves.map((s) => s.zAtMm), maxZ].sort((a, b) => a - b);
 
-  let gapStart = minZ;
-  let gapSize = maxZ - minZ;
-  for (let i = 0; i < sortedZ.length - 1; i++) {
+  // 「最も広い隙間」は、sortedZの隣り合う点同士の間隔（実在する隙間）だけを比較して
+  // 決める。以前はここをmaxZ-minZ（本体全体の高さ）で初期化していたため、既に棚板が
+  // 1枚以上ある状態では、どの実在の隙間もこの初期値（本体全体の高さ）を超えられず、
+  // 2枚目以降の棚板が常に最初の棚板と同じ位置（本体中央）に重なって配置されてしまう
+  // 不具合があった（パーツ一覧には棚板が追加されて見えるのに、3Dでは重なって
+  // 1枚しか見えないという症状の原因）。最初の実在の隙間（sortedZ[0]〜sortedZ[1]）を
+  // 初期値にし、残りの隙間とだけ比較する
+  let gapStart = sortedZ[0];
+  let gapSize = sortedZ[1] - sortedZ[0];
+  for (let i = 1; i < sortedZ.length - 1; i++) {
     const size = sortedZ[i + 1] - sortedZ[i];
     if (size > gapSize) {
       gapSize = size;
