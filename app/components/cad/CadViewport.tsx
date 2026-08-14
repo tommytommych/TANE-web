@@ -182,6 +182,12 @@ export default function CadViewport({ model, className, selectedPanelId, onSelec
   // （furnitureModelToViewerPanels基準、脚があれば負の値）を使う
   const floorY = Math.min(0, ...panels.map((p) => p.z)) * MM_TO_SCENE;
 
+  // シャドウの広がり（scale）は、高さを含むmaxDimMmではなく設置面の footprint（幅・奥行）
+  // だけで決める。以前はmaxDimMm（背の高い家具では高さが最大になりやすい）を使っていたため、
+  // 実際の設置面（幅750×奥行300mm程度）に対してシャドウの直径が3m近くになり、本体から
+  // 大きく離れた場所までぼやけた影が伸びて見える不具合があった（Phase F相当の見た目調整）
+  const footprintMm = Math.max(model.width, model.depth, 1);
+
   const setView = (mode: 'front' | 'oblique' | 'side' | 'top') => {
     const controls = controlsRef.current;
     if (!controls) return;
@@ -289,7 +295,7 @@ export default function CadViewport({ model, className, selectedPanelId, onSelec
         {panels.map((panel) => (
           <PanelMesh key={panel.id} panel={panel} isSelected={panel.id === selectedPanelId} onSelect={onSelectPanel} />
         ))}
-        <ContactShadows position={[center[0], floorY, center[2]]} opacity={0.35} scale={maxDimMm * MM_TO_SCENE * 3} blur={2.2} far={distance * 4} />
+        <ContactShadows position={[center[0], floorY, center[2]]} opacity={0.45} scale={footprintMm * MM_TO_SCENE * 1.5} blur={1.4} far={distance * 4} />
         <OrbitControls
           ref={controlsRef}
           makeDefault
