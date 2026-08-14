@@ -176,9 +176,9 @@ export default function CadPageShell() {
             添える（「ここで設計する」ことを明示する。STEP5対応）。ヘッダーの高さを大きく
             変えないよう、既存のitems-center・truncateの考え方を維持したまま2行構成にする */}
         <span className="flex flex-col leading-tight min-w-0">
-          <span className="text-sm font-black text-tanei-brand truncate">🌱 TANE:i ブラウザCAD</span>
+          <span className="text-sm font-black text-tanei-brand truncate">🌱 TANE:i 3D家具設計</span>
           <span className="text-[10px] text-tanei-ink-muted truncate">
-            ここで家具を設計します／幅・奥行・高さ・材料・パーツを自由に調整できます
+            ここで家具を設計し、3Dで完成形を確認できます／幅・奥行・高さ・材料・パーツを自由に調整できます
           </span>
         </span>
       </div>

@@ -53,7 +53,7 @@ const MODAL_META: Record<SavedItemType, { icon: string; label: string }> = {
   image: { icon: '🖼️', label: '保存した画像' },
   finished: { icon: '🏆', label: '完成作品' },
   history: { icon: '🕒', label: '相談履歴' },
-  cadProject: { icon: '🧊', label: '保存した設計（ブラウザCAD）' },
+  cadProject: { icon: '🧊', label: '保存した設計（TANE:i 3D家具設計）' },
 };
 
 // 手動で新規保存できるのは「画像」「完成作品」（他は会話中のボタンから保存される）

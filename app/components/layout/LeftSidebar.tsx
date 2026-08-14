@@ -14,7 +14,6 @@ interface LeftSidebarProps {
   onDownloadBlankCutSheet: () => void;
   isGeneratingPdf: boolean;
   onOpenModal: (type: SavedItemType) => void;
-  onConsumeImageUsage: () => boolean;
 }
 
 // Phase 4-01調査で判明：マイページの8項目が単純な縦一列で並んでおり、
@@ -26,7 +25,7 @@ const MY_PAGE_GROUPS: { title: string; items: { icon: string; label: string; typ
     title: '設計する',
     items: [
       { icon: '💾', label: '保存した設計・アイデア', type: 'design' },
-      { icon: '🧊', label: '保存した設計（ブラウザCAD）', type: 'cadProject' },
+      { icon: '🧊', label: '保存した設計（TANE:i 3D家具設計）', type: 'cadProject' },
     ],
   },
   {
@@ -70,7 +69,6 @@ export default function LeftSidebar({
   onDownloadBlankCutSheet,
   isGeneratingPdf,
   onOpenModal,
-  onConsumeImageUsage,
 }: LeftSidebarProps) {
   return (
     <>
@@ -171,14 +169,9 @@ export default function LeftSidebar({
                 </button>
               ))}
 
-              {/* Phase 4-01調査で判明：この2つが同じ見た目で並んでいると、初見ユーザーは
-                  何が違うのか・自分はどちらを使えばいいのか判断できなかった。TANE:iの
-                  設計画面はブラウザCADのみで、完成イメージ（旧「設計スタジオ」表記）は
-                  完成した姿を見るための補助機能という位置づけのため、「どちらで設計する？」
-                  という2択前提の文言をやめ、マイページの「設計する」「制作・作品」と同じ
-                  役割別の小見出しスタイルで「設計」「確認」に分ける。リンク先（/app/cad・
-                  /app/studio）・onConsumeImageUsageによる利用回数チェック・onCloseの
-                  挙動はいずれも変更していない */}
+              {/* TANE:iの設計入口は「TANE:i 3D家具設計」（/app/cad）1つだけにする。
+                  家具設計・3D確認・材料設定・木取り・カット申込書までをすべてここで
+                  行うため、完成イメージ（旧/app/studio）への別導線は置かない */}
               <p className="px-3 text-[11px] font-bold text-tanei-ink-muted">設計</p>
               <Link
                 href="/app/cad"
@@ -187,30 +180,8 @@ export default function LeftSidebar({
               >
                 <span>🌿</span>
                 <span className="flex flex-col leading-tight min-w-0">
-                  <span className="font-bold">ブラウザCAD</span>
+                  <span className="font-bold">TANE:i 3D家具設計</span>
                   <span className="text-[10px] font-normal text-tanei-ink-muted">スマホ・PC対応／インストール不要・すぐ使える</span>
-                </span>
-              </Link>
-
-              <p className="px-3 text-[11px] font-bold text-tanei-ink-muted mt-1.5">確認</p>
-              <Link
-                href="/app/studio"
-                onClick={(e) => {
-                  // 完成イメージ・カット申込書PDF・写真AI空間診断と同じ「本日のAI機能利用」の
-                  // 対象とする。上限到達時は遷移自体をキャンセルする（トーストはonConsumeImageUsage内で表示）
-                  if (!onConsumeImageUsage()) {
-                    e.preventDefault();
-                    return;
-                  }
-                  onClose();
-                }}
-                title="パソコン専用機能です"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-tanei-control text-sm bg-tanei-surface hover:bg-white border border-transparent hover:border-tanei-border text-tanei-ink transition-colors w-full text-left"
-              >
-                <span>✨</span>
-                <span className="flex flex-col leading-tight min-w-0">
-                  <span className="font-bold">完成イメージ</span>
-                  <span className="text-[10px] font-normal text-tanei-ink-muted">PC専用／写真のようなリアルな完成イメージを見る</span>
                 </span>
               </Link>
 

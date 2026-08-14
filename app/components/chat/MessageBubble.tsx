@@ -25,7 +25,6 @@ interface MessageBubbleProps {
   onSendMessage: (text: string, countUp?: boolean) => void;
   onDownloadCutSheet: (materialGroups?: MaterialGroup[], sheetLayouts?: SheetLayout[], itemName?: string) => void;
   onDownloadAssemblyManual: (manual?: AssemblyManual) => void;
-  onConsumeImageUsage: () => boolean;
   isGeneratingPdf: boolean;
   addItem: (
     type: SavedItemType,
@@ -60,7 +59,6 @@ function MessageBubble({
   onOpenGeminiImage,
   onSendMessage,
   onDownloadCutSheet,
-  onConsumeImageUsage,
   isGeneratingPdf,
   addItem,
   showToast,
@@ -148,7 +146,6 @@ function MessageBubble({
         <CompletionCards
           msg={msg}
           onDownloadCutSheet={onDownloadCutSheet}
-          onConsumeImageUsage={onConsumeImageUsage}
           isGeneratingPdf={isGeneratingPdf}
           addItem={addItem}
           showToast={showToast}

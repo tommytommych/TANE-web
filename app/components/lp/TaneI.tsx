@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion, useMotionValueEvent, useScroll } from 'framer-motion';
 import FadeIn from './motion/FadeIn';
 
-const STEPS = ['相談', '完成イメージ', '設計', '木取り図', 'PDF'];
+const STEPS = ['相談', '3D設計', '木取り図', 'PDF'];
 
 // このセクションはbodyより背が高く(300vh)、内側をstickyにすることで
 // 「スクロールするとステップが1つずつ進む」Apple風の演出を作っている

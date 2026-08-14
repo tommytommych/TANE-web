@@ -2,7 +2,6 @@
 
 import { memo, useMemo } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   type Message,
   type MaterialGroup,
@@ -14,13 +13,11 @@ import {
   stripInternalBlocks,
 } from '../../lib/cutlist';
 import type { SavedItemType } from '../../lib/types';
-import { pushSpecToStudio } from '../../lib/studioSync';
 import { CAD_INITIAL_DESIGN_SESSION_KEY } from '../../lib/studioSpec';
 
 interface CompletionCardsProps {
   msg: Message;
   onDownloadCutSheet: (materialGroups?: MaterialGroup[], sheetLayouts?: SheetLayout[], itemName?: string) => void;
-  onConsumeImageUsage: () => boolean;
   isGeneratingPdf: boolean;
   addItem: (
     type: SavedItemType,
@@ -35,13 +32,10 @@ interface CompletionCardsProps {
 function CompletionCards({
   msg,
   onDownloadCutSheet,
-  onConsumeImageUsage,
   isGeneratingPdf,
   addItem,
   showToast,
 }: CompletionCardsProps) {
-  const router = useRouter();
-
   // メッセージ本文から一度だけ抽出し、各カードのクリックハンドラで使い回す
   const materialGroups = useMemo(() => extractCutListFromContent(msg.content), [msg.content]);
   const sheetLayouts = useMemo(() => extractSheetLayoutFromContent(msg.content), [msg.content]);
@@ -85,17 +79,6 @@ function CompletionCards({
     showToast('設計・アイデアとして保存しました！');
   };
 
-  const handleOpenInStudio = () => {
-    if (!studioSpec) return;
-    // 設計スタジオでの完成イメージ生成も「本日のAI機能利用」の対象とする
-    // （上限到達時はonConsumeImageUsage内でトーストを出して遷移しない）
-    if (!onConsumeImageUsage()) return;
-    // 遷移前に送信しておくことで、/app/studioのiframeが接続する頃には
-    // サーバー（tanei-studio/server.py）側に最新仕様が反映されている
-    pushSpecToStudio(studioSpec);
-    router.push('/app/studio');
-  };
-
   // 「PDF」はファイル形式であって利用者が知りたい「何に使うものか」を表さないため、
   // 「カット申込書」（ホームセンターなどにカットを依頼するための書類）と表示する。
   // 内部のダウンロード処理・生成ロジック（onDownloadCutSheet）自体は変更しない。
@@ -125,12 +108,9 @@ function CompletionCards({
       </div>
 
       {/* 天板・底板・側板・背板からなる箱型の家具のみ、AIがtanei-studio-specブロックを
-          出力する。TANE:iの唯一の設計画面はブラウザCADで、完成イメージは「今の設計を見た目で
-          確認する」ための補助機能という位置づけのため、表示順は基本導線
-          （AI提案→ブラウザCADで設計する→（任意で）完成イメージを見る）に合わせて
-          ブラウザCADを先に置く。強調色（tanei-brand-soft）も引き続きブラウザCAD側に付け、
-          完成イメージ側を視覚的に強く見せない。完成イメージ側の導線
-          （handleOpenInStudio・pushSpecToStudio）は変更しない */}
+          出力する。TANE:iの設計入口は「TANE:i 3D家具設計」（/app/cad）1つだけで、
+          家具設計・3D確認・材料設定・木取り・カット申込書までをすべてここで行う
+          （完成イメージ（旧/app/studio）への別導線は廃止した） */}
       {studioSpec && (
         <div className="flex flex-col gap-1.5 mb-2">
           {/* Phase 4-07：クリック時、既存のstudioSpec（AIが提案した確定仕様、変更しない）を
@@ -152,28 +132,11 @@ function CompletionCards({
           >
             <span className="text-lg flex-shrink-0">🌿</span>
             <span className="flex flex-col leading-tight min-w-0">
-              <span className="text-xs font-bold">ブラウザCADで設計する</span>
-              <span className="text-[10px] text-tanei-ink-muted">スマホ・PC対応／インストール不要ですぐ使えます</span>
-              {/* Phase 4-09監査で判明：この2択のどちらがAI提案の寸法を引き継ぐのか、
-                  説明文からは判断できなかった（完成イメージ側もpushSpecToStudioで
-                  既存仕様を引き継ぐため、「寸法を引き継ぐこと」自体は差別化にならない）。
-                  Phase 4-07・4-08で実際に反映される幅・奥行・高さ・板厚の4項目だけを
-                  事実として記載する（品名・材料は現状反映されないため書かない） */}
+              <span className="text-xs font-bold">TANE:i 3D家具設計</span>
+              <span className="text-[10px] text-tanei-ink-muted">この家具を3Dで確認・編集します</span>
               <span className="text-[10px] text-tanei-ink-muted">AI提案の寸法（幅・奥行・高さ・板厚）をそのまま引き継ぎます</span>
             </span>
           </Link>
-          <button
-            type="button"
-            onClick={handleOpenInStudio}
-            title="パソコン専用機能です"
-            className="flex items-center gap-2.5 px-3 py-2.5 rounded-tanei-card border border-tanei-border bg-white text-tanei-ink hover:border-tanei-brand transition-colors text-left"
-          >
-            <span className="text-lg flex-shrink-0">✨</span>
-            <span className="flex flex-col leading-tight min-w-0">
-              <span className="text-xs font-bold">完成イメージを見る</span>
-              <span className="text-[10px] text-tanei-ink-muted">PC専用／写真のようなリアルな完成イメージを見る</span>
-            </span>
-          </button>
         </div>
       )}
 

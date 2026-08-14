@@ -6,7 +6,6 @@
 // 毎回再計算） → 3D表示、というデータ駆動の流れを維持している。
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import CadViewport from './CadViewport';
 import CadControls from './CadControls';
 import CadPartsPanel from './CadPartsPanel';
@@ -37,8 +36,6 @@ import {
   saveFurnitureProject,
   type SavedFurnitureProject,
 } from '../../lib/cad/projectStore';
-import { furnitureDesignToStudioSpec } from '../../lib/studioSpec';
-import { pushSpecToStudio } from '../../lib/studioSync';
 
 interface CadStudioProps {
   initialDesign?: FurnitureDesign;
@@ -65,7 +62,6 @@ export default function CadStudio({
   initialPartMaterials,
   initialPartFinishes,
 }: CadStudioProps) {
-  const router = useRouter();
   const [design, setDesign] = useState<FurnitureDesign>(initialDesign ?? createDefaultFurnitureDesign());
   // AI相談（チャット）からの提案を反映して来た場合のみtrue。initialDesignと同じく
   // マウント時の値を最初の1回だけ使う（design.kindはその後ユーザー操作で変わらないため、
@@ -374,26 +370,6 @@ export default function CadStudio({
     setSelectedPanelId(null);
   }, []);
 
-  // 「完成イメージを見る」（設計スタジオへ現在の設計を送って写真のようなリアルな
-  // レンダリングを見る補助導線）。既存のpushSpecToStudio（AIチャット側の「🖥 設計
-  // スタジオで開く」等と同じ関数、変更しない）をそのまま再利用する。設計スタジオ側の
-  // レンダリング処理はkind:'table'に対応していないため、furnitureDesignToStudioSpecが
-  // nullを返した場合（テーブルの場合）は何もしない（呼び出し元のボタンをdisabledに
-  // することで、そもそも押せない状態にしている）
-  const handleViewCompletionImage = useCallback(() => {
-    const spec = furnitureDesignToStudioSpec(design, {
-      item: projectName.trim() || DEFAULT_FURNITURE_PROJECT_NAME,
-      material,
-      partMaterials,
-      partFinishes,
-    });
-    if (!spec) return;
-    pushSpecToStudio(spec);
-    const query = new URLSearchParams({ from: 'cad' });
-    if (projectId) query.set('projectId', projectId);
-    router.push(`/app/studio?${query.toString()}`);
-  }, [design, projectName, material, partMaterials, partFinishes, projectId, router]);
-
   const handleUpdateShelf = useCallback(
     (patch: { zAtMm?: number; widthMm?: number; depthMm?: number }) => {
       if (!selectedPanelId) return;
@@ -534,16 +510,6 @@ export default function CadStudio({
             className="flex items-center gap-1.5 bg-tanei-accent hover:bg-tanei-accent-dark text-white text-sm font-bold px-3 py-1.5 rounded-tanei-control shadow-sm transition-colors"
           >
             🪚 木取り図を見る
-          </button>
-          <button
-            type="button"
-            onClick={handleViewCompletionImage}
-            title="パソコン専用機能です"
-            className="flex items-center gap-1.5 bg-white hover:bg-tanei-brand-soft text-tanei-ink border border-tanei-border text-sm font-bold px-3 py-1.5 rounded-tanei-control shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
-          >
-            ✨ この家具の完成イメージを見る
-            {/* titleのホバー表示だけではスマホ等で気づけないため、常時見える表記として追加する */}
-            <span className="text-[10px] font-bold text-tanei-ink-muted">（PC専用）</span>
           </button>
         </div>
         {saveMessage && <p className="text-xs font-bold text-tanei-brand">{saveMessage}</p>}
