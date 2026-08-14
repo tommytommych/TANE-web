@@ -151,6 +151,10 @@ export function setLegs(design: FurnitureDesign, legs: boolean): FurnitureDesign
   return { ...design, legs };
 }
 
+export function setDoors(design: FurnitureDesign, doors: boolean): FurnitureDesign {
+  return { ...design, doors };
+}
+
 let shelfIdCounter = 0;
 function nextShelfId(): string {
   shelfIdCounter += 1;
@@ -287,7 +291,12 @@ export function buildFurnitureModel(
     material,
     thickness: design.thickness,
     panels,
-    options: { backPanel: design.backPanel, legs: design.legs, shelfCount: design.shelves.length },
+    options: {
+      backPanel: design.backPanel,
+      legs: design.legs,
+      doors: design.doors ?? false,
+      shelfCount: design.shelves.length,
+    },
   };
 }
 
@@ -605,14 +614,24 @@ export const CUT_LIST_KIND_NAME: Partial<Record<FurniturePanelKind, string>> = {
   shelf: '棚板',
   leg: '脚',
   apron: '幕板',
+  door: '扉',
 };
 
 // パーツ単位で材料を指定する際のキー。CUT_LIST_KIND_NAMEの値と同じ語彙を使うことで、
 // 「天板だからパイン」「脚だからSPF」のような指定を、AIの提案（StudioSpec.partMaterials）・
 // ブラウザCADの編集状態（buildFurnitureModelのoverrides.partMaterials）・保存データ
 // （SavedFurnitureProject.partMaterials）のどこでも同じ形で扱えるようにする
-export type PartMaterialLabel = '天板' | '底板' | '側板' | '背板' | '棚板' | '脚' | '幕板';
-export const PART_MATERIAL_LABELS: PartMaterialLabel[] = ['天板', '底板', '側板', '背板', '棚板', '脚', '幕板'];
+export type PartMaterialLabel = '天板' | '底板' | '側板' | '背板' | '棚板' | '脚' | '幕板' | '扉';
+export const PART_MATERIAL_LABELS: PartMaterialLabel[] = [
+  '天板',
+  '底板',
+  '側板',
+  '背板',
+  '棚板',
+  '脚',
+  '幕板',
+  '扉',
+];
 
 // 脚・幕板は現実には規格材（SPF材等の角材）で作るパーツのため、パーツごとの材料選択で
 // 板材（パイン集成材・合板等）を選べてしまうと「テーブルの脚が合板」のような、現実には

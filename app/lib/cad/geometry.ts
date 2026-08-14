@@ -149,6 +149,28 @@ function buildLegPanels({ width, depth, thickness: t }: BoxDimensions): Furnitur
   }));
 }
 
+// 扉と側板・天板・底板の間に空ける隙間（mm）。実際の家具でも扉と本体の間には
+// 数mmの「隙（すき）」を設けるのが一般的で、隙間が無いと扉が枠に干渉して開閉できない。
+// 3D表示・木取り図上でも扉と側板を別々のパーツとしてはっきり見分けられるようにする効果もある
+const DOOR_GAP_MM = 2;
+
+/** 本体前面（開口部）いっぱいを覆う、シンプルな1枚扉を配置する
+ * （tanei-studio/freecad_scripts/generate_model.pyの_option_door、count=1の場合と
+ * 同じ考え方：観音開き等の複数枚・蝶番の向きはPhase C以降の拡張課題とし、
+ * まずは幅・高さいっぱいの1枚板だけを作る）。y座標を負にする（本体の手前側、
+ * 開口部より外側）ことで、扉が本体の中に埋まらず前面に取り付いているように見える */
+function buildDoorPanel({ width, height, thickness: t }: BoxDimensions): FurniturePanel {
+  const doorWidth = Math.max(MIN_SHELF_SIZE_MM, width - t * 2 - DOOR_GAP_MM * 2);
+  const doorHeight = Math.max(MIN_SHELF_SIZE_MM, height - t * 2 - DOOR_GAP_MM * 2);
+  return {
+    id: 'door',
+    kind: 'door',
+    label: '扉',
+    position: vec3(t + DOOR_GAP_MM, -t, t + DOOR_GAP_MM),
+    size: vec3(doorWidth, t, doorHeight),
+  };
+}
+
 // テーブル（天板+脚+幕板）専用の寸法定数。箱型のLEG_SIZE_MM/LEG_HEIGHT_MMとは別に持つ
 // （箱型の脚は本体の下にぶら下がる短い飾り脚、テーブルの脚は床から天板下面まで届く
 // 構造材のため、太さ・高さの考え方がそもそも異なる）
@@ -335,6 +357,10 @@ export function buildFurniturePanels(design: FurnitureDesign, materials?: TableM
 
   if (design.legs) {
     panels = [...panels, ...buildLegPanels(dims)];
+  }
+
+  if (design.doors) {
+    panels = [...panels, buildDoorPanel(dims)];
   }
 
   return [...panels, ...shelfPanels];

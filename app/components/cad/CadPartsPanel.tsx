@@ -10,13 +10,15 @@ interface CadPartsPanelProps {
   model: FurnitureModel;
   backPanel: boolean;
   legs: boolean;
-  /** 家具の構造の種類。'table'のときは棚板・背板・脚の切り替えUIを表示しない
+  doors: boolean;
+  /** 家具の構造の種類。'table'のときは棚板・背板・脚・扉の切り替えUIを表示しない
    * （テーブルは天板+脚+幕板という固定構成のため）。省略時は既存どおり箱型として扱う */
   kind?: 'box' | 'table';
   selectedPanelId: string | null;
   onAddShelf: () => void;
   onToggleBackPanel: () => void;
   onToggleLegs: () => void;
+  onToggleDoors: () => void;
   onSelectPanel: (panelId: string) => void;
 }
 
@@ -24,11 +26,13 @@ export default function CadPartsPanel({
   model,
   backPanel,
   legs,
+  doors,
   kind,
   selectedPanelId,
   onAddShelf,
   onToggleBackPanel,
   onToggleLegs,
+  onToggleDoors,
   onSelectPanel,
 }: CadPartsPanelProps) {
   const shelves = model.panels.filter((p) => p.kind === 'shelf');
@@ -62,6 +66,11 @@ export default function CadPartsPanel({
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={legs} onChange={onToggleLegs} className="h-4 w-4 accent-tanei-brand" />
             <span className="text-tanei-ink">脚あり</span>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={doors} onChange={onToggleDoors} className="h-4 w-4 accent-tanei-brand" />
+            <span className="text-tanei-ink">扉あり</span>
           </label>
         </>
       )}

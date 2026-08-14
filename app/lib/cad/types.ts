@@ -27,7 +27,17 @@ export interface Vector3Mm {
 /** パネル1枚の役割（意味的な種類）。tanei-studioのラベル方式と違い、UIの言語に依存しない
  * 識別子にしている（表示用の日本語ラベルは別途labelフィールドに持たせる）。
  * 一覧にない特殊パーツは 'custom' + label で表現できるようにし、将来の拡張を妨げない */
-export type FurniturePanelKind = 'top' | 'bottom' | 'left' | 'right' | 'back' | 'shelf' | 'leg' | 'apron' | 'custom';
+export type FurniturePanelKind =
+  | 'top'
+  | 'bottom'
+  | 'left'
+  | 'right'
+  | 'back'
+  | 'shelf'
+  | 'leg'
+  | 'apron'
+  | 'door'
+  | 'custom';
 
 /** パネルの仕上げ（tanei-studio/app/lib/studioSpec.tsのPanelFinishと同じ語彙で揃えている） */
 export type PanelFinish = 'clear' | 'walnut' | 'white' | 'black';
@@ -102,6 +112,11 @@ export interface FurnitureDesign {
   /** 脚の有無のみ（個別の脚ごとの編集はPhase 2-3以降の検討課題） */
   legs: boolean;
   shelves: ShelfEntry[];
+  /** 扉の有無（Phase C「パーツ追加」）。本体前面いっぱいを覆うシンプルな1枚扉のみ
+   * （観音開き等の複数枚・蝶番の向きはPhase C以降の拡張課題）。この機能より前に
+   * 保存されたプロジェクトには存在しないため、kindと同じ方針でoptionalにし、
+   * 省略時はfalse（扉なし）として扱う（isValidFurnitureDesign・geometry.ts参照） */
+  doors?: boolean;
 }
 
 /** 保存データ（IndexedDB）から読み込んだFurnitureDesignの構造検証。ブラウザの保存領域が
@@ -117,6 +132,7 @@ export const isValidFurnitureDesign = (value: unknown): value is FurnitureDesign
     typeof v.thickness === 'number' &&
     typeof v.backPanel === 'boolean' &&
     typeof v.legs === 'boolean' &&
+    (v.doors === undefined || typeof v.doors === 'boolean') &&
     Array.isArray(v.shelves) &&
     v.shelves.every((s) => {
       if (typeof s !== 'object' || s === null) return false;
