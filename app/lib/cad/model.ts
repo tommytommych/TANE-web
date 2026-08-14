@@ -197,6 +197,28 @@ export function removeShelfFromDesign(design: FurnitureDesign, shelfId: string):
   return { ...design, shelves: design.shelves.filter((s) => s.id !== shelfId) };
 }
 
+/** 棚板をちょうどcount枚、内寸の高さを均等に区切る位置へまとめて配置し直す
+ * （既存の棚板は置き換える）。addShelfToDesign()は「1枚ずつ、その時点で最も広い隙間へ
+ * 追加する」という手動編集向けの挙動のため、複数枚をまとめて指定する場合
+ * （AI提案の"5段"等）に順番に呼び出すと、隙間の埋まり方の偏りでバランスの悪い配置に
+ * なってしまう（例: 底側に固まって配置される）。「N枚でN+1個の均等な段を作る」という、
+ * tanei-studio側の横棚板（generate_model.pyの_option_shelf_h）と同じ考え方の計算式を
+ * 使うことで、常に均等な配置にする */
+export function setEvenlySpacedShelves(design: FurnitureDesign, count: number): FurnitureDesign {
+  if (count <= 0) return { ...design, shelves: [] };
+  const t = design.thickness;
+  const minZ = t;
+  const maxZ = Math.max(minZ, design.height - t);
+  const { widthMm, depthMm } = defaultShelfSize(design);
+  const shelves: ShelfEntry[] = Array.from({ length: count }, (_, i) => ({
+    id: nextShelfId(),
+    zAtMm: minZ + ((i + 1) * (maxZ - minZ)) / (count + 1),
+    widthMm,
+    depthMm,
+  }));
+  return { ...design, shelves };
+}
+
 /** 選択中の棚板1枚の高さ・幅・奥行きを更新する。側板・天板・底板・背板を突き抜けない
  * 範囲へ自動的にクランプする（自由変形は許可しない、という方針の実装箇所） */
 export function updateShelfInDesign(

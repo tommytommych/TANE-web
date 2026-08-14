@@ -7,10 +7,10 @@ import {
   PART_MATERIAL_LABELS,
   type CutListItem,
   type PartMaterialLabel,
-  addShelfToDesign,
   buildFurnitureModel,
   furnitureModelToDimensionalLumberItems,
   furnitureModelToSheetLayoutsByMaterial,
+  setEvenlySpacedShelves,
 } from './cad/model';
 
 export type PanelFinish = 'clear' | 'walnut' | 'white' | 'black';
@@ -196,12 +196,12 @@ export const studioSpecToFurnitureDesign = (spec: StudioSpec): FurnitureDesign =
   const shelfCount = spec.options?.shelf_h?.tier1;
   if (typeof shelfCount === 'number' && Number.isFinite(shelfCount) && shelfCount > 0) {
     const count = Math.min(MAX_AI_SHELF_COUNT, Math.round(shelfCount));
-    // 既存のaddShelfToDesign()（棚と天板・底板の間の最も広い隙間へ自動配置する、
-    // 「棚板を追加」ボタンと全く同じロジック）をそのまま繰り返し呼ぶだけで、
-    // 新しい配置計算は追加しない
-    for (let i = 0; i < count; i++) {
-      design = addShelfToDesign(design);
-    }
+    // setEvenlySpacedShelves()でN枚を内寸の高さいっぱいに均等配置する。addShelfToDesign()を
+    // N回繰り返す方式も試したが、「1枚ずつ、その時点で最も広い隙間へ追加する」という
+    // 手動編集向けの挙動のため、まとめてN枚指定する場合は底側に固まる等バランスの悪い
+    // 配置になってしまっていた（実機確認で判明）。AIが「5段」のようにまとめて指定してくる
+    // 場合は、常に均等な配置になるこちらを使う
+    design = setEvenlySpacedShelves(design, count);
   }
 
   return design;
