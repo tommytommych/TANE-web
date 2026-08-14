@@ -7,6 +7,7 @@ import {
   PART_MATERIAL_LABELS,
   type CutListItem,
   type PartMaterialLabel,
+  addShelfToDesign,
   buildFurnitureModel,
   furnitureModelToDimensionalLumberItems,
   furnitureModelToSheetLayoutsByMaterial,
@@ -149,13 +150,23 @@ export const isSafeStudioSpecDimensions = (spec: StudioSpec): boolean => {
 // 読み込み後すぐに削除するため、実質「1回限りの受け渡し」専用のキーとして扱う
 export const CAD_INITIAL_DESIGN_SESSION_KEY = 'tanei-cad-initial-design-v1';
 
+// AIチャットが棚板の枚数を指定してくる場合に許容する上限（安全側のガード）。
+// 完成イメージ側（tanei-studio）の横棚板は最大4枚までという制約があり、systemPrompt.tsでも
+// AIに4枚までに収めるよう指示しているが、AIの出力は指示を守るとは限らないため、
+// 万一大きすぎる数値が来ても大量の棚板生成で固まらないよう、ここでも上限を設ける
+const MAX_AI_SHELF_COUNT = 20;
+
 // StudioSpec（AIが提案した箱型家具の確定仕様）から、既存のFurnitureDesign
 // （ブラウザCADの唯一の編集状態、CadStudio.tsxのuseState<FurnitureDesign>初期値）へ
 // 変換する（Phase 4-07）。既存のstudioSpecToSheetLayout()と同じ「読み取り専用の変換」
 // という考え方を踏襲し、StudioSpec・FurnitureDesignどちらの型定義も変更しない。
-// backPanel・legs・shelvesはStudioSpec側に存在しない値のため、systemPrompt.tsが
-// 前提としている「天板・底板・側板・背板からなる棚なし箱型」という既存ルールに忠実な
-// 既定値（背板あり・脚なし・棚なし）で補うだけで、新しい推測ロジックは追加しない
+// backPanel・legsはStudioSpec側に存在しない値のため、systemPrompt.tsが前提としている
+// 「天板・底板・側板・背板からなる棚なし箱型」という既存ルールに忠実な既定値
+// （背板あり・脚なし）で補うだけで、新しい推測ロジックは追加しない。
+// shelvesだけは例外で、spec.options.shelf_h.tier1（furnitureDesignToStudioSpec()の
+// CAD→完成イメージ方向と同じ語彙）にAIが棚板の枚数を指定していれば反映する
+// （以前はここが常にshelves:[]に固定されており、AIが「5段」のような棚板付きの提案をしても
+// ブラウザCADを開くと棚板が消えてしまう不具合があった）
 export const studioSpecToFurnitureDesign = (spec: StudioSpec): FurnitureDesign => {
   if (spec.kind === 'table') {
     // テーブル（天板+脚+幕板）の場合、backPanel/legs/shelvesは型互換のためのプレースホルダー
@@ -171,7 +182,8 @@ export const studioSpecToFurnitureDesign = (spec: StudioSpec): FurnitureDesign =
       shelves: [],
     };
   }
-  return {
+
+  let design: FurnitureDesign = {
     width: spec.width,
     depth: spec.depth,
     height: spec.height,
@@ -180,6 +192,19 @@ export const studioSpecToFurnitureDesign = (spec: StudioSpec): FurnitureDesign =
     legs: false,
     shelves: [],
   };
+
+  const shelfCount = spec.options?.shelf_h?.tier1;
+  if (typeof shelfCount === 'number' && Number.isFinite(shelfCount) && shelfCount > 0) {
+    const count = Math.min(MAX_AI_SHELF_COUNT, Math.round(shelfCount));
+    // 既存のaddShelfToDesign()（棚と天板・底板の間の最も広い隙間へ自動配置する、
+    // 「棚板を追加」ボタンと全く同じロジック）をそのまま繰り返し呼ぶだけで、
+    // 新しい配置計算は追加しない
+    for (let i = 0; i < count; i++) {
+      design = addShelfToDesign(design);
+    }
+  }
+
+  return design;
 };
 
 // ブラウザCAD（CadStudio.tsx）から「完成イメージを見る」で設計スタジオへ送るための、
