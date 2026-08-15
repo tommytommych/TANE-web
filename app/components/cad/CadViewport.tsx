@@ -175,7 +175,10 @@ export default function CadViewport({ model, className, selectedPanelId, onSelec
     (model.depth / 2) * MM_TO_SCENE,
   ];
   const maxDimMm = Math.max(model.width, model.depth, model.height, 1);
-  const distance = maxDimMm * MM_TO_SCENE * 1.8;
+  // 以前は1.8倍だったため、特にテーブルのように幅が高さよりずっと大きい家具で、
+  // 初期表示のモデルが画面いっぱいに大きく映りすぎていた（実機確認で報告）。
+  // 周囲に余白ができるよう、後方へ引く距離を広げる
+  const distance = maxDimMm * MM_TO_SCENE * 2.4;
 
   // 接地シャドウ（ContactShadows）を置くY座標。脚ありの場合、脚の分だけ本体底面より
   // 下（マイナス側）が実際の設置面になるため、0（本体底面）ではなく全パネルの最小z値
