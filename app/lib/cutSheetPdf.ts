@@ -478,23 +478,90 @@ export const buildUniversalCutSheetPdf = async (
       const diagramHeightPt = layout.sheetHeightMm * scale;
 
       sheets.forEach((sheet, sheetIdx) => {
-        ensureSpace(diagramHeightPt + 40);
+        // 木取り図タイトル行は「材料名・板サイズ」「N枚目 / 全M枚」「歩留まり・余り材」の
+        // 3領域に分けて配置する。以前は材料名＋枚数を1本の文字列として左詰めで描画し、
+        // 歩留まり・余り材を右詰めで描画していたため、材料名が長い場合や板の総枚数が多い
+        // 場合に、左側のテキストが右詰めテキストの位置まで伸びて重なってしまう不具合があった。
+        // 右（歩留まり・余り材）→中央（枚数）の順に必要な幅を確保し、余った幅だけを左側の
+        // 材料名に割り当てる（材料名が収まらない場合だけ2行に折り返す）ことで、
+        // 「N枚目 / 全M枚」と「余り材」が絶対に重ならないようにする
+        const HEADER_REGION_GAP_PT = 12;
+        const HEADER_LINE_HEIGHT_PT = 13;
+        const materialNameFontSize = 10.5;
+        const pageCountFontSize = 10.5;
+        const yieldFontSize = 9;
 
-        const headerText =
-          sheets.length > 1
-            ? `${layout.name}（${sheet.sheetWidthMm}×${sheet.sheetHeightMm}mm）　${sheetIdx + 1}枚目 / 全${sheets.length}枚`
-            : `${layout.name}（${sheet.sheetWidthMm}×${sheet.sheetHeightMm}mm）`;
-        page.drawText(headerText, { x: margin, y: cursorY, size: 10.5, font: fontBold, color: black });
+        // layout.name（例：「パイン集成材（18mm厚）・サブロク板 (910×1820mm)」）は既に
+        // 板サイズを含んでいるため、以前ここでさらに追加していた
+        // `（${sheet.sheetWidthMm}×${sheet.sheetHeightMm}mm）`は同じ板サイズの二重表記
+        // だった（sheet.sheetWidthMm/sheetHeightMmは常にlayoutの板サイズと同じ値）。
+        // 見た目の重複を無くし、材料名を必要以上に長くしないためlayout.nameだけを使う
+        const materialNameText = layout.name;
+        const pageCountText = sheets.length > 1 ? `${sheetIdx + 1}枚目 / 全${sheets.length}枚` : null;
         const yieldText = `歩留まり ${Math.round(sheet.yieldRate * 100)}%　余り材 約${Math.round(sheet.leftoverAreaMm2 / 1000)}cm²`;
-        const yieldTextWidth = fontRegular.widthOfTextAtSize(yieldText, 9);
+
+        // 右領域（歩留まり・余り材）は常に右端固定。既存の見た目・文言・計算結果は変更しない
+        const yieldTextWidth = fontRegular.widthOfTextAtSize(yieldText, yieldFontSize);
+        const yieldRegionX = margin + tableWidth - yieldTextWidth;
+
+        // 中央領域（N枚目 / 全M枚）は行全体の中央寄せを基本としつつ、以下の2つの制約で
+        // 位置を調整する。
+        // ・右領域（歩留まり・余り材）と重ならない範囲までしか右へは寄せない
+        //   （余り材の数値が大きい場合の保険）
+        // ・材料名が中央寄せ位置よりも先に伸びている場合（材料名が行の半分近くまで長い
+        //   場合）は、材料名を1行のまま収められるよう、中央寄せをやめて材料名の直後
+        //   （最小限のギャップを空けた位置）まで右へずらす。それでも右領域と重なって
+        //   しまうほど材料名が長い場合だけ、材料名の方を2行に折り返す（後続の
+        //   leftMaxWidth計算）
+        let pageCountX: number | null = null;
+        let pageCountWidth = 0;
+        if (pageCountText) {
+          pageCountWidth = fontBold.widthOfTextAtSize(pageCountText, pageCountFontSize);
+          const naturalCenterX = margin + (tableWidth - pageCountWidth) / 2;
+          const maxCenterX = yieldRegionX - HEADER_REGION_GAP_PT - pageCountWidth;
+          const materialNameWidth = fontBold.widthOfTextAtSize(materialNameText, materialNameFontSize);
+          const minPageCountX = margin + materialNameWidth + HEADER_REGION_GAP_PT;
+          pageCountX = Math.min(maxCenterX, Math.max(naturalCenterX, minPageCountX));
+        }
+
+        // 左領域（材料名・板サイズ）に使える幅は、中央領域（表示があれば）または右領域の
+        // 手前までに制限する。収まらない場合はwrapTextToWidthで2行に折り返す
+        const leftRegionEnd = (pageCountX ?? yieldRegionX) - HEADER_REGION_GAP_PT;
+        const leftMaxWidth = Math.max(leftRegionEnd - margin, 60);
+        const materialNameLines = fontBold.widthOfTextAtSize(materialNameText, materialNameFontSize) <= leftMaxWidth
+          ? [materialNameText]
+          : wrapTextToWidth(materialNameText, fontBold, materialNameFontSize, leftMaxWidth);
+
+        const headerRowCount = Math.max(materialNameLines.length, 1);
+        ensureSpace(diagramHeightPt + headerRowCount * HEADER_LINE_HEIGHT_PT + 26);
+
+        const headerTopY = cursorY;
+        materialNameLines.forEach((line, lineIdx) => {
+          page.drawText(line, {
+            x: margin,
+            y: headerTopY - lineIdx * HEADER_LINE_HEIGHT_PT,
+            size: materialNameFontSize,
+            font: fontBold,
+            color: black,
+          });
+        });
+        if (pageCountText && pageCountX !== null) {
+          page.drawText(pageCountText, {
+            x: pageCountX,
+            y: headerTopY,
+            size: pageCountFontSize,
+            font: fontBold,
+            color: black,
+          });
+        }
         page.drawText(yieldText, {
-          x: margin + tableWidth - yieldTextWidth,
-          y: cursorY,
-          size: 9,
+          x: yieldRegionX,
+          y: headerTopY,
+          size: yieldFontSize,
           font: fontRegular,
           color: gray,
         });
-        cursorY -= 14;
+        cursorY -= headerRowCount * HEADER_LINE_HEIGHT_PT;
 
         const originX = margin;
         const originTopY = cursorY;
