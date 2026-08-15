@@ -586,7 +586,6 @@ export default function CadStudio({
         partMaterials={partMaterials}
         onPartMaterialChange={handlePartMaterialChange}
         onBack={() => setViewMode('design')}
-        onOpenBuildCheck={() => setViewMode('buildCheck')}
         scrollToBuildGuide={scrollToBuildGuide}
         onScrolledToBuildGuide={handleScrolledToBuildGuide}
         onViewPanel={handleViewPanel}

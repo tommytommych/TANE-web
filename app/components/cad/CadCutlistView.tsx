@@ -68,11 +68,6 @@ interface CadCutlistViewProps {
   partMaterials: Partial<Record<PartMaterialLabel, string>>;
   onPartMaterialChange: (label: PartMaterialLabel, value: string) => void;
   onBack: () => void;
-  /** カットリストの下、制作チェック画面（buildCheck）へ進むボタンから呼ばれる。
-   * 以前は「次へ：カットリストを見る」として別画面（cutMaterials）へ画面を切り替える
-   * ボタンだったが、カットリストをこの画面に統合したため、「次へ：制作チェックへ」として
-   * viewMode='buildCheck'へ進む役割に変わった（onOpenCutListから改称） */
-  onOpenBuildCheck: () => void;
   /** trueのとき、マウント時に「制作する」セクションまで自動スクロールする
    * （Phase 2-7の通常の「🪚 木取り図を見る」からの遷移では常にfalse／未指定） */
   scrollToBuildGuide?: boolean;
@@ -110,7 +105,6 @@ export default function CadCutlistView({
   partMaterials,
   onPartMaterialChange,
   onBack,
-  onOpenBuildCheck,
   scrollToBuildGuide,
   onScrolledToBuildGuide,
   onViewPanel,
@@ -620,14 +614,6 @@ export default function CadCutlistView({
                 </>
               )}
             </div>
-
-            <button
-              type="button"
-              onClick={onOpenBuildCheck}
-              className="w-full flex items-center justify-center gap-1.5 bg-white border border-tanei-border text-tanei-ink px-4 py-3 rounded-tanei-control text-sm font-bold hover:border-tanei-brand hover:text-tanei-brand transition-colors"
-            >
-              次へ：制作チェックへ →
-            </button>
 
             {primaryLayout && (
               <div id={BUILD_GUIDE_ANCHOR_ID}>
