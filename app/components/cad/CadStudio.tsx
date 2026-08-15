@@ -62,6 +62,29 @@ interface CadStudioProps {
 // cutlist画面内のセクションとして統合した（CadBuildChecklistView.tsxは削除済み）
 type CadViewMode = 'design' | 'cutlist';
 
+// 「作り方」の各STEP（1〜9）と、旧・製作チェック（buildChecklist、10項目）のキーの
+// 対応表。「作り方」の各STEPタイトルは、製作チェックの10項目の文言とほぼ1対1で
+// 重複していた（例：STEP1「材料を準備する」＝製作チェック1「材料を用意した」）ため、
+// ユーザーが操作するチェックボックスは「作り方」の9つだけに一本化した。ただし、
+// マイページ（SavedItemsModal.tsx、computeFurnitureProjectProgress）の製作進捗表示は
+// 既存のbuildChecklistの完了数をそのまま参照しているため、後方互換のために「作り方」の
+// STEPを完了にしたら対応するbuildChecklistのキーも同時に更新する（新しい進捗計算・
+// 新しい保存先は作らない）。STEP3「各パーツを寸法どおりにカットする」だけ、製作チェックの
+// 3番目「材料に寸法を書いた」・4番目「パーツをカットした」の2項目にまとめて対応させる
+// （切り出す直前に寸法を書く、という一体の作業とみなす。これが無いと3番目の項目だけ
+// 更新する手段が無くなり、buildChecklistが10/10に到達できなくなってしまう）
+const BUILD_STEP_TO_CHECKLIST_KEYS: Record<number, string[]> = {
+  1: ['1'],
+  2: ['2'],
+  3: ['3', '4'],
+  4: ['5'],
+  5: ['6'],
+  6: ['7'],
+  7: ['8'],
+  8: ['9'],
+  9: ['10'],
+};
+
 // チャット（/app）へ「チャットに戻る」で移動してブラウザバックで/app/cadに戻ってきた場合や、
 // Next.jsがCadStudioを再マウントした場合でも、まだ保存していない編集内容が消えないよう、
 // タブを閉じるまで保持されるsessionStorageに現在の編集内容を退避する（app/page.tsxの
@@ -374,15 +397,25 @@ export default function CadStudio({
     [buildChecklist, persistChecklists]
   );
 
-  // 「作り方」9STEPそれぞれのチェック（buildChecklist・10項目とは独立）
+  // 「作り方」9STEPそれぞれのチェック。BUILD_STEP_TO_CHECKLIST_KEYSに従い、対応する
+  // buildChecklist（旧・製作チェック10項目）のキーも同時に更新する（マイページの
+  // 製作進捗表示との後方互換のため。詳細はBUILD_STEP_TO_CHECKLIST_KEYSのコメント参照）
   const handleToggleBuildGuideStep = useCallback(
     (step: number) => {
       const key = String(step);
-      const next = { ...buildGuideChecked, [key]: !buildGuideChecked[key] };
-      setBuildGuideChecked(next);
-      void persistChecklists({ buildGuideChecked: next });
+      const nextGuideChecked = { ...buildGuideChecked, [key]: !buildGuideChecked[key] };
+      setBuildGuideChecked(nextGuideChecked);
+
+      const checklistKeys = BUILD_STEP_TO_CHECKLIST_KEYS[step] ?? [];
+      const nextChecklist = { ...buildChecklist };
+      checklistKeys.forEach((k) => {
+        nextChecklist[k] = nextGuideChecked[key];
+      });
+      setBuildChecklist(nextChecklist);
+
+      void persistChecklists({ buildGuideChecked: nextGuideChecked, buildChecklist: nextChecklist });
     },
-    [buildGuideChecked, persistChecklists]
+    [buildGuideChecked, buildChecklist, persistChecklists]
   );
 
   const { model, errorMessage } = useMemo(() => {

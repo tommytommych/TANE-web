@@ -16,7 +16,6 @@ import { buildUniversalCutSheetPdf } from '../../lib/cutSheetPdf';
 import { downloadPdfBytes } from '../../lib/download';
 import type { FurnitureModel } from '../../lib/cad/types';
 import {
-  BUILD_CHECKLIST_STEPS,
   buildCutListItems,
   CUT_LIST_KIND_NAME,
   dimensionalLumberItemsToCutGroups,
@@ -25,18 +24,11 @@ import {
   furnitureModelToSheetLayout,
   furnitureModelToSheetLayoutsByMaterial,
   getAllowedMaterialsForPartLabel,
-  getNextBuildStep,
   type CutListItem,
   type PartMaterialLabel,
 } from '../../lib/cad/model';
 import CadBuildGuide from './CadBuildGuide';
 import LumberCutDiagramSvgView from './LumberCutDiagramSvg';
-
-// 製作チェック（10項目、以前は別画面のCadBuildChecklistView.tsx、viewMode='buildCheck'
-// だったが、木取り図画面のセクションとして統合した）へのスクロール先id。
-// CadBuildGuide.tsxの同名定数と値を一致させる必要があるが、既存の他のanchor id定数と
-// 同じく、importで結合を強めるのではなく値だけを再利用する（既存方針を踏襲）
-const BUILD_CHECKLIST_ANCHOR_ID = 'cad-build-checklist';
 
 // 制作チェック画面の「制作へ進む」から来たときだけ、この要素まで自動スクロールする
 // （CadBuildGuide自体は変更せず、外側にidを持つラッパーを用意するだけにしている）
@@ -133,7 +125,9 @@ export default function CadCutlistView({
   // 「制作準備」はCadBuildGuide.tsxのPREP_CHECKLIST_ITEMSと同じキーを直接参照する
   // （importで結合を強めず、値だけを再利用する既存の方針を踏襲）
   const isPrepDone = Boolean(buildChecklist['1'] && buildChecklist['tools_ready'] && buildChecklist['safety_confirmed']);
-  const isBuildGuideDone = Array.from({ length: 9 }, (_, i) => String(i + 1)).every((k) => buildGuideChecked[k]);
+  const BUILD_GUIDE_STEP_KEYS = Array.from({ length: 9 }, (_, i) => String(i + 1));
+  const buildGuideDoneCount = BUILD_GUIDE_STEP_KEYS.filter((k) => buildGuideChecked[k]).length;
+  const isBuildGuideDone = buildGuideDoneCount === BUILD_GUIDE_STEP_KEYS.length;
   const progressSteps = [
     { label: '設計', done: true },
     { label: '木取り', done: Boolean(buildChecklist[CUT_LAYOUT_CONFIRMED_KEY]) },
@@ -236,14 +230,6 @@ export default function CadCutlistView({
     return order.map((groupMaterial) => ({ material: groupMaterial, items: groups.get(groupMaterial) ?? [] }));
   }, [cutListItems]);
   const cutListDoneCount = cutListItems.filter((item) => cutListChecked[item.id]).length;
-
-  // 製作チェック（10項目）の進捗。CadBuildGuide.tsxの製作進捗カードと全く同じ
-  // buildChecklist・BUILD_CHECKLIST_STEPS・getNextBuildStepから毎回算出するだけで、
-  // 新しい進捗データは作らない
-  const buildDoneCount = BUILD_CHECKLIST_STEPS.filter((_, i) => buildChecklist[String(i + 1)]).length;
-  const buildPercent = Math.round((buildDoneCount / BUILD_CHECKLIST_STEPS.length) * 100);
-  const nextBuildStep = getNextBuildStep(buildChecklist);
-  const isBuildChecklistComplete = nextBuildStep === null;
 
   const showStatus = (msg: string) => {
     setStatusMessage(msg);
@@ -631,67 +617,19 @@ export default function CadCutlistView({
               </div>
             )}
 
-            {/* 製作チェック（10項目）。以前は別画面（CadBuildChecklistView.tsx、
-                viewMode='buildCheck'）だったが、上の「制作する」セクション（材料・工具・
-                パーツ・作り方・安全ポイント）と内容が重複する「🔎 製作前チェック」カードや
-                「製作ナビ」等は再現せず、木取り図画面と全く同じ1本のページの続きとして、
-                実際にチェックする10項目と完了時の保存導線だけをここに置く。チェック状態
-                （buildChecklist）・判定（getNextBuildStep）は既存のものをそのまま使う */}
+            {/* 製作完了・作品保存。以前はここに「製作チェック」という並行する10項目の
+                チェックリストがあったが、内容が上の「作り方」9STEPとほぼ1対1で重複して
+                いたため削除し、「作り方」の完了状態（isBuildGuideDone、buildGuideChecked）を
+                唯一の判定元にした。作り方の各STEPを完了にすると、後方互換のため
+                buildChecklistの対応するキーも同時に更新されるため（CadStudio.tsx
+                handleToggleBuildGuideStep参照）、マイページの製作進捗表示はそのまま動く */}
             {primaryLayout && (
-              <div id={BUILD_CHECKLIST_ANCHOR_ID} className="border-t border-tanei-border pt-4 scroll-mt-4">
-                <h3 className="text-sm font-bold text-tanei-ink mb-1">製作チェック</h3>
-                <p className="text-xs text-tanei-ink-muted mb-2">
-                  実際に製作しながら、完了した項目にチェックを入れてください。
-                </p>
-                <p className="text-xs text-tanei-ink mb-2">
-                  製作チェック：
-                  <span className="font-black text-tanei-brand">
-                    {buildDoneCount} / {BUILD_CHECKLIST_STEPS.length}
-                  </span>{' '}
-                  完了（{buildPercent}%）
-                </p>
-                <ol className="flex flex-col gap-2">
-                  {BUILD_CHECKLIST_STEPS.map((label, i) => {
-                    const stepNumber = i + 1;
-                    const isChecked = Boolean(buildChecklist[String(stepNumber)]);
-                    const isCurrent = !isChecked && nextBuildStep !== null && stepNumber === nextBuildStep.stepNumber;
-                    return (
-                      <li
-                        key={stepNumber}
-                        className={`rounded-tanei-control border overflow-hidden transition-colors ${
-                          isChecked
-                            ? 'bg-tanei-brand-soft border-tanei-brand'
-                            : isCurrent
-                              ? 'bg-white border-tanei-accent ring-1 ring-tanei-accent'
-                              : 'bg-white border-tanei-border'
-                        }`}
-                      >
-                        {isCurrent && <p className="text-[10px] font-black text-tanei-accent px-3 pt-2">▶ 現在の作業</p>}
-                        <label
-                          className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
-                            isChecked ? '' : 'hover:bg-tanei-surface'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => onToggleBuildChecklistKey(String(stepNumber))}
-                            className="h-4 w-4 accent-tanei-brand flex-shrink-0"
-                          />
-                          <span className={`text-sm font-bold ${isChecked ? 'text-tanei-ink line-through' : 'text-tanei-ink'}`}>
-                            {stepNumber}. {label}
-                          </span>
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ol>
-
-                {isBuildChecklistComplete ? (
-                  <div className="mt-3 rounded-tanei-control border border-tanei-brand bg-tanei-brand-soft px-4 py-4 flex flex-col gap-3">
+              <div className="border-t border-tanei-border pt-4">
+                {isBuildGuideDone ? (
+                  <div className="rounded-tanei-control border border-tanei-brand bg-tanei-brand-soft px-4 py-4 flex flex-col gap-3">
                     <div>
                       <p className="text-sm font-black text-tanei-brand">✓ 製作完了</p>
-                      <p className="text-xs text-tanei-ink mt-1">すべての製作チェックが完了しました。</p>
+                      <p className="text-xs text-tanei-ink mt-1">すべての「作り方」STEPが完了しました。</p>
                     </div>
                     <Link
                       href={`/app?openFinished=1&finishedTitle=${encodeURIComponent(projectName)}${
@@ -703,8 +641,8 @@ export default function CadCutlistView({
                     </Link>
                   </div>
                 ) : (
-                  <p className="text-xs text-tanei-ink-muted mt-2">
-                    あと{BUILD_CHECKLIST_STEPS.length - buildDoneCount}項目チェックすると製作完了です。
+                  <p className="text-xs text-tanei-ink-muted">
+                    「作り方」のSTEPをあと{BUILD_GUIDE_STEP_KEYS.length - buildGuideDoneCount}つ完了すると製作完了です。
                   </p>
                 )}
               </div>

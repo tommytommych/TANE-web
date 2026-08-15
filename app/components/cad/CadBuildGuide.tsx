@@ -9,13 +9,11 @@ import { useState } from 'react';
 import type { FurnitureModel, FurniturePanel } from '../../lib/cad/types';
 import type { SheetLayout } from '../../lib/sheetLayout';
 import {
-  BUILD_CHECKLIST_STEPS,
   CUT_LIST_KIND_NAME,
   FURNITURE_BUILD_TOOLS,
   buildFurnitureSteps,
   calculateMaterialCostEstimate,
   findMaterialPriceInfo,
-  getNextBuildStep,
   type DimensionalLumberCutGroup,
 } from '../../lib/cad/model';
 import { AMAZON_TOOLS } from '../../lib/constants';
@@ -76,12 +74,6 @@ const BUILD_STEPS_ANCHOR_ID = 'cad-build-steps';
 const SAFETY_NOTES_ANCHOR_ID = 'cad-safety-notes';
 // 制作チェックの制作ナビ（Phase 3-12）の「買い物リスト」からのスクロール先（Phase 3-23）
 const SHOPPING_LIST_ANCHOR_ID = 'cad-shopping-list';
-// 製作チェック（10項目、CadCutlistView.tsx側に統合済み）へのスクロール先id。
-// 以前は別画面（CadBuildChecklistView.tsx、viewMode='buildCheck'）への画面遷移だったが、
-// 木取り図ページ内に統合したため、同じページ内スクロールに変わった。CadCutlistView.tsx側の
-// 同名定数と値を一致させる必要があるが、既存の他のanchor id定数と同じく、importで結合を
-// 強めるのではなく値だけを再利用する（既存方針を踏襲） */
-const BUILD_CHECKLIST_ANCHOR_ID = 'cad-build-checklist';
 
 interface CadBuildGuideProps {
   model: FurnitureModel;
@@ -97,13 +89,16 @@ interface CadBuildGuideProps {
   /** 「作るパーツ」の「このパーツを見る」から、既存の3D CADへ該当パーツを
    * ハイライトした状態で移動する（Phase 3-2） */
   onViewPanel: (panelId: string) => void;
-  /** 制作チェック（Phase 2-7）のチェック状態。ここでは表示専用で、チェックの追加・変更は
-   * 既存のCadBuildChecklistViewからのみ行う（Phase 3-5） */
+  /** ③製作準備（材料・工具・安全の3項目）の完了判定に使う。以前はここに「製作チェック」
+   * （10項目の別リスト）の表示・関連付けも含んでいたが、「作り方」9STEPと内容が
+   * ほぼ重複していたため統合し、この画面ではもう表示しない（値は引き続き参照する） */
   buildChecklist: Record<string, boolean>;
-  /** 「作り方」9STEPそれぞれのチェック状態。buildChecklist（制作チェック10項目）とは
-   * 独立した、STEPごとの完了状態。キーはSTEP番号（1〜9）の文字列 */
+  /** 「作り方」9STEPそれぞれのチェック状態。この画面で唯一ユーザーが操作する製作の
+   * チェックリスト。キーはSTEP番号（1〜9）の文字列 */
   buildGuideChecked: Record<string, boolean>;
-  /** STEPのチェックボックスから呼ばれる。CadStudio.tsxのbuildGuideCheckedを更新する */
+  /** STEPのチェックボックスから呼ばれる。CadStudio.tsxのbuildGuideCheckedを更新するほか、
+   * マイページ（SavedItemsModal.tsx）の製作進捗表示が引き続き参照できるよう、対応する
+   * buildChecklistのキーも同時に更新する（後方互換のための同期。詳細はCadStudio.tsx参照） */
   onToggleBuildGuideStep: (step: number) => void;
   /** 「制作準備」（Phase「1ページ縦スクロール型」）のチェックボックスから呼ばれる。
    * buildChecklistの特定キーを直接トグルする、CadCutlistView.tsxと同じ仕組み */
@@ -147,16 +142,13 @@ export default function CadBuildGuide({
 }: CadBuildGuideProps) {
   const isPrepComplete = PREP_CHECKLIST_ITEMS.every((item) => Boolean(buildChecklist[item.key]));
   const steps = buildFurnitureSteps(model.panels, model.thickness);
-  // 制作チェック（Phase 2-7）と全く同じ関数・同じデータを使い、進捗表示が食い違わないようにする。
-  // この「制作進捗」カード自体は10項目の制作チェックの全体進捗を示すもので、
-  // 下記のSTEPごとのチェック（buildGuideChecked）とは独立して維持する
-  const buildDoneCount = BUILD_CHECKLIST_STEPS.filter((_, i) => buildChecklist[String(i + 1)]).length;
-  const buildPercent = Math.round((buildDoneCount / BUILD_CHECKLIST_STEPS.length) * 100);
-  const nextBuildStep = getNextBuildStep(buildChecklist);
 
   // 「作り方」9ステップの「現在の作業」表示。各STEPカードに追加したチェックボックス
-  // （buildGuideChecked、制作チェック10項目のbuildChecklistとは別の独立した状態）から、
-  // 最初にチェックが入っていないSTEPを「現在の作業」として求める
+  // （buildGuideChecked）から、最初にチェックが入っていないSTEPを「現在の作業」として求める。
+  // 以前は別に「制作チェック」（buildChecklist、10項目）という並行するチェックリストが
+  // あったが、作り方の9ステップとほぼ1対1で内容が重複していたため統合し、「作り方」の
+  // チェックボックスだけを唯一の入力先にした（CadStudio.tsxのhandleToggleBuildGuideStepが
+  // buildChecklistへも同時に反映するため、マイページの製作進捗表示は変更なしで動く）
   const guideDoneCount = steps.filter((s) => buildGuideChecked[String(s.stepNumber)]).length;
   const currentBuildStepNumber = steps.find((s) => !buildGuideChecked[String(s.stepNumber)])?.stepNumber ?? null;
   const isBuildStepDone = (stepNumber: number) => Boolean(buildGuideChecked[String(stepNumber)]);
@@ -165,25 +157,6 @@ export default function CadBuildGuide({
   // isBuildStepDone・steps.lengthから毎回算出するだけ
   const completedStepCount = guideDoneCount;
   const stepProgressPercent = Math.round((completedStepCount / steps.length) * 100);
-
-  // 「作り方」と制作チェックの関連表示（Phase 3-26）。既存のCONFIRM_TARGETS
-  // （CadBuildChecklistView.tsx、Phase 3-10）では、チェック項目6「組み立て位置を確認した」〜
-  // 9「ガタつきを確認した」の4件が、個別のステップ番号にではなく、まとめて「作り方を見る」
-  // （BUILD_STEPS_ANCHOR_ID）というセクション全体に対応付けられている。9ステップと10項目は
-  // 完全な1対1対応ではないため、この4件のどれが具体的にどのステップに対応するかという
-  // 新しい対応表は作らない。代わりに、この4件（既存コードで確認できる、作り方に関連する
-  // 範囲）の完了状況を集計するだけにとどめ、Phase 3-25の「現在の作業」ステップ
-  // （currentBuildStepNumber、全完了時は最後のステップ）が6〜9の範囲にある場合だけ、
-  // そのステップ1箇所にのみ表示する（情報が過密にならないよう、常に最大1箇所）
-  const BUILD_STEP_RELATED_CHECKLIST_ITEMS = [6, 7, 8, 9] as const;
-  const relatedChecklistDoneCount = BUILD_STEP_RELATED_CHECKLIST_ITEMS.filter(
-    (n) => buildChecklist[String(n)]
-  ).length;
-  const relatedChecklistTotal = BUILD_STEP_RELATED_CHECKLIST_ITEMS.length;
-  const checklistRelationStepNumber = currentBuildStepNumber ?? steps.length;
-  const showChecklistRelation = (BUILD_STEP_RELATED_CHECKLIST_ITEMS as readonly number[]).includes(
-    checklistRelationStepNumber
-  );
 
   // 既存のAIチャット用木材価格目安リスト（app/lib/constants.ts）から、現在選択中の材料と
   // 名前が一致するものだけを表示する。一致しなければ「価格情報なし」と正直に表示する
@@ -309,32 +282,6 @@ export default function CadBuildGuide({
             </button>
           </div>
         </div>
-      </div>
-
-      <div className="rounded-tanei-control border border-tanei-border bg-white p-3 flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-tanei-ink-muted">製作進捗</span>
-          <span className="text-sm font-black text-tanei-brand">
-            {buildDoneCount} / {BUILD_CHECKLIST_STEPS.length}（{buildPercent}%）
-          </span>
-        </div>
-        <div className="w-full bg-tanei-border h-2 rounded-full overflow-hidden">
-          <div className="bg-tanei-brand h-full transition-all duration-300" style={{ width: `${buildPercent}%` }} />
-        </div>
-        {nextBuildStep ? (
-          <p className="text-xs text-tanei-ink">
-            次にやること：<span className="font-bold">{nextBuildStep.label}</span>
-          </p>
-        ) : (
-          <p className="text-xs font-bold text-tanei-brand">✓ 製作完了</p>
-        )}
-        <button
-          type="button"
-          onClick={() => scrollToSection(BUILD_CHECKLIST_ANCHOR_ID)}
-          className="self-start text-xs font-bold text-tanei-brand hover:text-tanei-brand-dark underline"
-        >
-          製作チェックを見る
-        </button>
       </div>
 
       <div>
@@ -738,11 +685,6 @@ export default function CadBuildGuide({
               {steps.map((step) => {
                 const isListStepDone = isBuildStepDone(step.stepNumber);
                 const isListStepCurrent = !isListStepDone && step.stepNumber === currentBuildStepNumber;
-                // このSTEPに確認ポイントが存在するかどうかは、既存のisChecklistRelationStepと
-                // 全く同じ条件（showChecklistRelation・checklistRelationStepNumber、Phase 3-26）を
-                // ここでも再利用するだけ。新しいSTEP↔チェック項目対応表は作らない（Phase 3-45）
-                const isListStepChecklistRelation =
-                  showChecklistRelation && step.stepNumber === checklistRelationStepNumber;
                 return (
                   <li key={step.stepNumber}>
                     {/* ネストしたボタン（下の「確認ポイントを見る →」）を有効なHTMLとして
@@ -823,34 +765,6 @@ export default function CadBuildGuide({
                       {isListStepCurrent && (
                         <span className="text-[10px] text-tanei-ink-muted">→ このSTEPを進める</span>
                       )}
-                      {/* Phase 3-45：確認ポイントの状態・導線。既存のrelatedChecklistDoneCount・
-                          relatedChecklistTotalから毎回算出するだけで、buildChecklistへの
-                          書き込みは一切行わない。STEPカード本体のクリックと独立させるため、
-                          ボタン側でstopPropagationしてgoToBuildStepが誤発火しないようにする */}
-                      {isListStepChecklistRelation && (
-                        <span className="mt-1 pt-1 border-t border-tanei-border flex items-center justify-between gap-2 flex-wrap">
-                          <span className="text-[10px] text-tanei-ink-muted">
-                            確認ポイント{'　'}
-                            {relatedChecklistDoneCount === relatedChecklistTotal
-                              ? '✓ 確認済み'
-                              : relatedChecklistDoneCount === 0
-                                ? '○ 未確認'
-                                : '◐ 一部確認済み'}
-                          </span>
-                          {relatedChecklistDoneCount < relatedChecklistTotal && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                scrollToSection(BUILD_CHECKLIST_ANCHOR_ID);
-                              }}
-                              className="text-[10px] font-bold text-tanei-accent hover:text-tanei-accent-dark"
-                            >
-                              確認ポイントを見る →
-                            </button>
-                          )}
-                        </span>
-                      )}
                     </div>
                   </li>
                 );
@@ -866,7 +780,6 @@ export default function CadBuildGuide({
             const isCurrent = !isDone && step.stepNumber === currentBuildStepNumber;
             const panelId = `cad-build-step-panel-${step.stepNumber}`;
             const partGroups = findStepPartGroups(model.panels, step.description);
-            const isChecklistRelationStep = showChecklistRelation && step.stepNumber === checklistRelationStepNumber;
             return (
               <li
                 key={step.stepNumber}
@@ -989,79 +902,6 @@ export default function CadBuildGuide({
                             </li>
                           ))}
                         </ul>
-                      </div>
-                    )}
-                    {isChecklistRelationStep && (
-                      <div className="mt-2.5 pt-2.5 border-t border-tanei-border">
-                        <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">このSTEPの確認ポイント</p>
-                        {/* 制作チェック項目6〜9それぞれの完了状態（Phase 3-31）。既存の
-                            BUILD_CHECKLIST_STEPS・buildChecklistを読み取り専用で使うだけで、
-                            特定のチェック項目番号を特定のSTEP番号に対応付けるものではない
-                            （Phase 3-26と同じく、この4件は「作り方」セクション全体に対する
-                            確認ポイントとして扱う） */}
-                        <ul className="flex flex-col gap-1 mb-1.5">
-                          {BUILD_STEP_RELATED_CHECKLIST_ITEMS.map((itemNumber) => {
-                            const isItemDone = Boolean(buildChecklist[String(itemNumber)]);
-                            return (
-                              <li key={itemNumber} className="flex items-start gap-1.5 text-[11px]">
-                                <span
-                                  className={`flex-shrink-0 font-bold ${isItemDone ? 'text-tanei-brand' : 'text-tanei-ink-muted'}`}
-                                >
-                                  {isItemDone ? '✓ 確認済み' : '○ 未確認'}
-                                </span>
-                                <span className={isItemDone ? 'text-tanei-ink-muted line-through' : 'text-tanei-ink'}>
-                                  {BUILD_CHECKLIST_STEPS[itemNumber - 1]}
-                                </span>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                        {relatedChecklistDoneCount === relatedChecklistTotal ? (
-                          // 完了しているチェック項目がもう無いため、誘導ボタンは表示しない（Phase 3-28）
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-[11px] font-bold text-tanei-brand">✓ 製作チェック済み</span>
-                            <span className="text-[11px] text-tanei-brand">✓ この確認ポイントは完了しています</span>
-                            {/* Phase 3-39：完了時の締めくくりの補助表示。制作チェック側の状態は
-                                一切書き換えず、既存のrelatedChecklistDoneCount等から表示するだけ */}
-                            <span className="text-[10px] text-tanei-ink-muted">このSTEPの確認は完了しています</span>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col gap-1">
-                            {relatedChecklistDoneCount === 0 ? (
-                              <span className="text-[11px] font-bold text-tanei-ink-muted">製作チェック：未完了</span>
-                            ) : (
-                              <span className="text-[11px] font-bold text-tanei-ink-muted">
-                                製作チェック：一部完了（{relatedChecklistDoneCount}/{relatedChecklistTotal}）
-                              </span>
-                            )}
-                            {/* Phase 3-32：未完了の確認ポイントがあることを補助的に伝える文言。
-                                現在の作業STEPでは少し目立たせ、それ以外は控えめな表示にとどめる */}
-                            <p className={isCurrent ? 'text-[11px] font-bold text-tanei-accent' : 'text-[10px] text-tanei-ink-muted'}>
-                              まだ確認が必要です
-                            </p>
-                            {/* Phase 3-39：制作チェック画面への導線を分かりやすくする補助文。
-                                実際のチェック更新はCadBuildChecklistView側にのみ任せ、
-                                ここでbuildChecklist・cutListCheckedを一切書き換えない */}
-                            <p className={isCurrent ? 'text-[11px] font-bold text-tanei-accent' : 'text-[10px] text-tanei-ink-muted'}>
-                              確認したら製作チェックを更新してください
-                            </p>
-                            {/* Phase 3-51：現在STEP（isCurrent）だけ、既存のtanei-accent系トークン
-                                （ring-2・text-tanei-accent等で既に使っている強調色）に切り替えて
-                                ボタンを少しだけ目立たせる。非現在STEPは従来どおりtanei-brand系の
-                                まま変更しない。新しい色・新しいコンポーネントは追加しない */}
-                            <button
-                              type="button"
-                              onClick={() => scrollToSection(BUILD_CHECKLIST_ANCHOR_ID)}
-                              className={
-                                isCurrent
-                                  ? 'self-start flex-shrink-0 text-[11px] font-bold text-tanei-accent border border-tanei-accent/40 hover:bg-tanei-accent/10 hover:border-tanei-accent rounded-full px-2.5 py-1 transition-colors'
-                                  : 'self-start flex-shrink-0 text-[11px] font-bold text-tanei-brand border border-tanei-brand/40 hover:bg-tanei-brand-soft hover:border-tanei-brand rounded-full px-2.5 py-1 transition-colors'
-                              }
-                            >
-                              製作チェックを見る →
-                            </button>
-                          </div>
-                        )}
                       </div>
                     )}
                     {/* STEP間の前後ナビゲーション（Phase 3-29）。新しいSTEPデータは作らず、
