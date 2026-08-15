@@ -16,8 +16,10 @@ import {
   calculateMaterialCostEstimate,
   findMaterialPriceInfo,
   getNextBuildStep,
+  type DimensionalLumberCutGroup,
 } from '../../lib/cad/model';
 import { AMAZON_TOOLS } from '../../lib/constants';
+import { packMaterialGroup } from '../../lib/cutSheetPdf';
 
 /** 「作り方」の各ステップから「使用するパーツ」を特定する（Phase 3-26）。
  * AIによる推測は行わず、既存のCUT_LIST_KIND_NAME（カットリストと共通の名称対応表）に
@@ -86,6 +88,12 @@ interface CadBuildGuideProps {
   material: string;
   sheetLayout: SheetLayout;
   sheetCount: number;
+  /** SPF材等の規格材（getFurnitureMaterialTypeが'dimensionalLumber'と判定する材料）の
+   * カット計画一覧。板材（sheetLayout）1件しか表示できなかった「必要な材料」「買い物リスト」に、
+   * 規格材も並べて表示するために使う。新しい集計ロジックは作らず、CadCutlistView.tsxの
+   * 📐カット図（LumberCutDiagramSvgView）と全く同じdimensionalLumberItemsToCutGroupsの
+   * 結果をそのまま受け取る */
+  lumberCutGroups: DimensionalLumberCutGroup[];
   /** 「作るパーツ」の「このパーツを見る」から、既存の3D CADへ該当パーツを
    * ハイライトした状態で移動する（Phase 3-2） */
   onViewPanel: (panelId: string) => void;
@@ -130,6 +138,7 @@ export default function CadBuildGuide({
   material,
   sheetLayout,
   sheetCount,
+  lumberCutGroups,
   onViewPanel,
   buildChecklist,
   buildGuideChecked,
@@ -182,6 +191,20 @@ export default function CadBuildGuide({
   // 木取り図（sheetLayout）が既にここまで生成できている＝木取り可能な状態でのみ
   // CadBuildGuideが描画されるため、必要枚数（sheetCount）は常に既存の木取りデータそのまま
   const costEstimate = calculateMaterialCostEstimate(material, sheetCount);
+
+  // SPF材等の規格材（lumberCutGroups）も、板材と同じ考え方で価格目安・材料費を出す。
+  // 必要本数は既存のpackMaterialGroup（1次元ビンパッキング、📐カット図と全く同じ計算）の
+  // 結果のboards数をそのまま使い、新しい必要本数の計算はしない
+  const lumberMaterialInfo = lumberCutGroups.map((group) => {
+    const boardCount = packMaterialGroup(group.cutGroup).length;
+    return {
+      material: group.material,
+      cutGroup: group.cutGroup,
+      boardCount,
+      priceInfo: findMaterialPriceInfo(group.material),
+      costEstimate: calculateMaterialCostEstimate(group.material, boardCount),
+    };
+  });
 
   // 買い物リストのチェック状態は、このセクション内だけの一時的な表示用状態。
   // IndexedDB・SavedFurnitureProjectには一切保存せず、リロードすれば初期状態に戻る
@@ -363,6 +386,62 @@ export default function CadBuildGuide({
         ) : (
           <p className="text-xs text-tanei-ink-muted">参考価格データがありません</p>
         )}
+
+        {/* SPF材等の規格材（脚・幕板等）。板材（sheetLayout）は上のブロックで
+            表示済みのため、材料が異なる規格材だけをここに追加で並べる。木取り図画面の
+            📐カット図と同じlumberCutGroups・同じpackMaterialGroupの結果を使うため、
+            「必要本数」がこことカット図とで食い違うことはない */}
+        {lumberMaterialInfo.map((info) => (
+          <div key={info.material} className="mt-3 pt-3 border-t border-tanei-border">
+            <div className="rounded-tanei-control border border-tanei-border bg-white px-3 py-2 text-sm text-tanei-ink flex flex-wrap gap-x-4 gap-y-1">
+              <span className="font-bold">{info.material}</span>
+              <span>規格材の長さ：{info.cutGroup.boardLengthMm}mm</span>
+              <span>
+                必要本数：<span className="font-black text-tanei-brand">{info.boardCount}本</span>
+              </span>
+            </div>
+
+            <h3 className="text-xs font-bold text-tanei-ink-muted mt-2 mb-1">価格目安（コーナン）</h3>
+            {info.priceInfo.length > 0 ? (
+              <div className="rounded-tanei-control border border-tanei-border bg-white divide-y divide-tanei-border overflow-hidden">
+                {info.priceInfo.map((wood) => (
+                  <div key={wood.name} className="px-3 py-2 text-xs text-tanei-ink">
+                    <span className="font-bold text-tanei-brand">{wood.name}</span>
+                    <span className="text-tanei-ink-muted"> ／ {wood.size} ／ {wood.length}</span>
+                    <div className="text-tanei-ink-muted mt-0.5">目安：{wood.price}（{wood.feature}）</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-tanei-ink-muted">価格情報なし</p>
+            )}
+
+            <h3 className="text-xs font-bold text-tanei-ink-muted mt-3 mb-1">材料費の目安</h3>
+            {info.costEstimate ? (
+              <div className="rounded-tanei-control border border-tanei-border bg-white overflow-hidden">
+                <div className="divide-y divide-tanei-border">
+                  {info.costEstimate.items.map((item) => (
+                    <div key={item.name} className="px-3 py-2 text-xs text-tanei-ink flex items-center justify-between gap-2">
+                      <span className="text-tanei-ink-muted">{item.name}（{item.quantity}本）</span>
+                      <span className="font-bold text-tanei-ink">{formatYenRange(item.subtotalLow, item.subtotalHigh)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-3 py-2 bg-tanei-brand-soft flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-tanei-ink">材料費合計の目安</span>
+                  <span className="text-sm font-black text-tanei-brand">
+                    {formatYenRange(info.costEstimate.totalLow, info.costEstimate.totalHigh)}
+                  </span>
+                </div>
+                <p className="px-3 py-2 text-[10px] text-tanei-ink-muted leading-relaxed">
+                  ※価格は参考値です。実際の価格は店舗・サイズ・時期などにより異なります。ビス・ボンド・塗料などの副資材は含みません。
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-tanei-ink-muted">参考価格データがありません</p>
+            )}
+          </div>
+        ))}
       </div>
 
       <div id={SHOPPING_LIST_ANCHOR_ID} className="rounded-tanei-control border border-tanei-border bg-white overflow-hidden scroll-mt-4">
@@ -413,6 +492,40 @@ export default function CadBuildGuide({
                     </li>
                   );
                 })()}
+                {/* SPF材等の規格材（脚・幕板等）も、板材と同じチェックリスト形式で並べる */}
+                {lumberMaterialInfo.map((info) => {
+                  const key = `material:${info.material}`;
+                  const isChecked = Boolean(checkedShoppingItems[key]);
+                  return (
+                    <li key={key}>
+                      <label
+                        className={`flex items-start gap-2.5 px-3 py-2 cursor-pointer transition-colors ${
+                          isChecked ? 'bg-tanei-brand-soft' : 'bg-white hover:bg-tanei-surface'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleShoppingItem(key)}
+                          className="mt-0.5 h-4 w-4 accent-tanei-brand flex-shrink-0"
+                        />
+                        <span className="flex-1 text-xs">
+                          <span className={`block font-bold ${isChecked ? 'text-tanei-ink line-through' : 'text-tanei-ink'}`}>
+                            {info.material}　×{info.boardCount}本
+                          </span>
+                          <span className="block text-tanei-ink-muted mt-0.5">
+                            規格材の長さ：{info.cutGroup.boardLengthMm}mm
+                          </span>
+                          <span className="block text-tanei-ink-muted mt-0.5">
+                            {info.costEstimate
+                              ? `価格目安：${formatYenRange(info.costEstimate.totalLow, info.costEstimate.totalHigh)}`
+                              : '参考価格データなし'}
+                          </span>
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
 

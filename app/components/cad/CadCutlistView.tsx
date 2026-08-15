@@ -172,10 +172,13 @@ export default function CadCutlistView({
   // 規格材のカット図（📐、LumberCutDiagramSvgView）。板取り図を作らない規格材でも、
   // どの1本からどのパーツを何本切り出すのかが視覚的に分かるようにする（新しい木取り
   // 計算ロジックは作らず、既存のdimensionalLumberItems＝buildCutListItemsの結果を
-  // そのままapp/lib/cutSheetPdf.tsのpackMaterialGroupへ渡せる形に変換するだけ）
+  // そのままapp/lib/cutSheetPdf.tsのpackMaterialGroupへ渡せる形に変換するだけ）。
+  // CadBuildGuide.tsxの「必要な材料」「買い物リスト」がSPF材等の規格材も表示できるよう、
+  // この同じ配列をそのままpropsで渡す（新しい集計ロジックは作らない）
+  const lumberCutGroups = useMemo(() => dimensionalLumberItemsToCutGroups(dimensionalLumberItems), [dimensionalLumberItems]);
   const lumberCutGroupsByMaterial = useMemo(
-    () => new Map(dimensionalLumberItemsToCutGroups(dimensionalLumberItems).map((g) => [g.material, g.cutGroup])),
-    [dimensionalLumberItems]
+    () => new Map(lumberCutGroups.map((g) => [g.material, g.cutGroup])),
+    [lumberCutGroups]
   );
 
   // 板材（sheetLayouts）が1件も無い場合（理論上、全パーツが規格材の場合のみ発生しうる
@@ -618,6 +621,7 @@ export default function CadCutlistView({
                   material={material}
                   sheetLayout={primaryLayout}
                   sheetCount={primarySheetCount}
+                  lumberCutGroups={lumberCutGroups}
                   onViewPanel={onViewPanel}
                   buildChecklist={buildChecklist}
                   onToggleBuildChecklistKey={onToggleBuildChecklistKey}
