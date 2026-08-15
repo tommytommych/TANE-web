@@ -137,7 +137,7 @@ export default function CadCutlistView({
     { label: '木取り', done: Boolean(buildChecklist[CUT_LAYOUT_CONFIRMED_KEY]) },
     { label: 'カット', done: Boolean(buildChecklist[CUT_MATERIALS_CONFIRMED_KEY]) },
     { label: '準備', done: isPrepDone },
-    { label: '制作', done: isBuildGuideDone },
+    { label: '製作', done: isBuildGuideDone },
     { label: '完成', done: isBuildGuideDone },
   ];
   const currentProgressIndex = progressSteps.findIndex((s) => !s.done);

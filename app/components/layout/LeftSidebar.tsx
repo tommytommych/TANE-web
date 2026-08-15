@@ -29,7 +29,7 @@ const MY_PAGE_GROUPS: { title: string; items: { icon: string; label: string; typ
     ],
   },
   {
-    title: '制作・作品',
+    title: '製作・作品',
     items: [
       { icon: '📏', label: '木取り図', type: 'cutlist' },
       { icon: '📝', label: '保存したカット申込書', type: 'pdf' },

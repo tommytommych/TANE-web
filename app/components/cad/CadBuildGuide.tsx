@@ -229,14 +229,14 @@ export default function CadBuildGuide({
   return (
     <div className="flex flex-col gap-4 border-t border-tanei-border pt-4">
       <div>
-        <h2 className="text-lg font-black text-tanei-ink">制作する</h2>
+        <h2 className="text-lg font-black text-tanei-ink">製作する</h2>
         <p className="text-xs text-tanei-ink-muted mt-0.5">
           この家具を作るために必要なもの・作り方をまとめています
         </p>
       </div>
 
       <div className="rounded-tanei-control border border-tanei-border bg-white p-3">
-        <span className="text-xs font-bold text-tanei-ink-muted">制作前チェック</span>
+        <span className="text-xs font-bold text-tanei-ink-muted">製作前チェック</span>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
           <div className="rounded-tanei-control bg-tanei-surface px-2.5 py-2 flex flex-col items-center gap-1">
             <span className="text-[11px] text-tanei-ink-muted">材料</span>
@@ -283,25 +283,11 @@ export default function CadBuildGuide({
             </button>
           </div>
         </div>
-
-        <div className="mt-3 pt-3 border-t border-tanei-border text-center">
-          <p className="text-xs font-bold text-tanei-ink">準備ができたら制作を開始</p>
-          <p className="text-[11px] text-tanei-ink-muted mt-0.5 mb-2">
-            材料・工具・パーツ・作り方を確認したら、制作を始めましょう。
-          </p>
-          <button
-            type="button"
-            onClick={onViewBuildCheck}
-            className="w-full sm:w-auto bg-tanei-brand text-white text-sm font-bold px-6 py-2.5 rounded-tanei-control hover:bg-tanei-brand-dark transition-colors"
-          >
-            {!nextBuildStep ? '✓ 制作完了を見る' : buildDoneCount > 0 ? '制作を続ける' : '制作を開始する'}
-          </button>
-        </div>
       </div>
 
       <div className="rounded-tanei-control border border-tanei-border bg-white p-3 flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-tanei-ink-muted">制作進捗</span>
+          <span className="text-xs font-bold text-tanei-ink-muted">製作進捗</span>
           <span className="text-sm font-black text-tanei-brand">
             {buildDoneCount} / {BUILD_CHECKLIST_STEPS.length}（{buildPercent}%）
           </span>
@@ -314,14 +300,14 @@ export default function CadBuildGuide({
             次にやること：<span className="font-bold">{nextBuildStep.label}</span>
           </p>
         ) : (
-          <p className="text-xs font-bold text-tanei-brand">✓ 制作完了</p>
+          <p className="text-xs font-bold text-tanei-brand">✓ 製作完了</p>
         )}
         <button
           type="button"
           onClick={onViewBuildCheck}
           className="self-start text-xs font-bold text-tanei-brand hover:text-tanei-brand-dark underline"
         >
-          制作チェックを見る
+          製作チェックを見る
         </button>
       </div>
 
@@ -506,7 +492,7 @@ export default function CadBuildGuide({
           セクションは削除せず、詳しい情報はそのまま残しつつ、ここではチェックボックス
           だけに絞ったシンプルな確認欄にする */}
       <div id={PREP_ANCHOR_ID} className="scroll-mt-4">
-        <h3 className="text-sm font-bold text-tanei-ink mb-1">③ 制作準備</h3>
+        <h3 className="text-sm font-bold text-tanei-ink mb-1">③ 製作準備</h3>
         <p className="text-xs text-tanei-ink-muted mb-2">作り始める前に、材料・工具・安全を確認してください。</p>
         <ul className="rounded-tanei-control border border-tanei-border divide-y divide-tanei-border overflow-hidden bg-white">
           {PREP_CHECKLIST_ITEMS.map((item) => {
@@ -532,7 +518,7 @@ export default function CadBuildGuide({
             );
           })}
         </ul>
-        {isPrepComplete && <p className="text-xs font-bold text-tanei-brand mt-1.5">✓ 制作準備完了！</p>}
+        {isPrepComplete && <p className="text-xs font-bold text-tanei-brand mt-1.5">✓ 製作準備完了！</p>}
       </div>
 
       <div>
@@ -540,13 +526,13 @@ export default function CadBuildGuide({
 
         {!isPrepComplete ? (
           <div className="rounded-tanei-control border border-tanei-border bg-tanei-surface-muted px-4 py-6 text-center">
-            <p className="text-sm font-bold text-tanei-ink-muted">🔒 制作準備が完了すると作り方を開始できます</p>
+            <p className="text-sm font-bold text-tanei-ink-muted">🔒 製作準備が完了すると作り方を開始できます</p>
             <button
               type="button"
               onClick={() => scrollToSection(PREP_ANCHOR_ID)}
               className="mt-2 text-xs font-bold text-tanei-brand hover:text-tanei-brand-dark underline"
             >
-              ↑ 制作準備を確認する
+              ↑ 製作準備を確認する
             </button>
           </div>
         ) : (
@@ -917,7 +903,7 @@ export default function CadBuildGuide({
                         {relatedChecklistDoneCount === relatedChecklistTotal ? (
                           // 完了しているチェック項目がもう無いため、誘導ボタンは表示しない（Phase 3-28）
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-[11px] font-bold text-tanei-brand">✓ 制作チェック済み</span>
+                            <span className="text-[11px] font-bold text-tanei-brand">✓ 製作チェック済み</span>
                             <span className="text-[11px] text-tanei-brand">✓ この確認ポイントは完了しています</span>
                             {/* Phase 3-39：完了時の締めくくりの補助表示。制作チェック側の状態は
                                 一切書き換えず、既存のrelatedChecklistDoneCount等から表示するだけ */}
@@ -926,10 +912,10 @@ export default function CadBuildGuide({
                         ) : (
                           <div className="flex flex-col gap-1">
                             {relatedChecklistDoneCount === 0 ? (
-                              <span className="text-[11px] font-bold text-tanei-ink-muted">制作チェック：未完了</span>
+                              <span className="text-[11px] font-bold text-tanei-ink-muted">製作チェック：未完了</span>
                             ) : (
                               <span className="text-[11px] font-bold text-tanei-ink-muted">
-                                制作チェック：一部完了（{relatedChecklistDoneCount}/{relatedChecklistTotal}）
+                                製作チェック：一部完了（{relatedChecklistDoneCount}/{relatedChecklistTotal}）
                               </span>
                             )}
                             {/* Phase 3-32：未完了の確認ポイントがあることを補助的に伝える文言。
@@ -941,7 +927,7 @@ export default function CadBuildGuide({
                                 実際のチェック更新はCadBuildChecklistView側にのみ任せ、
                                 ここでbuildChecklist・cutListCheckedを一切書き換えない */}
                             <p className={isCurrent ? 'text-[11px] font-bold text-tanei-accent' : 'text-[10px] text-tanei-ink-muted'}>
-                              確認したら制作チェックを更新してください
+                              確認したら製作チェックを更新してください
                             </p>
                             {/* Phase 3-51：現在STEP（isCurrent）だけ、既存のtanei-accent系トークン
                                 （ring-2・text-tanei-accent等で既に使っている強調色）に切り替えて
@@ -956,7 +942,7 @@ export default function CadBuildGuide({
                                   : 'self-start flex-shrink-0 text-[11px] font-bold text-tanei-brand border border-tanei-brand/40 hover:bg-tanei-brand-soft hover:border-tanei-brand rounded-full px-2.5 py-1 transition-colors'
                               }
                             >
-                              制作チェックを見る →
+                              製作チェックを見る →
                             </button>
                           </div>
                         )}
@@ -1004,7 +990,7 @@ export default function CadBuildGuide({
             ここに1箇所、最終地点として分かりやすい見た目のものを追加するだけにとどめる */}
         {completedStepCount === steps.length && (
           <div className="rounded-tanei-control border-2 border-tanei-brand bg-tanei-brand-soft px-4 py-4 text-center mt-3">
-            <p className="text-base font-black text-tanei-brand">🎉 制作完了！</p>
+            <p className="text-base font-black text-tanei-brand">🎉 製作完了！</p>
             <p className="text-xs text-tanei-ink mt-1">✓ すべてのSTEPが完了しています。</p>
           </div>
         )}
@@ -1022,6 +1008,26 @@ export default function CadBuildGuide({
             </li>
           ))}
         </ul>
+      </div>
+
+      {/* 製作を始めるボタン（材料・工具・パーツ・作り方・安全ポイントの後、この
+          セクションの一番下）。以前は「制作前チェック」カードの中、セクション上部に
+          あったため、上から読み進める途中に大きなボタンが挟まる形になり分かりにくかった。
+          ここまでの内容を確認し終えた最後に置くことで、「読み終えたら押す」という
+          自然な流れにする。ボタンの役割（onViewBuildCheck・状態に応じた文言の出し分け）は
+          変更していない */}
+      <div className="rounded-tanei-control border border-tanei-border bg-white p-4 text-center">
+        <p className="text-xs font-bold text-tanei-ink">準備ができたら製作を開始</p>
+        <p className="text-[11px] text-tanei-ink-muted mt-0.5 mb-2">
+          材料・工具・パーツ・作り方を確認したら、製作を始めましょう。
+        </p>
+        <button
+          type="button"
+          onClick={onViewBuildCheck}
+          className="w-full sm:w-auto bg-tanei-brand text-white text-sm font-bold px-6 py-2.5 rounded-tanei-control hover:bg-tanei-brand-dark transition-colors"
+        >
+          {!nextBuildStep ? '✓ 製作完了を見る' : buildDoneCount > 0 ? '製作を続ける' : '製作を開始する'}
+        </button>
       </div>
     </div>
   );

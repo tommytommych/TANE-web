@@ -196,7 +196,7 @@ export default function CadBuildChecklistView({
 
         <div>
           <p className="text-[11px] font-bold text-tanei-accent">STEP 5 / 6</p>
-          <h2 className="text-lg font-black text-tanei-ink">制作チェック</h2>
+          <h2 className="text-lg font-black text-tanei-ink">製作チェック</h2>
           <p className="text-xs text-tanei-ink-muted mt-0.5">
             今どこまで進んだかを確認しながら、順番に作業を進めましょう。
           </p>
@@ -208,7 +208,7 @@ export default function CadBuildChecklistView({
             FURNITURE_BUILD_TOOLSなど既存データから毎回その場で組み立てるだけで、
             新しい保存・新しいチェック状態は一切持たない */}
         <div className="rounded-tanei-control border border-tanei-border bg-tanei-surface px-4 py-3 flex flex-col gap-2">
-          <p className="text-xs font-bold text-tanei-ink-muted">🔎 制作前チェック</p>
+          <p className="text-xs font-bold text-tanei-ink-muted">🔎 製作前チェック</p>
           <p className="text-[11px] text-tanei-ink-muted -mt-1">作り始める前に、ここだけ確認しましょう。</p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
@@ -264,8 +264,8 @@ export default function CadBuildChecklistView({
         {isAllComplete ? (
           <div className="rounded-tanei-control border border-tanei-brand bg-tanei-brand-soft px-4 py-3 flex flex-col gap-3">
             <div>
-              <p className="text-sm font-black text-tanei-brand">✓ 制作完了</p>
-              <p className="text-xs text-tanei-ink mt-1">すべての制作チェックが完了しました。</p>
+              <p className="text-sm font-black text-tanei-brand">✓ 製作完了</p>
+              <p className="text-xs text-tanei-ink mt-1">すべての製作チェックが完了しました。</p>
             </div>
             <Link
               href={`/app?openFinished=1&finishedTitle=${encodeURIComponent(projectName)}${
@@ -308,7 +308,7 @@ export default function CadBuildChecklistView({
           id={BUILD_NAV_ID}
           className="sticky top-0 z-10 -mx-4 bg-tanei-bg px-4 py-2 border-b border-tanei-border scroll-mt-4"
         >
-          <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">制作ナビ</p>
+          <p className="text-[11px] font-bold text-tanei-ink-muted mb-1.5">製作ナビ</p>
           <div className="flex gap-1.5 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
             {BUILD_NAV_ITEMS.map((item) => (
               <button
@@ -324,7 +324,7 @@ export default function CadBuildChecklistView({
         </div>
 
         <p className="text-sm text-tanei-ink">
-          制作進捗：<span className="font-black text-tanei-brand">{doneCount} / {BUILD_CHECKLIST_STEPS.length}</span> 完了
+          製作進捗：<span className="font-black text-tanei-brand">{doneCount} / {BUILD_CHECKLIST_STEPS.length}</span> 完了
         </p>
 
         <ol className="flex flex-col gap-2">
@@ -385,7 +385,7 @@ export default function CadBuildChecklistView({
           onClick={onNext}
           className="bg-tanei-brand text-white px-4 py-3 rounded-tanei-control text-sm font-bold hover:bg-tanei-brand-dark transition-colors"
         >
-          制作へ進む →
+          製作へ進む →
         </button>
       </div>
 
@@ -397,7 +397,7 @@ export default function CadBuildChecklistView({
           onClick={scrollToBuildNav}
           className="fixed bottom-4 right-4 z-20 bg-tanei-brand text-white text-xs font-bold px-3.5 py-2.5 rounded-full shadow-lg hover:bg-tanei-brand-dark transition-colors"
         >
-          ↑ 制作ナビへ戻る
+          ↑ 製作ナビへ戻る
         </button>
       )}
     </div>

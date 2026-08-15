@@ -73,8 +73,8 @@ const PROJECT_NOTES_MAX_LENGTH = 2000;
 const PROGRESS_FILTER_OPTIONS: { value: BuildProgressStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'すべて' },
   { value: 'not_started', label: '未着手' },
-  { value: 'building', label: '制作中' },
-  { value: 'completed', label: '制作完了' },
+  { value: 'building', label: '製作中' },
+  { value: 'completed', label: '製作完了' },
 ];
 
 // 「並び替え」（Phase 3-18）の選択肢。既存のcreatedAt/updatedAt/projectNameを読み取って
@@ -396,7 +396,7 @@ export default function SavedItemsModal({
     const trimmed = memoDraft.trim().slice(0, FINISHED_MEMO_MAX_LENGTH);
     if (trimmed !== (item.content ?? '').trim()) {
       onUpdate(item.id, { content: trimmed });
-      showToast?.('制作メモを保存しました🌱');
+      showToast?.('製作メモを保存しました🌱');
     }
     setEditingMemoId(null);
   };
@@ -528,10 +528,10 @@ export default function SavedItemsModal({
               同じデータを見せているだけで、二重に保存するものは無い */}
           {activeModal === 'finished' && (
             <div>
-              <p className="text-xs font-bold text-tanei-ink-muted mb-1">🕰 制作履歴</p>
+              <p className="text-xs font-bold text-tanei-ink-muted mb-1">🕰 製作履歴</p>
               {historyItems.length === 0 ? (
                 <p className="text-center text-gray-400 py-6 text-sm bg-tanei-bg rounded-tanei-control border border-tanei-border">
-                  制作履歴はまだありません。
+                  製作履歴はまだありません。
                 </p>
               ) : (
                 <div className="flex flex-col gap-2">
@@ -554,7 +554,7 @@ export default function SavedItemsModal({
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-bold text-tanei-ink break-words">{item.title}</p>
                           <p className="text-xs text-tanei-ink-muted break-words">関連する設計：{projectName}</p>
-                          <span className="inline-block text-[11px] font-bold text-tanei-brand mt-0.5">✓ 制作完了</span>
+                          <span className="inline-block text-[11px] font-bold text-tanei-brand mt-0.5">✓ 製作完了</span>
                           <p className="text-[11px] text-gray-500 mt-0.5">{item.date}</p>
                           <div className="flex gap-2 flex-wrap mt-1.5">
                             <button
@@ -602,7 +602,7 @@ export default function SavedItemsModal({
               </div>
 
               <div>
-                <p className="text-xs font-bold text-tanei-ink-muted mb-1">制作進捗で絞り込む</p>
+                <p className="text-xs font-bold text-tanei-ink-muted mb-1">製作進捗で絞り込む</p>
                 <div className="flex flex-wrap gap-1.5">
                   {PROGRESS_FILTER_OPTIONS.map((opt) => (
                     <button
@@ -679,7 +679,7 @@ export default function SavedItemsModal({
                 const overallDone = progress ? progress.cutListDone + progress.buildDone : 0;
                 const overallTotal = progress ? progress.cutListTotal + progress.buildTotal : 0;
                 const overallPercent = overallTotal > 0 ? Math.round((overallDone / overallTotal) * 100) : 0;
-                const openLabel = progress?.isComplete ? '設計を見る' : hasStarted ? '制作を続ける' : '開く';
+                const openLabel = progress?.isComplete ? '設計を見る' : hasStarted ? '製作を続ける' : '開く';
 
                 return (
                   <div key={item.id} className="border border-tanei-border p-4 rounded-tanei-card bg-tanei-bg flex flex-col gap-3">
@@ -728,7 +728,7 @@ export default function SavedItemsModal({
                                   : 'bg-tanei-surface-muted text-tanei-ink-muted'
                               }`}
                             >
-                              {buildStatus === 'building' ? '制作中' : '未着手'}
+                              {buildStatus === 'building' ? '製作中' : '未着手'}
                             </span>
                           )}
                           {project?.notes && (
@@ -796,12 +796,12 @@ export default function SavedItemsModal({
                       <div className="flex flex-col gap-2">
                         {progress.isComplete ? (
                           <span className="self-start text-xs font-bold text-tanei-brand bg-tanei-brand-soft rounded-tanei-control px-2.5 py-1.5">
-                            ✓ 制作完了
+                            ✓ 製作完了
                           </span>
                         ) : hasStarted ? (
                           <>
                             <div className="flex items-center justify-between text-xs">
-                              <span className="font-bold text-tanei-ink-muted">制作進捗</span>
+                              <span className="font-bold text-tanei-ink-muted">製作進捗</span>
                               <span className="font-black text-tanei-brand">{overallPercent}%</span>
                             </div>
                             <div className="w-full bg-tanei-border h-2 rounded-full overflow-hidden">
@@ -818,7 +818,7 @@ export default function SavedItemsModal({
                                 </div>
                               </div>
                               <div>
-                                <div className="text-[11px] text-tanei-ink-muted">制作チェック</div>
+                                <div className="text-[11px] text-tanei-ink-muted">製作チェック</div>
                                 <div className="text-xs font-bold text-tanei-ink">
                                   {progress.buildDone} / {progress.buildTotal}
                                 </div>
@@ -826,7 +826,7 @@ export default function SavedItemsModal({
                             </div>
                           </>
                         ) : (
-                          <span className="text-xs text-tanei-ink-muted">制作進捗：未開始</span>
+                          <span className="text-xs text-tanei-ink-muted">製作進捗：未開始</span>
                         )}
 
                         {!progress.isComplete && nextStep && (
@@ -838,7 +838,7 @@ export default function SavedItemsModal({
                     )}
 
                     <p className="text-[11px] text-tanei-ink-muted">
-                      制作実績：{finishedCount > 0 ? `${finishedCount}件` : 'まだありません'}
+                      製作実績：{finishedCount > 0 ? `${finishedCount}件` : 'まだありません'}
                     </p>
 
                     <div className="flex items-center gap-3 flex-wrap">
@@ -1096,7 +1096,7 @@ export default function SavedItemsModal({
                   title・fileDataUrl・relatedProjectIdは一切触れない */}
               <div>
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-bold text-tanei-ink-muted">制作メモ</p>
+                  <p className="text-[11px] font-bold text-tanei-ink-muted">製作メモ</p>
                   {editingMemoId !== viewingFinishedItem.id && (
                     <button
                       onClick={() => {
@@ -1105,7 +1105,7 @@ export default function SavedItemsModal({
                       }}
                       className="text-[11px] font-bold text-tanei-accent hover:underline"
                     >
-                      ✏️ 制作メモを編集
+                      ✏️ 製作メモを編集
                     </button>
                   )}
                 </div>
@@ -1118,7 +1118,7 @@ export default function SavedItemsModal({
                       maxLength={FINISHED_MEMO_MAX_LENGTH}
                       rows={4}
                       placeholder="実際に作ってみて気づいたことを残しておけます。"
-                      aria-label="制作メモを編集"
+                      aria-label="製作メモを編集"
                       className="w-full border border-tanei-border rounded-tanei-control px-2.5 py-1.5 text-sm resize-none"
                     />
                     <p className="text-[11px] text-tanei-ink-muted text-right">
@@ -1213,19 +1213,19 @@ export default function SavedItemsModal({
 
                   {viewingProgress && viewingBuildStatus && (
                     <div className="pt-2 border-t border-tanei-border">
-                      <p className="text-[11px] font-bold text-tanei-ink-muted">制作進捗</p>
+                      <p className="text-[11px] font-bold text-tanei-ink-muted">製作進捗</p>
                       <p className="text-sm font-bold text-tanei-brand mt-0.5">
                         {viewingBuildStatus === 'completed'
-                          ? '✓ 制作完了'
+                          ? '✓ 製作完了'
                           : viewingBuildStatus === 'building'
-                            ? `制作中 ${viewingProgress.buildDone} / ${viewingProgress.buildTotal}`
+                            ? `製作中 ${viewingProgress.buildDone} / ${viewingProgress.buildTotal}`
                             : '未開始'}
                       </p>
                     </div>
                   )}
 
                   <p className="text-[11px] text-tanei-ink-muted">
-                    この設計の制作実績：{viewingFinishedCount > 0 ? `${viewingFinishedCount}件` : 'まだありません'}
+                    この設計の製作実績：{viewingFinishedCount > 0 ? `${viewingFinishedCount}件` : 'まだありません'}
                   </p>
 
                   <Link
@@ -1233,7 +1233,7 @@ export default function SavedItemsModal({
                     onClick={onClose}
                     className="self-start inline-flex items-center gap-1.5 text-xs font-bold bg-white border border-tanei-border text-tanei-ink px-3 py-1.5 rounded-tanei-control hover:bg-tanei-surface-muted transition-colors"
                   >
-                    制作内容を見る
+                    製作内容を見る
                   </Link>
                 </div>
               )}
@@ -1253,7 +1253,7 @@ export default function SavedItemsModal({
                   と全く同じもの）をそのまま再利用する。新しい複製ロジックは作らない */}
               {viewingRelatedCadItem ? (
                 <div className="border-t border-tanei-border pt-3">
-                  <p className="text-[11px] font-bold text-tanei-ink-muted mb-1">再制作</p>
+                  <p className="text-[11px] font-bold text-tanei-ink-muted mb-1">再製作</p>
                   {duplicateConfirmId === viewingRelatedCadItem.id ? (
                     <div className="flex flex-col gap-2">
                       <p className="text-xs text-tanei-ink-muted">この設計を複製しますか？元の設計はそのまま残ります。</p>
