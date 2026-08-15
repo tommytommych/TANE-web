@@ -752,53 +752,83 @@ export const buildUniversalCutSheetPdf = async (
     })),
   ];
 
+  // 「材質」欄は木取り図と同じlayout.name（材料名＋板サイズ）をそのまま使うため、
+  // 特に板材のカット依頼では文字列が長くなりやすい。以前は列幅190pxに対して折り返しを
+  // 一切行わずに描画していたため、長い材質名が隣の「長さ(mm)」列まではみ出して重なって
+  // 見える不具合があった。「材質」列の幅を広げつつ、それでも収まらない場合は
+  // wrapTextToWidth（木取り図ヘッダーの重なり修正と同じ考え方）でセル内に折り返し、
+  // 折り返しが発生した行だけ高さを広げることで、どの列も他の列とは絶対に重ならないようにする
   const columns = [
-    { label: '材質', width: 190 },
-    { label: '長さ (mm)', width: 100 },
-    { label: '数量', width: 70 },
+    { label: '材質', width: 230 },
+    { label: '長さ (mm)', width: 90 },
+    { label: '数量', width: 55 },
     { label: '備考', width: 0 },
   ];
   columns[columns.length - 1].width =
     tableWidth - columns.slice(0, -1).reduce((sum, c) => sum + c.width, 0);
 
-  const rowHeight = 21;
-  ensureSpace(20 + rowHeight * (flatCutList.length + 1));
+  const TABLE_CELL_FONT_SIZE = 9.5;
+  const TABLE_LINE_HEIGHT_PT = 12;
+  // 1行だけのセルの行高さが、以前の固定rowHeight（21px）と完全に一致するように
+  // 逆算した値（21 = 1 * TABLE_LINE_HEIGHT_PT + TABLE_ROW_VPAD）。折り返しが発生しない
+  // 大多数の行は、見た目・行間ともに以前と変わらない
+  const TABLE_ROW_VPAD_PT = 9;
+
+  const wrapCellLines = (text: string, font: PDFFont, colWidth: number): string[] => {
+    const maxWidth = colWidth - 16;
+    if (maxWidth <= 0 || font.widthOfTextAtSize(text, TABLE_CELL_FONT_SIZE) <= maxWidth) return [text];
+    return wrapTextToWidth(text, font, TABLE_CELL_FONT_SIZE, maxWidth);
+  };
+
+  const tableRows: { cells: string[]; isHeader: boolean }[] = [
+    { cells: columns.map((c) => c.label), isHeader: true },
+    ...flatCutList.map((item) => ({
+      cells: [item.material, `${item.lengthMm}`, `${item.qty}`, item.note],
+      isHeader: false,
+    })),
+  ];
+  const tableRowLines = tableRows.map((row) =>
+    row.cells.map((cellText, ci) => wrapCellLines(cellText, row.isHeader ? fontBold : fontRegular, columns[ci].width))
+  );
+  const tableRowHeights = tableRowLines.map(
+    (lines) => Math.max(1, ...lines.map((l) => l.length)) * TABLE_LINE_HEIGHT_PT + TABLE_ROW_VPAD_PT
+  );
+  const totalTableHeight = tableRowHeights.reduce((sum, h) => sum + h, 0);
+
+  ensureSpace(20 + totalTableHeight);
 
   page.drawText('■ カット依頼リスト', { x: margin, y: cursorY, size: 13, font: fontBold, color: black });
   cursorY -= 20;
 
-  const tableTop = cursorY;
-
-  const drawRow = (idx: number, cells: string[], isHeader: boolean) => {
-    const rowY = tableTop - rowHeight * (idx + 1);
+  tableRows.forEach((row, idx) => {
+    const rh = tableRowHeights[idx];
+    const rowY = cursorY - rh;
     page.drawRectangle({
       x: margin,
       y: rowY,
       width: tableWidth,
-      height: rowHeight,
-      color: isHeader ? rgb(0.95, 0.95, 0.95) : undefined,
+      height: rh,
+      color: row.isHeader ? rgb(0.95, 0.95, 0.95) : undefined,
       borderColor: border,
       borderWidth: 1,
     });
     let x = margin;
-    cells.forEach((cellText, ci) => {
-      page.drawText(cellText, {
-        x: x + 8,
-        y: rowY + 7,
-        size: 9.5,
-        font: isHeader ? fontBold : fontRegular,
-        color: black,
+    tableRowLines[idx].forEach((lines, ci) => {
+      lines.forEach((line, li) => {
+        page.drawText(line, {
+          x: x + 8,
+          y: rowY + 7 + (lines.length - 1 - li) * TABLE_LINE_HEIGHT_PT,
+          size: TABLE_CELL_FONT_SIZE,
+          font: row.isHeader ? fontBold : fontRegular,
+          color: black,
+        });
       });
       x += columns[ci].width;
     });
-  };
-
-  drawRow(0, columns.map((c) => c.label), true);
-  flatCutList.forEach((item, i) => {
-    drawRow(i + 1, [item.material, `${item.lengthMm}`, `${item.qty}`, item.note], false);
+    cursorY = rowY;
   });
 
-  cursorY = tableTop - rowHeight * (flatCutList.length + 1) - 20;
+  cursorY -= 20;
 
   // ---------- お名前 / 店舗記入欄 ----------
   const bottomBoxHeight = 42;
