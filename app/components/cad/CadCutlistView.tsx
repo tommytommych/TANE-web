@@ -17,6 +17,7 @@ import type { FurnitureModel } from '../../lib/cad/types';
 import {
   buildCutListItems,
   CUT_LIST_KIND_NAME,
+  dimensionalLumberItemsToCutGroups,
   FURNITURE_MATERIALS,
   furnitureModelToDimensionalLumberItems,
   furnitureModelToSheetLayout,
@@ -26,6 +27,7 @@ import {
   type PartMaterialLabel,
 } from '../../lib/cad/model';
 import CadBuildGuide from './CadBuildGuide';
+import LumberCutDiagramSvgView from './LumberCutDiagramSvg';
 
 // 制作チェック画面の「制作へ進む」から来たときだけ、この要素まで自動スクロールする
 // （CadBuildGuide自体は変更せず、外側にidを持つラッパーを用意するだけにしている）
@@ -170,6 +172,15 @@ export default function CadCutlistView({
     });
     return order.map((groupMaterial) => ({ material: groupMaterial, items: groups.get(groupMaterial) ?? [] }));
   }, [dimensionalLumberItems]);
+
+  // 規格材のカット図（📐、LumberCutDiagramSvgView）。板取り図を作らない規格材でも、
+  // どの1本からどのパーツを何本切り出すのかが視覚的に分かるようにする（新しい木取り
+  // 計算ロジックは作らず、既存のdimensionalLumberItems＝buildCutListItemsの結果を
+  // そのままapp/lib/cutSheetPdf.tsのpackMaterialGroupへ渡せる形に変換するだけ）
+  const lumberCutGroupsByMaterial = useMemo(
+    () => new Map(dimensionalLumberItemsToCutGroups(dimensionalLumberItems).map((g) => [g.material, g.cutGroup])),
+    [dimensionalLumberItems]
+  );
 
   // 板材（sheetLayouts）が1件も無い場合（理論上、全パーツが規格材の場合のみ発生しうる
   // 稀なケース）だけ、CadBuildGuide.tsx向けに既存のfurnitureModelToSheetLayout
@@ -417,6 +428,26 @@ export default function CadCutlistView({
                 {!sheetLayouts.length && (
                   <h3 className="text-sm font-bold text-tanei-ink mb-1 scroll-mt-4">木取り図</h3>
                 )}
+
+                {/* 規格材のカット図（📐）。板材のようなサブロク板の木取り図は作れないが、
+                    「決まった長さの1本の材料から、どのパーツを何本切り出すか」を
+                    視覚的に示す（新しい木取り計算ロジックは使わず、既存のCutListItem
+                    ＝カットリストと全く同じ寸法・本数をそのまま使う） */}
+                <div className="flex flex-col gap-3 mb-2">
+                  {dimensionalLumberGroups.map((group) => {
+                    const cutGroup = lumberCutGroupsByMaterial.get(group.material);
+                    if (!cutGroup) return null;
+                    return (
+                      <LumberCutDiagramSvgView
+                        key={group.material}
+                        material={group.material}
+                        group={cutGroup}
+                        items={group.items}
+                      />
+                    );
+                  })}
+                </div>
+
                 <div className="flex flex-col gap-2">
                   {dimensionalLumberGroups.map((group) => (
                     <div
@@ -424,7 +455,7 @@ export default function CadCutlistView({
                       className="bg-white rounded-tanei-control border border-tanei-border p-3"
                     >
                       <p className="text-xs font-bold text-tanei-brand mb-1.5">
-                        {group.material}（規格材・板取り図なし）
+                        {group.material}（規格材）
                       </p>
                       <ul className="flex flex-col gap-1">
                         {group.items.map((item) => (

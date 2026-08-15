@@ -12,6 +12,7 @@
 // panels（延いては3D表示）は毎回buildFurnitureModel()で再計算される。
 
 import type { SheetLayout, SheetPart } from '../sheetLayout';
+import type { CutPart, MaterialGroup } from '../cutlist';
 import type { FurnitureDesign, FurnitureModel, FurniturePanel, FurniturePanelKind, PanelFinish, ShelfEntry } from './types';
 import {
   buildFurniturePanels,
@@ -771,6 +772,86 @@ export function buildCutListItems(model: FurnitureModel): CutListItem[] {
  * として木取り図画面・PDFに表示するために使う。新しい集計ロジックは作らない */
 export function furnitureModelToDimensionalLumberItems(model: FurnitureModel): CutListItem[] {
   return buildCutListItems(model).filter((item) => getFurnitureMaterialType(item.material) === 'dimensionalLumber');
+}
+
+// 規格材（SPF材等）として実際にホームセンターで販売されている長さ（mm）。
+// app/lib/constants.tsのKOHNAN_WOOD_LISTの同名エントリ（'910 / 1820mm'・'910 / 1820 / 2440mm'、
+// 価格目安の表示用テキスト）と同じ値を、カット計画（下のdimensionalLumberItemsToCutGroups）が
+// 実際に計算で使える数値として持つ。STANDARD_BOARD_SIZES（板材の定尺サイズ一覧）と同じ、
+// 「既存の価格データと同じ値のハードコード済みカタログ」という考え方。区別なしの'SPF材'は、
+// geometry.tsのresolveDimensionalLumberCrossSectionと同じく2×4相当として扱う
+const DIMENSIONAL_LUMBER_STOCK_LENGTHS_MM: Record<string, number[]> = {
+  'SPF材（1×4）': [910, 1820],
+  'SPF材（2×4）': [910, 1820, 2440],
+  SPF材: [910, 1820, 2440],
+};
+const DEFAULT_DIMENSIONAL_LUMBER_STOCK_LENGTHS_MM = [1820];
+
+/** 部材の中で最も長いものが収まる、最小の規格材の長さを選ぶ（無駄に長い規格材を
+ * 買わずに済むように）。どの規格材の長さにも収まらない部材がある場合（設計が
+ * 規格材の最大長を超える等）は、用意されている中で最も長いものを返す */
+function pickDimensionalLumberStockLengthMm(material: string, pieceLengthsMm: number[]): number {
+  const available = DIMENSIONAL_LUMBER_STOCK_LENGTHS_MM[material] ?? DEFAULT_DIMENSIONAL_LUMBER_STOCK_LENGTHS_MM;
+  const sorted = [...available].sort((a, b) => a - b);
+  const maxPieceLengthMm = Math.max(0, ...pieceLengthsMm);
+  return sorted.find((lengthMm) => lengthMm >= maxPieceLengthMm) ?? sorted[sorted.length - 1];
+}
+
+export interface DimensionalLumberCutGroup {
+  /** グループ化に使った元の材料名（例：'SPF材（2×4）'）。CadCutlistView.tsx側で、
+   * 既存のdimensionalLumberGroups（材料ごとのCutListItem一覧、表示用）と対応付ける際に使う */
+  material: string;
+  /** app/lib/cutSheetPdf.tsが既に持つ1次元ビンパッキング（packMaterialGroup）・
+   * PDFのカット図描画ロジックへそのまま渡せる形。新しいカット計算エンジンは作らない */
+  cutGroup: MaterialGroup;
+}
+
+/** furnitureModelToDimensionalLumberItems()の結果（規格材のパーツ一覧、既存の
+ * buildCutListItems()から来た寸法・本数をそのまま使う。新しい寸法計算は行わない）を、
+ * 材料ごとにグループ化し、app/lib/cutSheetPdf.tsが既に持つMaterialGroup形式へ変換する。
+ * これにより、AIチャットの木取りカット図（packMaterialGroup・PDFのバー型カット図）と
+ * 全く同じ描画ロジックを、ブラウザCAD由来の規格材（SPF材の脚・幕板等）にもそのまま
+ * 再利用できる。木取り図（サブロク板、furnitureModelToSheetLayoutsByMaterial）とは
+ * 完全に別の対象（getFurnitureMaterialTypeが'dimensionalLumber'の材料のみ）のため、
+ * 板材の木取り図に規格材を混ぜて表示することはない */
+export function dimensionalLumberItemsToCutGroups(items: CutListItem[]): DimensionalLumberCutGroup[] {
+  const order: string[] = [];
+  const groups = new Map<string, CutListItem[]>();
+  items.forEach((item) => {
+    const list = groups.get(item.material);
+    if (list) {
+      list.push(item);
+    } else {
+      groups.set(item.material, [item]);
+      order.push(item.material);
+    }
+  });
+
+  return order.map((material) => {
+    const groupItems = groups.get(material) ?? [];
+    // CutListItem.widthMm（3辺を昇順ソートした際の最大値）が、規格材における「切り出す
+    // 長さ」に相当する（heightMm×thicknessMmが断面。buildCutListItems参照）
+    const boardLengthMm = pickDimensionalLumberStockLengthMm(
+      material,
+      groupItems.map((item) => item.widthMm)
+    );
+    const parts: CutPart[] = groupItems.map((item) => ({ sizeMm: item.widthMm, qty: item.qty }));
+    const crossSectionLabel = groupItems[0] ? `${groupItems[0].thicknessMm}×${groupItems[0].heightMm}mm` : '';
+    return {
+      material,
+      cutGroup: {
+        name: `${material}（${crossSectionLabel}）`,
+        boardLengthMm,
+        parts,
+      },
+    };
+  });
+}
+
+/** furnitureModelToDimensionalLumberItems() → dimensionalLumberItemsToCutGroups()を
+ * 続けて呼ぶだけの便宜関数 */
+export function furnitureModelToDimensionalLumberCutGroups(model: FurnitureModel): DimensionalLumberCutGroup[] {
+  return dimensionalLumberItemsToCutGroups(furnitureModelToDimensionalLumberItems(model));
 }
 
 /** マイページ（保存した設計一覧）で表示する、1プロジェクト分の制作進捗（Phase 2-8）。

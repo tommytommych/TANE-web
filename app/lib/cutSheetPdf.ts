@@ -3,7 +3,7 @@ import fontkit from '@pdf-lib/fontkit';
 import QRCode from 'qrcode';
 import type { MaterialGroup } from './cutlist';
 import { packSheetLayout, type SheetLayout, type PackedSheet } from './sheetLayout';
-import type { CutListItem } from './cad/model';
+import { dimensionalLumberItemsToCutGroups, type CutListItem } from './cad/model';
 
 // 木取り図（カット図）のデモデータ。チャットに該当データが見つからない場合のフォールバック
 export const DEMO_MATERIAL_GROUPS: MaterialGroup[] = [
@@ -36,14 +36,16 @@ export const DEMO_MATERIAL_GROUPS: MaterialGroup[] = [
 
 const CUT_KERF_MM = 3; // のこ刃の厚み分。ピースを1つ置くたびに実際に消費される幅として加算する
 
-interface PackedBoard {
+export interface PackedBoard {
   pieces: number[];
   usedMm: number;
   leftoverMm: number;
 }
 
-// 1次元ビンパッキング（First Fit Decreasing）で、パーツを元板へ自動的に詰めていく
-const packMaterialGroup = (group: MaterialGroup): PackedBoard[] => {
+// 1次元ビンパッキング（First Fit Decreasing）で、パーツを元板へ自動的に詰めていく。
+// ブラウザCADの規格材カット図（app/components/cad/LumberCutDiagramSvg.tsx）が、
+// AIチャットの木取りカット図と全く同じアルゴリズムを再利用できるようexportする
+export const packMaterialGroup = (group: MaterialGroup): PackedBoard[] => {
   const pieces: number[] = [];
   group.parts.forEach((part) => {
     for (let i = 0; i < part.qty; i++) pieces.push(part.sizeMm);
@@ -147,6 +149,16 @@ export const buildUniversalCutSheetPdf = async (
   // 1次元木取り図セクション自体を表示しない
   const materialGroups =
     materialGroupsInput.length === 0 && sheetLayouts.length === 0 ? DEMO_MATERIAL_GROUPS : materialGroupsInput;
+
+  // 「■ 木取り図（カット図）」のバー型カット図だけ、規格材（SPF材の脚・幕板等）も
+  // 描画対象に含める。materialGroups自体は変更しない（「■ カット依頼リスト」表は
+  // 引き続きdimensionalLumberItemsから直接行を作っており、ここに含めてしまうと
+  // 同じ部材が二重に表示されてしまうため）。既存のpackMaterialGroup・バー描画ロジックは
+  // 一切変更せず、渡すデータだけを増やす
+  const diagramMaterialGroups = [
+    ...materialGroups,
+    ...dimensionalLumberItemsToCutGroups(dimensionalLumberItems).map((g) => g.cutGroup),
+  ];
 
   const pdfDoc = await PDFDocument.create();
   pdfDoc.registerFontkit(fontkit);
@@ -269,7 +281,7 @@ export const buildUniversalCutSheetPdf = async (
   cursorY -= 14;
 
   // ---------- 木取り図（カット図）（仕様1・2・3） ----------
-  if (materialGroups.length > 0) {
+  if (diagramMaterialGroups.length > 0) {
   page.drawText('■ 木取り図（カット図）', { x: margin, y: cursorY, size: 13, font: fontBold, color: black });
   cursorY -= 16;
 
@@ -284,15 +296,15 @@ export const buildUniversalCutSheetPdf = async (
   });
   cursorY -= 10;
 
-  const sizeColorMap = createSizeColorMap(materialGroups);
+  const sizeColorMap = createSizeColorMap(diagramMaterialGroups);
   const barHeight = 26;
   const barGap = 8;
   const groupGap = 14;
-  const maxBoardLengthMm = Math.max(...materialGroups.map((g) => g.boardLengthMm));
+  const maxBoardLengthMm = Math.max(...diagramMaterialGroups.map((g) => g.boardLengthMm));
   const diagramScale = (tableWidth - 80) / maxBoardLengthMm;
   // ※元板の長さの比率がそのまま図の横幅に反映されるよう、全グループで共通のスケールを使う
 
-  materialGroups.forEach((group) => {
+  diagramMaterialGroups.forEach((group) => {
     const boards = packMaterialGroup(group);
     const summary = group.parts.map((p) => `${p.sizeMm}(${p.qty})`).join('　');
 
