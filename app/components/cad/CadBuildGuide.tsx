@@ -74,6 +74,12 @@ const BUILD_STEPS_ANCHOR_ID = 'cad-build-steps';
 const SAFETY_NOTES_ANCHOR_ID = 'cad-safety-notes';
 // 制作チェックの制作ナビ（Phase 3-12）の「買い物リスト」からのスクロール先（Phase 3-23）
 const SHOPPING_LIST_ANCHOR_ID = 'cad-shopping-list';
+// 製作チェック（10項目、CadCutlistView.tsx側に統合済み）へのスクロール先id。
+// 以前は別画面（CadBuildChecklistView.tsx、viewMode='buildCheck'）への画面遷移だったが、
+// 木取り図ページ内に統合したため、同じページ内スクロールに変わった。CadCutlistView.tsx側の
+// 同名定数と値を一致させる必要があるが、既存の他のanchor id定数と同じく、importで結合を
+// 強めるのではなく値だけを再利用する（既存方針を踏襲） */
+const BUILD_CHECKLIST_ANCHOR_ID = 'cad-build-checklist';
 
 interface CadBuildGuideProps {
   model: FurnitureModel;
@@ -91,8 +97,6 @@ interface CadBuildGuideProps {
   buildGuideChecked: Record<string, boolean>;
   /** STEPのチェックボックスから呼ばれる。CadStudio.tsxのbuildGuideCheckedを更新する */
   onToggleBuildGuideStep: (step: number) => void;
-  /** 「制作チェックを見る」から、既存のviewMode切り替えでCadBuildChecklistViewへ戻る */
-  onViewBuildCheck: () => void;
   /** 「制作準備」（Phase「1ページ縦スクロール型」）のチェックボックスから呼ばれる。
    * buildChecklistの特定キーを直接トグルする、CadCutlistView.tsxと同じ仕組み */
   onToggleBuildChecklistKey: (key: string) => void;
@@ -130,7 +134,6 @@ export default function CadBuildGuide({
   buildChecklist,
   buildGuideChecked,
   onToggleBuildGuideStep,
-  onViewBuildCheck,
   onToggleBuildChecklistKey,
 }: CadBuildGuideProps) {
   const isPrepComplete = PREP_CHECKLIST_ITEMS.every((item) => Boolean(buildChecklist[item.key]));
@@ -304,7 +307,7 @@ export default function CadBuildGuide({
         )}
         <button
           type="button"
-          onClick={onViewBuildCheck}
+          onClick={() => scrollToSection(BUILD_CHECKLIST_ANCHOR_ID)}
           className="self-start text-xs font-bold text-tanei-brand hover:text-tanei-brand-dark underline"
         >
           製作チェックを見る
@@ -726,7 +729,7 @@ export default function CadBuildGuide({
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onViewBuildCheck();
+                                scrollToSection(BUILD_CHECKLIST_ANCHOR_ID);
                               }}
                               className="text-[10px] font-bold text-tanei-accent hover:text-tanei-accent-dark"
                             >
@@ -935,7 +938,7 @@ export default function CadBuildGuide({
                                 まま変更しない。新しい色・新しいコンポーネントは追加しない */}
                             <button
                               type="button"
-                              onClick={onViewBuildCheck}
+                              onClick={() => scrollToSection(BUILD_CHECKLIST_ANCHOR_ID)}
                               className={
                                 isCurrent
                                   ? 'self-start flex-shrink-0 text-[11px] font-bold text-tanei-accent border border-tanei-accent/40 hover:bg-tanei-accent/10 hover:border-tanei-accent rounded-full px-2.5 py-1 transition-colors'
@@ -1010,25 +1013,6 @@ export default function CadBuildGuide({
         </ul>
       </div>
 
-      {/* 製作を始めるボタン（材料・工具・パーツ・作り方・安全ポイントの後、この
-          セクションの一番下）。以前は「制作前チェック」カードの中、セクション上部に
-          あったため、上から読み進める途中に大きなボタンが挟まる形になり分かりにくかった。
-          ここまでの内容を確認し終えた最後に置くことで、「読み終えたら押す」という
-          自然な流れにする。ボタンの役割（onViewBuildCheck・状態に応じた文言の出し分け）は
-          変更していない */}
-      <div className="rounded-tanei-control border border-tanei-border bg-white p-4 text-center">
-        <p className="text-xs font-bold text-tanei-ink">準備ができたら製作を開始</p>
-        <p className="text-[11px] text-tanei-ink-muted mt-0.5 mb-2">
-          材料・工具・パーツ・作り方を確認したら、製作を始めましょう。
-        </p>
-        <button
-          type="button"
-          onClick={onViewBuildCheck}
-          className="w-full sm:w-auto bg-tanei-brand text-white text-sm font-bold px-6 py-2.5 rounded-tanei-control hover:bg-tanei-brand-dark transition-colors"
-        >
-          {!nextBuildStep ? '✓ 製作完了を見る' : buildDoneCount > 0 ? '製作を続ける' : '製作を開始する'}
-        </button>
-      </div>
     </div>
   );
 }

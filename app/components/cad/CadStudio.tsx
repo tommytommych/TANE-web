@@ -12,7 +12,6 @@ import CadPartsPanel from './CadPartsPanel';
 import CadAppearancePanel from './CadAppearancePanel';
 import CadSelectedPartPanel from './CadSelectedPartPanel';
 import CadCutlistView from './CadCutlistView';
-import CadBuildChecklistView from './CadBuildChecklistView';
 import {
   addShelfToDesign,
   buildFurnitureModel,
@@ -58,8 +57,10 @@ interface CadStudioProps {
 }
 
 // 「1ページ縦スクロール型」への変更で、以前は独立したviewMode='cutMaterials'画面
-// だったカットリストは、cutlist画面内のセクションとして統合した（別画面には戻さない）
-type CadViewMode = 'design' | 'cutlist' | 'buildCheck';
+// だったカットリストは、cutlist画面内のセクションとして統合した（別画面には戻さない）。
+// 同様に、以前は独立したviewMode='buildCheck'画面だった製作チェック（10項目）も、
+// cutlist画面内のセクションとして統合した（CadBuildChecklistView.tsxは削除済み）
+type CadViewMode = 'design' | 'cutlist';
 
 // チャット（/app）へ「チャットに戻る」で移動してブラウザバックで/app/cadに戻ってきた場合や、
 // Next.jsがCadStudioを再マウントした場合でも、まだ保存していない編集内容が消えないよう、
@@ -111,14 +112,6 @@ export default function CadStudio({
     initialPartFinishes ?? {}
   );
   const [viewMode, setViewMode] = useState<CadViewMode>('design');
-  // 制作チェック画面の「制作へ進む」から木取り図画面（cutlist）へ戻ったときだけ、
-  // 「制作する」セクションまで自動スクロールするためのフラグ（Phase 2-9）。
-  // viewModeの種類は増やさず、既存のcutlist画面内の見せ方だけを変える
-  const [scrollToBuildGuide, setScrollToBuildGuide] = useState(false);
-  // 制作チェックの各項目にある「確認する」導線（Phase 3-10）から、cutlist画面内の
-  // 特定セクションへスクロールするための、Phase 2-9とは別の一時的なターゲットid。
-  // Phase 2-9のscrollToBuildGuideは変更せず、並行する専用の状態として持つ
-  const [pendingCutlistAnchor, setPendingCutlistAnchor] = useState<string | null>(null);
 
   // 保存済みプロジェクトの管理状態。projectIdがnull＝まだ一度も保存していない新規設計
   // （「保存する」を押すと新規プロジェクトになる）、値がある＝既存プロジェクトの更新になる
@@ -381,11 +374,6 @@ export default function CadStudio({
     [buildChecklist, persistChecklists]
   );
 
-  const handleToggleBuildStep = useCallback(
-    (step: number) => handleToggleBuildChecklistKey(String(step)),
-    [handleToggleBuildChecklistKey]
-  );
-
   // 「作り方」9STEPそれぞれのチェック（buildChecklist・10項目とは独立）
   const handleToggleBuildGuideStep = useCallback(
     (step: number) => {
@@ -396,26 +384,6 @@ export default function CadStudio({
     },
     [buildGuideChecked, persistChecklists]
   );
-
-  // 自動スクロール後にフラグを戻すためのコールバック。参照を固定しておくことで、
-  // CadCutlistView側のuseEffectが不要に再実行されないようにしている
-  const handleScrolledToBuildGuide = useCallback(() => {
-    setScrollToBuildGuide(false);
-  }, []);
-
-  // 制作チェックの各項目の「確認する」導線（Phase 3-10）。カットリストも木取り図画面に
-  // 統合された（Phase「1ページ縦スクロール型」）ため、遷移先は常にcutlist画面内の
-  // 特定セクションへのスクロールになる。buildChecklist自体は一切読み書きしない（表示・遷移のみ）
-  const handleConfirmChecklistSection = useCallback((target: { anchorId?: string }) => {
-    if (target.anchorId) {
-      setPendingCutlistAnchor(target.anchorId);
-    }
-    setViewMode('cutlist');
-  }, []);
-
-  const handleScrolledToPendingAnchor = useCallback(() => {
-    setPendingCutlistAnchor(null);
-  }, []);
 
   const { model, errorMessage } = useMemo(() => {
     try {
@@ -552,31 +520,6 @@ export default function CadStudio({
     setViewMode('design');
   }, []);
 
-  if (viewMode === 'buildCheck') {
-    return (
-      <CadBuildChecklistView
-        checked={buildChecklist}
-        onToggle={handleToggleBuildStep}
-        projectName={projectName.trim() || DEFAULT_FURNITURE_PROJECT_NAME}
-        onBack={() => {
-          // カットリストが木取り図画面（cutlist）内のセクションに統合されたため、
-          // 「← カットリストに戻る」は同じcutlist画面内のカットリストのセクションへ
-          // スクロールする（CadCutlistView.tsxのCUT_MATERIALS_ANCHOR_IDと同じ文字列）
-          setPendingCutlistAnchor('cad-cut-materials');
-          setViewMode('cutlist');
-        }}
-        onNext={() => {
-          setScrollToBuildGuide(true);
-          setViewMode('cutlist');
-        }}
-        onConfirmSection={handleConfirmChecklistSection}
-        projectId={projectId}
-        model={lastValidModel}
-        material={material}
-      />
-    );
-  }
-
   if (viewMode === 'cutlist') {
     return (
       <CadCutlistView
@@ -586,8 +529,6 @@ export default function CadStudio({
         partMaterials={partMaterials}
         onPartMaterialChange={handlePartMaterialChange}
         onBack={() => setViewMode('design')}
-        scrollToBuildGuide={scrollToBuildGuide}
-        onScrolledToBuildGuide={handleScrolledToBuildGuide}
         onViewPanel={handleViewPanel}
         buildChecklist={buildChecklist}
         onToggleBuildChecklistKey={handleToggleBuildChecklistKey}
@@ -595,9 +536,8 @@ export default function CadStudio({
         onToggleCutListItem={handleToggleCutListItem}
         buildGuideChecked={buildGuideChecked}
         onToggleBuildGuideStep={handleToggleBuildGuideStep}
-        onViewBuildCheck={() => setViewMode('buildCheck')}
-        pendingAnchor={pendingCutlistAnchor}
-        onScrolledToPendingAnchor={handleScrolledToPendingAnchor}
+        projectName={projectName.trim() || DEFAULT_FURNITURE_PROJECT_NAME}
+        projectId={projectId}
       />
     );
   }
