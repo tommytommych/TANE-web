@@ -4,7 +4,8 @@
 // AIチャット→ブラウザCAD（studioSpecToFurnitureDesign）の一方向の変換専用になっている
 
 import type { FurnitureDesign } from './cad/types';
-import { PART_MATERIAL_LABELS, type PartMaterialLabel, setEvenlySpacedShelves } from './cad/model';
+import { PART_MATERIAL_LABELS, type PartMaterialLabel, setEvenlySpacedShelves, MAX_DRAWER_COUNT } from './cad/model';
+import { MIN_LEG_HEIGHT_MM, MAX_LEG_HEIGHT_MM } from './cad/geometry';
 
 export type PanelFinish = 'clear' | 'walnut' | 'white' | 'black';
 
@@ -30,7 +31,18 @@ export interface StudioSpec {
    * 均等割りする方式のため、正確な位置までは再現できず「枚数」だけを引き継ぐ（無いよりは
    * 近い見た目になる、という割り切り）。扉・脚・キャスターなど他の追加パーツはブラウザCAD側に
    * 対応する概念が無いため、ここでは扱わない */
-  options?: { shelf_h?: { tier1?: number } };
+  /** kind:"box"の場合のみ有効な追加パーツ指定（任意）。ブラウザCADの手動編集で既に
+   * できること（脚のON/OFF・本数・高さ、扉のON/OFF・枚数、引き出しの枚数）を、
+   * AI提案の時点でも指定できるようにする。省略時は従来通り「脚なし・扉なし・引き出しなし」 */
+  options?: {
+    shelf_h?: { tier1?: number };
+    legs?: boolean;
+    legHeightMm?: number;
+    legCount?: 4 | 6;
+    doors?: boolean;
+    doorCount?: 1 | 2;
+    drawerCount?: number;
+  };
 }
 
 const PANEL_LABELS = ['天板', '底板', '側板', '背板'];
@@ -55,11 +67,23 @@ const isValidPartMaterials = (value: unknown): value is StudioSpec['partMaterial
 const isValidStudioSpecOptions = (value: unknown): value is StudioSpec['options'] => {
   if (value === undefined) return true;
   if (typeof value !== 'object' || value === null) return false;
-  const shelfH = (value as Record<string, unknown>).shelf_h;
-  if (shelfH === undefined) return true;
-  if (typeof shelfH !== 'object' || shelfH === null) return false;
-  const tier1 = (shelfH as Record<string, unknown>).tier1;
-  return tier1 === undefined || typeof tier1 === 'number';
+  const v = value as Record<string, unknown>;
+
+  const shelfH = v.shelf_h;
+  if (shelfH !== undefined) {
+    if (typeof shelfH !== 'object' || shelfH === null) return false;
+    const tier1 = (shelfH as Record<string, unknown>).tier1;
+    if (tier1 !== undefined && typeof tier1 !== 'number') return false;
+  }
+
+  return (
+    (v.legs === undefined || typeof v.legs === 'boolean') &&
+    (v.legHeightMm === undefined || typeof v.legHeightMm === 'number') &&
+    (v.legCount === undefined || v.legCount === 4 || v.legCount === 6) &&
+    (v.doors === undefined || typeof v.doors === 'boolean') &&
+    (v.doorCount === undefined || v.doorCount === 1 || v.doorCount === 2) &&
+    (v.drawerCount === undefined || typeof v.drawerCount === 'number')
+  );
 };
 
 export const isValidStudioSpec = (value: unknown): value is StudioSpec => {
@@ -159,6 +183,32 @@ export const studioSpecToFurnitureDesign = (spec: StudioSpec): FurnitureDesign =
     // 配置になってしまっていた（実機確認で判明）。AIが「5段」のようにまとめて指定してくる
     // 場合は、常に均等な配置になるこちらを使う
     design = setEvenlySpacedShelves(design, count);
+  }
+
+  // 脚・扉・引き出しは、ブラウザCADの手動編集（CadStudio.tsx）で既にできることを
+  // AI提案の時点でも反映できるようにする（Phase：チャット提案のバリエーション拡充）。
+  // 値の妥当性チェック（isValidStudioSpec）は型（number/boolean）までしか見ていないため、
+  // ここでもshelfCountと同じ考え方で、CAD本体と同じ許容範囲へクランプしてから反映する
+  // （範囲外の値をそのまま渡すとgeometry.tsのパネル生成が壊れた見た目になり得るため）
+  if (spec.options?.legs) {
+    design = {
+      ...design,
+      legs: true,
+      legHeightMm:
+        typeof spec.options.legHeightMm === 'number' && Number.isFinite(spec.options.legHeightMm)
+          ? Math.min(MAX_LEG_HEIGHT_MM, Math.max(MIN_LEG_HEIGHT_MM, Math.round(spec.options.legHeightMm)))
+          : undefined,
+      legCount: spec.options.legCount === 6 ? 6 : 4,
+    };
+  }
+
+  if (spec.options?.doors) {
+    design = { ...design, doors: true, doorCount: spec.options.doorCount === 2 ? 2 : 1 };
+  }
+
+  const drawerCount = spec.options?.drawerCount;
+  if (typeof drawerCount === 'number' && Number.isFinite(drawerCount) && drawerCount > 0) {
+    design = { ...design, drawerCount: Math.min(MAX_DRAWER_COUNT, Math.round(drawerCount)) };
   }
 
   return design;

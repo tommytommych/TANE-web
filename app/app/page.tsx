@@ -649,12 +649,7 @@ export default function Home() {
             onFocusChatInput={() => textInputRef.current?.focus()}
           />
 
-          {messages.length === 1 && (
-            <StartCards
-              onSendMessage={sendMessage}
-              onOpenPhotoPicker={() => fileInputRef.current?.click()}
-            />
-          )}
+          {messages.length === 1 && <StartCards onSendMessage={sendMessage} />}
         </div>
 
         <ChatInput
