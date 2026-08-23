@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Card from '../ui/Card';
 import SectionTitle from '../ui/SectionTitle';
 import type { SavedItemType } from '../../lib/types';
+import { LINE_ENABLED, LINE_OFFICIAL_URL } from '../../lib/lineConfig';
 
 interface LeftSidebarProps {
   isOpen: boolean;
@@ -114,15 +115,26 @@ export default function LeftSidebar({
             </div>
 
             {/* LINE公式アカウント連携ボタン */}
-            <a
-              href="https://line.me/R/ti/p/@mdo9046l"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 bg-[#06C755] hover:bg-[#05b34c] text-white p-3 rounded-tanei-control font-bold text-sm shadow-md transition-all"
-            >
-              <span className="text-lg">💚</span>
-              <span>LINE公式アカウントで相談する</span>
-            </a>
+            {LINE_ENABLED ? (
+              <a
+                href={LINE_OFFICIAL_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 bg-[#06C755] hover:bg-[#05b34c] text-white p-3 rounded-tanei-control font-bold text-sm shadow-md transition-all"
+              >
+                <span className="text-lg">💚</span>
+                <span>LINE公式アカウントで相談する</span>
+              </a>
+            ) : (
+              <span
+                aria-disabled="true"
+                title="LINE連携は準備中です"
+                className="flex items-center justify-center gap-2 bg-tanei-surface-muted text-tanei-ink-muted p-3 rounded-tanei-control font-bold text-sm cursor-not-allowed select-none"
+              >
+                <span className="text-lg">💚</span>
+                <span>LINE公式アカウントで相談する（準備中）</span>
+              </span>
+            )}
 
             <div className="grid grid-cols-2 gap-2.5">
               <Card padding="sm" muted>

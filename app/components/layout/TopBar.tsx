@@ -1,5 +1,7 @@
 'use client';
 
+import { LINE_ENABLED, LINE_OFFICIAL_URL } from '../../lib/lineConfig';
+
 interface TopBarProps {
   isLeftSidebarOpen: boolean;
   onToggleSidebar: () => void;
@@ -35,15 +37,26 @@ export default function TopBar({ isLeftSidebarOpen, onToggleSidebar, onNewConver
       </div>
 
       <div className="flex items-center gap-3">
-        <a
-          href="https://line.me/R/ti/p/@mdo9046l"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="bg-[#06C755] hover:bg-[#05b34c] text-white text-xs font-bold px-3 py-2 rounded-tanei-control shadow-sm transition-all flex items-center gap-1.5"
-        >
-          <span>💚</span>
-          <span>LINE公式</span>
-        </a>
+        {LINE_ENABLED ? (
+          <a
+            href={LINE_OFFICIAL_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-[#06C755] hover:bg-[#05b34c] text-white text-xs font-bold px-3 py-2 rounded-tanei-control shadow-sm transition-all flex items-center gap-1.5"
+          >
+            <span>💚</span>
+            <span>LINE公式</span>
+          </a>
+        ) : (
+          <span
+            aria-disabled="true"
+            title="LINE連携は準備中です"
+            className="bg-tanei-surface-muted text-tanei-ink-muted text-xs font-bold px-3 py-2 rounded-tanei-control flex items-center gap-1.5 cursor-not-allowed select-none"
+          >
+            <span>💚</span>
+            <span>LINE公式・準備中</span>
+          </span>
+        )}
         <div className="text-xs text-tanei-ink-muted font-bold hidden sm:block">
           🌱 TANE:i DIYアシスタント
         </div>

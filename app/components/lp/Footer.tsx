@@ -1,8 +1,9 @@
 'use client';
 
 import FadeIn from './motion/FadeIn';
+import { LINE_ENABLED, LINE_OFFICIAL_URL } from '../../lib/lineConfig';
 
-const CONTACT_HREF = 'https://line.me/R/ti/p/@mdo9046l';
+const CONTACT_HREF = LINE_OFFICIAL_URL;
 const SOCIAL_LINKS = [
   { label: 'YouTube', href: 'https://www.youtube.com/@tomishin_channel_DIY', icon: YoutubeIcon },
   { label: 'Instagram', href: 'https://www.instagram.com/__tomishin__diy/', icon: InstagramIcon },
@@ -48,8 +49,17 @@ export default function Footer() {
 
       <FadeIn delay={0.15}>
         <div className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-[13px]">
-          {LEGAL_LINKS.map((link) =>
-            link.external ? (
+          {LEGAL_LINKS.map((link) => {
+            // お問い合わせ（LINE）はLINE連携が準備中の環境ではクリックできないよう非リンク表示にする
+            if (link.href === LINE_OFFICIAL_URL && !LINE_ENABLED) {
+              return (
+                <span key={link.label} aria-disabled="true" title="LINE連携は準備中です" className="cursor-not-allowed">
+                  {link.label}（準備中）
+                </span>
+              );
+            }
+
+            return link.external ? (
               <a
                 key={link.label}
                 href={link.href}
@@ -63,8 +73,8 @@ export default function Footer() {
               <a key={link.label} href={link.href} className="transition-colors hover:text-[#1F3028]">
                 {link.label}
               </a>
-            )
-          )}
+            );
+          })}
         </div>
       </FadeIn>
 
