@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
 :root {
+  /* このアプリはdark:クラスを一切使わないライトテーマ専用設計のため、OS側が
+     ダークモードでもフォーム部品（input等）の既定色まで反転させないよう固定する。
+     未指定だとiOS Safari等で数値入力欄の文字やbg-white未指定の領域が暗転し、
+     文字が読めなくなる不具合につながる */
+  color-scheme: light;
   --background: #faf8f4;
   --foreground: #1f3028;
 
@@ -48,13 +53,6 @@
 
   --radius-tanei-card: var(--radius-tanei-card);
   --radius-tanei-control: var(--radius-tanei-control);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #14201a;
-    --foreground: #f2efe9;
-  }
 }
 
 body {

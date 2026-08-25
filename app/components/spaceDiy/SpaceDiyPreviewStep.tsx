@@ -143,7 +143,7 @@ export default function SpaceDiyPreviewStep({ proposal, onBack }: SpaceDiyPrevie
                     const raw = e.target.value;
                     dim.set(raw === '' ? NaN : Number(raw));
                   }}
-                  className={`border rounded-tanei-control px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-tanei-brand ${
+                  className={`border rounded-tanei-control px-2 py-1.5 text-sm text-tanei-ink bg-white focus:outline-none focus:ring-2 focus:ring-tanei-brand ${
                     valid ? 'border-tanei-border' : 'border-red-400 bg-red-50'
                   }`}
                 />
