@@ -14,6 +14,7 @@ import { packSheetLayout } from '../../lib/sheetLayout';
 import SheetLayoutSvgView from '../chat/SheetLayoutSvg';
 import { buildUniversalCutSheetPdf } from '../../lib/cutSheetPdf';
 import { downloadPdfBytes } from '../../lib/download';
+import { consumeLocalUsage, getLocalRemainingCount, DAILY_IMAGE_LIMIT, IMAGE_USAGE_STORAGE_KEY } from '../../lib/localUsage';
 import type { FurnitureModel } from '../../lib/cad/types';
 import {
   buildCutListItems,
@@ -238,6 +239,12 @@ export default function CadCutlistView({
 
   const handleDownloadPdf = async () => {
     if (sheetLayouts.length === 0 && dimensionalLumberItems.length === 0) return;
+    // カット申込書PDFはチャット経由（app/app/page.tsx）と同じく「本日のAI機能利用」
+    // （1日5回）を共通で消費する。CAD側の閲覧・編集操作自体は消費しない
+    if (getLocalRemainingCount(IMAGE_USAGE_STORAGE_KEY, DAILY_IMAGE_LIMIT) <= 0) {
+      showStatus('本日のAI機能のご利用回数が上限（5回）に達しました🙏 また明日ご利用ください。');
+      return;
+    }
     setIsGeneratingPdf(true);
     try {
       const pdfBytes = await buildUniversalCutSheetPdf(
@@ -251,6 +258,7 @@ export default function CadCutlistView({
         dimensionalLumberItems
       );
       downloadPdfBytes(new Uint8Array(pdfBytes), 'TANEi_CutSheet.pdf');
+      consumeLocalUsage(IMAGE_USAGE_STORAGE_KEY, DAILY_IMAGE_LIMIT);
       showStatus('カット申込書のダウンロードが完了しました！');
       setHasGeneratedCutSheet(true);
     } catch (error) {
