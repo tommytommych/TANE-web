@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import Card from '../ui/Card';
 import SectionTitle from '../ui/SectionTitle';
 import type { SavedItemType } from '../../lib/types';
@@ -185,17 +184,19 @@ export default function LeftSidebar({
                   家具設計・3D確認・材料設定・木取り・カット申込書までをすべてここで
                   行う（Phase E：旧設計スタジオ／FreeCAD+POV-Ray版の/app/studioは廃止済み） */}
               <p className="px-3 text-[11px] font-bold text-tanei-ink-muted">設計</p>
-              <Link
-                href="/app/cad"
-                onClick={onClose}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-tanei-control text-sm bg-tanei-brand-soft hover:bg-white border border-tanei-brand/40 hover:border-tanei-brand text-tanei-ink transition-colors w-full text-left"
+              {/* サイドバーからの直接入口は準備中。チャット完了カード（CompletionCards.tsx）
+                  経由の「TANE:i 3D家具設計」への導線はそのまま残す */}
+              <span
+                aria-disabled="true"
+                title="準備中です"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-tanei-control text-sm bg-tanei-surface-muted border border-tanei-border text-tanei-ink-muted w-full text-left cursor-not-allowed select-none"
               >
                 <span>🌿</span>
                 <span className="flex flex-col leading-tight min-w-0">
-                  <span className="font-bold">TANE:i 3D家具設計</span>
+                  <span className="font-bold">TANE:i 3D家具設計（準備中）</span>
                   <span className="text-[10px] font-normal text-tanei-ink-muted">スマホ・PC対応／インストール不要・すぐ使える</span>
                 </span>
-              </Link>
+              </span>
 
               <div className="mt-1.5 pt-2.5 border-t border-tanei-border">
                 <button
