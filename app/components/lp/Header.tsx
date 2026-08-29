@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState, type MouseEvent } from 'react';
 
 const NAV_ITEMS = [
@@ -88,17 +89,14 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* 公開準備中: TANE:i本体（/app）はまだ一般公開の準備ができていないため、CTAを一時的に無効化している */}
+        {/* TANE:i本体（/app）はベータ版として公開済みのため、CTAから直接遷移できるようにする */}
         <div className="hidden lg:block">
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            title="近日公開"
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#1F3028]/40 px-5 py-2.5 text-[13px] font-medium text-[#FAF8F4]/70 cursor-not-allowed"
+          <Link
+            href="/app"
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#1F3028] px-5 py-2.5 text-[13px] font-medium text-[#FAF8F4] transition-colors hover:bg-[#1F3028]/85"
           >
-            TANE:iをはじめる（近日公開）
-          </button>
+            TANE:iをはじめる
+          </Link>
         </div>
 
         <button
@@ -140,15 +138,13 @@ export default function Header() {
               {item.label}
             </a>
           ))}
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            title="近日公開"
-            className="mt-3 mb-2 flex items-center justify-center rounded-full bg-[#1F3028]/40 px-5 py-3 text-[14px] font-medium text-[#FAF8F4]/70 cursor-not-allowed"
+          <Link
+            href="/app"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="mt-3 mb-2 flex items-center justify-center rounded-full bg-[#1F3028] px-5 py-3 text-[14px] font-medium text-[#FAF8F4]"
           >
-            TANE:iをはじめる（近日公開）
-          </button>
+            TANE:iをはじめる
+          </Link>
         </nav>
       )}
     </header>

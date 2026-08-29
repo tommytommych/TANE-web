@@ -188,16 +188,14 @@ export default function TaneiAboutPage() {
           </h2>
         </FadeIn>
         <FadeIn delay={0.15}>
-          {/* 公開準備中: TANE:i本体（/app）はまだ一般公開の準備ができていないため、CTAを一時的に無効化している */}
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            title="近日公開"
-            className="mt-10 inline-flex items-center gap-2 rounded-full bg-white/40 px-8 py-3.5 text-[14px] font-medium text-[#1F3028]/70 cursor-not-allowed"
+          {/* TANE:i本体（/app）はベータ版として公開済みのため、CTAから直接遷移できるようにする */}
+          <Link
+            href="/app"
+            className="mt-10 inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 text-[14px] font-medium text-[#1F3028] transition-colors hover:bg-white/90"
           >
-            TANE:iをはじめる（近日公開）
-          </button>
+            TANE:iをはじめる
+            <span aria-hidden="true">→</span>
+          </Link>
         </FadeIn>
       </section>
 
