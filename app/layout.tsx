@@ -27,6 +27,9 @@ const notoSansJP = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
+  // カスタムドメイン（taneproject.com）を正式なOG画像・canonical URLの基準にする。
+  // チャットアプリ側（app/app/layout.tsx、tane-i.vercel.appでホスト）には影響しない
+  metadataBase: new URL("https://taneproject.com"),
   title: "TANE PROJECT | Ideas into Reality.",
   description: "TANE PROJECTは、DIYを起点にAI・クリエイティブ・教育・デジタルファブリケーションを融合し、アイデアを現実へ変えるブランドです。",
   openGraph: {
