@@ -11,6 +11,11 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY!,
 });
 
+// 最大4枚の写真＋構造化JSON出力（responseSchema）はチャットの単発テキスト応答より
+// 時間がかかりやすく、Vercelのデフォルトの関数タイムアウト（未設定時は数秒〜10秒程度）に
+// 引っかかって「通信エラーが発生しました」になる事例があったため、明示的に延長する
+export const maxDuration = 60;
+
 const MAX_PHOTOS = 4;
 
 const FRIENDLY_ERROR = {
