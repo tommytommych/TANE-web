@@ -2,8 +2,16 @@ import { NextResponse } from 'next/server';
 import { messagingApi, validateSignature } from '@line/bot-sdk';
 import { GoogleGenAI, createPartFromBase64, createPartFromText } from '@google/genai';
 import { buildSystemInstruction, CAMEO_MODE_TRIGGER_REGEX } from '../../lib/systemPrompt';
-import { stripInternalBlocks, extractContextFromContent, extractOptionsFromContent, isFreeInputOption } from '../../lib/cutlist';
-import { getConversationState, saveConversationState } from '../../lib/lineConversationHistory';
+import {
+  stripInternalBlocks,
+  extractContextFromContent,
+  extractOptionsFromContent,
+  isFreeInputOption,
+  extractCutListFromContent,
+  extractSheetLayoutFromContent,
+  formatCutListSummary,
+} from '../../lib/cutlist';
+import { getConversationState, saveConversationState, resetConversationState } from '../../lib/lineConversationHistory';
 
 export const runtime = 'nodejs';
 
@@ -80,6 +88,63 @@ const HUMAN_HANDOFF_REPLY_MESSAGE =
   `▼ご意見・ご質問フォーム\n${FEEDBACK_FORM_URL}\n\n` +
   `もちろん、このままメッセージを送っていただいても大丈夫です！`;
 
+// この中のいずれかが（部分一致ではなく）そのまま送られてきた場合、Geminiは呼ばず
+// 会話履歴・判明済みContextを完全にリセットする。長い会話でAIの認識がずれてしまった時や、
+// 別の家具の相談を始めたい時に、ユーザー自身でやり直せるようにする（リッチメニューの
+// ボタンからも同じテキストを送れるようにする想定。HUMAN_HANDOFF_MESSAGEと同じ方式）
+const RESET_TRIGGER_MESSAGES = ['最初からやり直す', 'リセット', '会話をリセット'];
+
+const RESET_REPLY_MESSAGE = '会話履歴をリセットしました🌱\n新しくご相談ください！';
+
+// AIとのやり取りの返信には常にこのボタンを添えて、ユーザーがいつでもワンタップで
+// リセットできるようにする（リッチメニューの設置・画像作成が不要な、コードだけで
+// 完結する「リセットボタン」）。タップすると送信される文言はRESET_TRIGGER_MESSAGESの
+// 1つ目と一致させる
+const RESET_QUICK_REPLY_ITEM = {
+  type: 'action',
+  action: { type: 'message', label: '🔄 最初からやり直す', text: RESET_TRIGGER_MESSAGES[0] },
+};
+
+// AIが提示したtanei-options由来の選択肢に、常時表示のリセットボタンを1つ追加する。
+// クイックリプライは最大13個までのため、選択肢が多い場合は末尾を削ってリセットボタンの
+// 分の枠を必ず確保する
+function withResetQuickReply(quickReplyItems) {
+  const base = quickReplyItems ?? [];
+  return [...base.slice(0, QUICK_REPLY_MAX_ITEMS - 1), RESET_QUICK_REPLY_ITEM];
+}
+
+// リッチメニューの「木取り図」ボタンから、そのままこのテキストが送られてくる想定
+// （HUMAN_HANDOFF_MESSAGE・RESET_TRIGGER_MESSAGESと同じ、完全一致トリガー方式）
+const CUTLIST_REQUEST_MESSAGE = '木取り図';
+
+// まだ設計提案（tanei-cutlist・tanei-sheetlayout）が出ていない状態で「木取り図」が
+// 押された場合の案内。Geminiは呼ばない
+const CUTLIST_NOT_READY_MESSAGE =
+  'まだ木取り図ができていません🙏 まずは作りたい家具について教えてください🌱';
+
+const CUTLIST_CONFIRM_MESSAGE =
+  '木取り図ができました！🌱\nホームセンターのカット申込書として使える形式でお出ししますか？';
+
+const CUTLIST_YES_LABEL = 'はい';
+const CUTLIST_NO_LABEL = 'いいえ';
+const CUTLIST_YES_MESSAGES = [CUTLIST_YES_LABEL, 'はい。', 'うん', 'お願いします'];
+const CUTLIST_NO_MESSAGES = [CUTLIST_NO_LABEL, 'いいえ。', 'いらない', '不要です'];
+
+const CUTLIST_CONFIRM_QUICK_REPLY_ITEMS = [
+  { type: 'action', action: { type: 'message', label: CUTLIST_YES_LABEL, text: CUTLIST_YES_LABEL } },
+  { type: 'action', action: { type: 'message', label: CUTLIST_NO_LABEL, text: CUTLIST_NO_LABEL } },
+];
+
+const CUTLIST_DECLINED_MESSAGE = '承知しました🌱 また必要になったら「木取り図」ボタンからいつでもどうぞ！';
+
+// WEB版のカット申込書PDF（app/lib/cutSheetPdf.ts）と違い、LINEはPDFを生成・送信できないため、
+// 同じ木取りデータ（MaterialGroup・SheetLayout）を既存のformatCutListSummaryでプレーンテキストに
+// 変換し、ホームセンターの店頭でそのまま伝えられるカット依頼リストとして返す
+function buildCutSheetSummaryReply(state) {
+  const summary = formatCutListSummary(state.lastMaterialGroups ?? [], state.lastSheetLayouts ?? []);
+  return `以下の寸法でホームセンターにカットをご依頼ください📐\n\n${summary}`;
+}
+
 // Gemini呼び出しにタイムアウトが無いと、まれに応答が返らないまま無期限に待ち続け、
 // Vercelの関数タイムアウト（maxDuration）まで無反応になってしまう（実機で確認済みの不具合）。
 // LINEの返信トークンは短時間で失効するため、まだ余裕をもってエラー返信できる時間で区切る。
@@ -151,9 +216,7 @@ function consumeDailyQuota(userId) {
 // 会話履歴を持てないため、userIdをキーにサーバー側（app/lib/lineConversationHistory）で
 // 直近の会話履歴と判明済みContextを保持し、毎回Geminiへ引き継ぐ。これにより、設置場所や
 // 家具の種類などを何度も聞き直してしまうループを防ぐ（app/api/chatのcontextNoteと同じ方針）
-async function generateReply(userId, currentUserText, parts, { isCameoMode = false } = {}) {
-  const state = await getConversationState(userId);
-
+async function generateReply(userId, currentUserText, parts, state, { isCameoMode = false } = {}) {
   const contents = [
     ...state.turns.map((turn) => ({ role: turn.role, parts: [createPartFromText(turn.text)] })),
     { role: 'user', parts },
@@ -184,27 +247,38 @@ async function generateReply(userId, currentUserText, parts, { isCameoMode = fal
   // 履歴にはstripped後のテキストのみを保持し（tanei-*ブロックはGeminiへの再入力にも不要）、
   // Contextだけはtanei-contextブロックから抽出した最新の値で更新する
   const newContext = extractContextFromContent(rawText) ?? state.context;
+  // 「木取り図」リッチメニューから後で参照できるよう、最新の木取りデータ（角材・シート材）を
+  // 保持しておく。この回答に新しい木取りデータが含まれていなければ、直前までの値を維持する
+  // （設計が確定した最終提案の後、雑談や微調整の会話が続いても消えないようにするため）
+  const newMaterialGroups = extractCutListFromContent(rawText) ?? state.lastMaterialGroups;
+  const newSheetLayouts = extractSheetLayoutFromContent(rawText) ?? state.lastSheetLayouts;
   await saveConversationState(userId, {
     turns: [...state.turns, { role: 'user', text: currentUserText }, { role: 'model', text: strippedText }],
     context: newContext,
+    lastMaterialGroups: newMaterialGroups,
+    lastSheetLayouts: newSheetLayouts,
+    // 通常のAI相談ターンに入った時点で、カット申込書の確認待ちは終了したものとして扱う
+    pendingCutSheetConfirmation: false,
   });
 
   return { text: strippedText.slice(0, LINE_TEXT_MESSAGE_LIMIT), quickReplyItems };
 }
 
-function generateReplyText(userId, userMessage) {
-  return generateReply(userId, userMessage, [createPartFromText(userMessage)], {
+function generateReplyText(userId, userMessage, state) {
+  return generateReply(userId, userMessage, [createPartFromText(userMessage)], state, {
     isCameoMode: CAMEO_MODE_TRIGGER_REGEX.test(userMessage),
   });
 }
 
-function generateReplyForImage(userId, base64Image, mimeType) {
+function generateReplyForImage(userId, base64Image, mimeType, state) {
   // 画像バイナリ自体は容量が大きく、履歴に保存する意味も薄いため、履歴上のユーザー発言としては
   // プレースホルダーのテキストのみを残す（写真から読み取った内容はAIの返答テキスト側に残る）
-  return generateReply(userId, '（写真を送信しました）', [
-    createPartFromText(IMAGE_PROMPT),
-    createPartFromBase64(base64Image, mimeType),
-  ]);
+  return generateReply(
+    userId,
+    '（写真を送信しました）',
+    [createPartFromText(IMAGE_PROMPT), createPartFromBase64(base64Image, mimeType)],
+    state
+  );
 }
 
 async function streamToBuffer(stream) {
@@ -273,13 +347,55 @@ async function handleMessageEvent(event) {
     return;
   }
 
+  const userId = event.source?.userId;
+  const state = await getConversationState(userId);
+
   // Geminiは呼ばず、受付を伝える定型メッセージだけ返信してLINE側の手動チャットに委ねる
   if (event.message.type === 'text' && event.message.text === HUMAN_HANDOFF_MESSAGE) {
     await replySafely(event.replyToken, HUMAN_HANDOFF_REPLY_MESSAGE);
     return;
   }
 
-  const userId = event.source?.userId;
+  // Geminiは呼ばず、会話履歴・Contextを消してリセット完了だけ返信する
+  if (event.message.type === 'text' && RESET_TRIGGER_MESSAGES.includes(event.message.text)) {
+    await resetConversationState(userId);
+    await replySafely(event.replyToken, RESET_REPLY_MESSAGE);
+    return;
+  }
+
+  // リッチメニューの「木取り図」ボタン：直近の設計提案があれば、ホームセンターの
+  // カット申込書として出すかどうかの確認を出す。無ければまだ早い旨を案内する
+  if (event.message.type === 'text' && event.message.text === CUTLIST_REQUEST_MESSAGE) {
+    const hasCutData =
+      (state.lastMaterialGroups && state.lastMaterialGroups.length > 0) ||
+      (state.lastSheetLayouts && state.lastSheetLayouts.length > 0);
+
+    if (hasCutData) {
+      await saveConversationState(userId, { ...state, pendingCutSheetConfirmation: true });
+      await replySafely(event.replyToken, CUTLIST_CONFIRM_MESSAGE, CUTLIST_CONFIRM_QUICK_REPLY_ITEMS);
+    } else {
+      await replySafely(event.replyToken, CUTLIST_NOT_READY_MESSAGE);
+    }
+    return;
+  }
+
+  // 「木取り図」ボタンの確認（はい/いいえ）待ち状態での返答。それ以外の文言が来た場合は
+  // 通常のAI相談として下へ流す（pendingCutSheetConfirmationはgenerateReplyの保存時にfalseになる）
+  if (event.message.type === 'text' && state.pendingCutSheetConfirmation) {
+    const answer = event.message.text.trim();
+
+    if (CUTLIST_YES_MESSAGES.includes(answer)) {
+      await saveConversationState(userId, { ...state, pendingCutSheetConfirmation: false });
+      await replySafely(event.replyToken, buildCutSheetSummaryReply(state), [RESET_QUICK_REPLY_ITEM]);
+      return;
+    }
+
+    if (CUTLIST_NO_MESSAGES.includes(answer)) {
+      await saveConversationState(userId, { ...state, pendingCutSheetConfirmation: false });
+      await replySafely(event.replyToken, CUTLIST_DECLINED_MESSAGE);
+      return;
+    }
+  }
 
   if (userId && !consumeDailyQuota(userId)) {
     await replySafely(event.replyToken, LIMIT_REACHED_MESSAGE);
@@ -291,17 +407,17 @@ async function handleMessageEvent(event) {
 
   try {
     if (event.message.type === 'text') {
-      ({ text: replyText, quickReplyItems } = await generateReplyText(userId, event.message.text));
+      ({ text: replyText, quickReplyItems } = await generateReplyText(userId, event.message.text, state));
     } else {
       const { base64, mimeType } = await fetchLineImageAsBase64(event.message);
-      ({ text: replyText, quickReplyItems } = await generateReplyForImage(userId, base64, mimeType));
+      ({ text: replyText, quickReplyItems } = await generateReplyForImage(userId, base64, mimeType, state));
     }
   } catch (error) {
     console.error('LINE bot Gemini error:', error);
     replyText = buildGeminiErrorReplyText(error);
   }
 
-  await replySafely(event.replyToken, replyText, quickReplyItems);
+  await replySafely(event.replyToken, replyText, withResetQuickReply(quickReplyItems));
 }
 
 export async function POST(req) {

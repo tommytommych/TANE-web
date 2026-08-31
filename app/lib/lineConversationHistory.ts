@@ -1,5 +1,6 @@
 import { kv } from '@vercel/kv';
-import type { DesignContext } from './cutlist';
+import type { DesignContext, MaterialGroup } from './cutlist';
+import type { SheetLayout } from './sheetLayout';
 
 // LINE Bot(app/api/line/route.js)専用の会話ステート管理。
 // LINEのMessaging APIは1メッセージごとに独立したWebhookイベントとして届くため、WEB版のように
@@ -15,9 +16,24 @@ export interface StoredTurn {
 export interface ConversationState {
   turns: StoredTurn[];
   context: DesignContext | null;
+  // 直近でAIが提案した木取りデータ（tanei-cutlist・tanei-sheetlayout）。
+  // 「木取り図」リッチメニューから「ホームセンターのカット申込書」形式の
+  // テキストを求められた時に使う。strippedText（会話履歴用）からは
+  // tanei-*ブロックが取り除かれるため、別途ここに保持しておく必要がある
+  lastMaterialGroups: MaterialGroup[] | null;
+  lastSheetLayouts: SheetLayout[] | null;
+  // 「ホームセンターのカット申込書として出しますか？」の確認待ち状態。
+  // trueの間だけ、次のメッセージを「はい/いいえ」の返答として解釈する
+  pendingCutSheetConfirmation: boolean;
 }
 
-const EMPTY_STATE: ConversationState = { turns: [], context: null };
+const EMPTY_STATE: ConversationState = {
+  turns: [],
+  context: null,
+  lastMaterialGroups: null,
+  lastSheetLayouts: null,
+  pendingCutSheetConfirmation: false,
+};
 
 // やり取りが無いまま経過したら会話をリセットする猶予期間
 const HISTORY_TTL_SECONDS = 60 * 60 * 24;
@@ -38,10 +54,13 @@ function stateKey(userId: string): string {
 
 export async function getConversationState(userId: string | undefined): Promise<ConversationState> {
   if (!userId) return EMPTY_STATE;
-  if (!KV_CONFIGURED) return inMemoryState.get(userId) ?? EMPTY_STATE;
+  // ...EMPTY_STATEで補完することで、スキーマ追加前（lastMaterialGroups等が無い）に
+  // 保存された古いstateを読み込んでも欠けたフィールドがundefinedのまま扱われず、
+  // 常に全フィールドが揃った状態になる
+  if (!KV_CONFIGURED) return { ...EMPTY_STATE, ...(inMemoryState.get(userId) ?? {}) };
 
   const state = await kv.get<ConversationState>(stateKey(userId));
-  return state ?? EMPTY_STATE;
+  return { ...EMPTY_STATE, ...(state ?? {}) };
 }
 
 export async function saveConversationState(userId: string | undefined, state: ConversationState): Promise<void> {
@@ -54,4 +73,17 @@ export async function saveConversationState(userId: string | undefined, state: C
     return;
   }
   await kv.set(stateKey(userId), trimmed, { ex: HISTORY_TTL_SECONDS });
+}
+
+// ユーザーが「最初からやり直す」等でリセットを求めた際に、会話履歴・判明済みContextを
+// 完全に消す。saveConversationState(userId, EMPTY_STATE)と等価だが、リセット専用の
+// 意図が呼び出し側から分かりやすいよう別名で用意する
+export async function resetConversationState(userId: string | undefined): Promise<void> {
+  if (!userId) return;
+
+  if (!KV_CONFIGURED) {
+    inMemoryState.delete(userId);
+    return;
+  }
+  await kv.del(stateKey(userId));
 }
