@@ -14,6 +14,12 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY!,
 });
 
+// 会話が長くなるほど毎回送信する履歴（history）が積み上がり、Geminiの応答生成に
+// かかる時間も伸びていく。maxDurationが未設定だとVercelのデフォルトの関数
+// タイムアウトに達し、何度かやり取りした後に「通信エラーが発生しました」に
+// なる事例があったため、明示的に延長する（app/api/space-diy/route.tsと同じ対応）
+export const maxDuration = 60;
+
 const DAILY_LIMIT_MESSAGE =
   '本日の無料相談回数の上限（10回）に達しました🙏 また明日、あらためてご相談ください。';
 

@@ -7,6 +7,11 @@ import { getConversationState, saveConversationState } from '../../lib/lineConve
 
 export const runtime = 'nodejs';
 
+// app/api/chat・app/api/space-diyと同様、会話履歴の蓄積・画像処理でGeminiの応答生成に
+// 時間がかかる場合があるため、maxDuration未設定時のVercelデフォルトタイムアウトによる
+// 打ち切りを避ける（LINEの返信トークン自体の有効期限内で完了する前提は変わらない）
+export const maxDuration = 60;
+
 const { MessagingApiClient, MessagingApiBlobClient } = messagingApi;
 
 const CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
