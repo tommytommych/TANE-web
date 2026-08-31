@@ -52,6 +52,11 @@ const HUMAN_HANDOFF_REPLY_MESSAGE =
   `▼ご意見・ご質問フォーム\n${FEEDBACK_FORM_URL}\n\n` +
   `もちろん、このままメッセージを送っていただいても大丈夫です！`;
 
+// Gemini呼び出しにタイムアウトが無いと、まれに応答が返らないまま無期限に待ち続け、
+// Vercelの関数タイムアウト（maxDuration）まで無反応になってしまう（実機で確認済みの不具合）。
+// LINEの返信トークンは短時間で失効するため、まだ余裕をもってエラー返信できる時間で区切る
+const GEMINI_TIMEOUT_MS = 25000;
+
 // TANE:i本体(app/app/page.tsx)の「本日の無料相談 10回」と同じ回数・仕様に合わせる。
 // LINE bot側はサーバーで完結する必要があるため、ユーザーごと・日付ごとにサーバー側で実カウントする
 // （本体側はブラウザのstateだけで実際には強制されていないカウンターだが、こちらは実際に上限まで制限する）
@@ -110,6 +115,7 @@ async function generateReply(userId, currentUserText, parts, { isCameoMode = fal
     contents,
     config: {
       systemInstruction: buildSystemInstruction({ isCameoMode }) + contextNote,
+      httpOptions: { timeout: GEMINI_TIMEOUT_MS },
     },
   });
 
@@ -157,7 +163,11 @@ async function streamToBuffer(stream) {
 // LINEサーバーを経由せず、送信されたURLから直接取得する
 async function fetchLineImageAsBase64(message) {
   if (message.contentProvider?.type === 'external' && message.contentProvider.originalContentUrl) {
-    const res = await fetch(message.contentProvider.originalContentUrl);
+    // 外部URLへのfetchにもタイムアウトが無いと同様に無期限に待ち続ける可能性があるため、
+    // Gemini呼び出しと同じ考え方でAbortControllerによる上限を設ける
+    const res = await fetch(message.contentProvider.originalContentUrl, {
+      signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+    });
     const mimeType = res.headers.get('content-type') || 'image/jpeg';
     const buffer = Buffer.from(await res.arrayBuffer());
     return { base64: buffer.toString('base64'), mimeType };
