@@ -54,8 +54,33 @@ const HUMAN_HANDOFF_REPLY_MESSAGE =
 
 // Gemini呼び出しにタイムアウトが無いと、まれに応答が返らないまま無期限に待ち続け、
 // Vercelの関数タイムアウト（maxDuration）まで無反応になってしまう（実機で確認済みの不具合）。
-// LINEの返信トークンは短時間で失効するため、まだ余裕をもってエラー返信できる時間で区切る
-const GEMINI_TIMEOUT_MS = 25000;
+// LINEの返信トークンは短時間で失効するため、まだ余裕をもってエラー返信できる時間で区切る。
+// 1回だけ自動リトライする分の時間も見込んで、単発時の25秒より短めに設定する
+const GEMINI_TIMEOUT_MS = 15000;
+const GEMINI_RETRY_DELAY_MS = 1000;
+
+// Gemini側の一時的な過負荷（503 UNAVAILABLE）・処理遅延（504 DEADLINE_EXCEEDED）は、
+// 少し時間を置いて同じリクエストをもう一度送るだけで成功することが多い。実機検証で
+// 実際にこれらのエラーが発生する場面を確認したため、ユーザーにエラーを見せる前に
+// 1回だけ自動でやり直す（RESOURCE_EXHAUSTED等のクォータ超過はリトライしても
+// 無駄なため対象外）
+function isTransientGeminiError(error) {
+  const status = error && typeof error.status === 'number' ? error.status : null;
+  if (status === 503 || status === 504) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('UNAVAILABLE') || message.includes('DEADLINE_EXCEEDED');
+}
+
+async function generateContentWithRetry(config) {
+  try {
+    return await ai.models.generateContent(config);
+  } catch (error) {
+    if (!isTransientGeminiError(error)) throw error;
+    console.warn('LINE bot Gemini transient error, retrying once:', error);
+    await new Promise((resolve) => setTimeout(resolve, GEMINI_RETRY_DELAY_MS));
+    return await ai.models.generateContent(config);
+  }
+}
 
 // TANE:i本体(app/app/page.tsx)の「本日の無料相談 10回」と同じ回数・仕様に合わせる。
 // LINE bot側はサーバーで完結する必要があるため、ユーザーごと・日付ごとにサーバー側で実カウントする
@@ -110,7 +135,7 @@ async function generateReply(userId, currentUserText, parts, { isCameoMode = fal
     ? `\n\n【これまでに判明している情報（Context）】\n${JSON.stringify(state.context)}\n上記のうち値がnullの項目を優先して、次の質問を1つだけしてください。item・size・place・budget・experienceが埋まっていれば設計を開始してください。`
     : '';
 
-  const response = await ai.models.generateContent({
+  const response = await generateContentWithRetry({
     model: 'gemini-flash-latest',
     contents,
     config: {
