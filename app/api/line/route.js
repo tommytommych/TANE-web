@@ -274,6 +274,14 @@ export async function POST(req) {
     return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
   }
 
+  // TEMP DEBUG（原因調査用、確認後に削除する）：実際にVercel上で使われているGEMINI_API_KEYの
+  // フィンガープリント（先頭6文字＋末尾4文字のみ）をログに出す。キー自体は出力しない
+  const geminiKey = process.env.GEMINI_API_KEY || '';
+  console.log(
+    'TEMP DEBUG gemini key fingerprint:',
+    geminiKey ? `${geminiKey.slice(0, 6)}...${geminiKey.slice(-4)} (length=${geminiKey.length})` : '(empty)'
+  );
+
   const signature = req.headers.get('x-line-signature');
   const body = await req.text();
 
