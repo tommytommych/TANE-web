@@ -145,6 +145,12 @@ export const extractOptionsFromContent = (content: string): string[] | null => {
   }
 };
 
+// AIが提示する選択肢の最後には、必ず「自由に入力する」（自由入力を促す文言）が付く
+// （systemPrompt.ts参照）。これはユーザーからの実際の回答ではないため、他の選択肢のように
+// そのままメッセージとして送信すると、AIが具体的な回答を得られず同じ質問を繰り返してしまう
+// （WEB版・LINE版共通の判定のため、UIコンポーネントではなくここに置く）
+export const isFreeInputOption = (option: string): boolean => option.includes('自由') && option.includes('入力');
+
 // 会話全体を通してAIが保持・更新する設計コンテキスト（作品名・サイズ・場所・予算・工具・経験・木材）
 export interface DesignContext {
   item: string | null;

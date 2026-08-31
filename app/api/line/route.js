@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { messagingApi, validateSignature } from '@line/bot-sdk';
 import { GoogleGenAI, createPartFromBase64, createPartFromText } from '@google/genai';
 import { buildSystemInstruction, CAMEO_MODE_TRIGGER_REGEX } from '../../lib/systemPrompt';
-import { stripInternalBlocks, extractContextFromContent } from '../../lib/cutlist';
+import { stripInternalBlocks, extractContextFromContent, extractOptionsFromContent, isFreeInputOption } from '../../lib/cutlist';
 import { getConversationState, saveConversationState } from '../../lib/lineConversationHistory';
 
 export const runtime = 'nodejs';
@@ -36,6 +36,34 @@ const IMAGE_PROMPT =
 
 // LINEのメッセージ1通あたりの上限文字数。超えるとreplyMessageが失敗するため安全に切り詰める
 const LINE_TEXT_MESSAGE_LIMIT = 5000;
+
+// LINEのクイックリプライの制約（Messaging APIの仕様）：ボタンは最大13個、
+// ラベルは最大20文字。実際にメッセージとして送信される文言（text）自体は
+// WEB版のボタン（MessageBubble.tsx）と同じくオプションの全文を使う
+const QUICK_REPLY_MAX_ITEMS = 13;
+const QUICK_REPLY_LABEL_MAX_LENGTH = 20;
+
+// AIの回答末尾のtanei-optionsブロックを、WEB版の選択肢ボタンと同じ内容の
+// LINEクイックリプライへ変換する。「自由に入力する」は除外する（LINEでは
+// クイックリプライを無視してそのまま文章を打てるため、専用の選択肢は不要）
+function buildQuickReplyItems(rawText) {
+  const options = extractOptionsFromContent(rawText);
+  if (!options) return undefined;
+
+  const items = options
+    .filter((opt) => !isFreeInputOption(opt))
+    .slice(0, QUICK_REPLY_MAX_ITEMS)
+    .map((opt) => ({
+      type: 'action',
+      action: {
+        type: 'message',
+        label: opt.length > QUICK_REPLY_LABEL_MAX_LENGTH ? `${opt.slice(0, QUICK_REPLY_LABEL_MAX_LENGTH - 1)}…` : opt,
+        text: opt,
+      },
+    }));
+
+  return items.length > 0 ? items : undefined;
+}
 
 // リッチメニュー等からこのテキストが送られてきた場合は、Geminiによる自動応答を行わず
 // LINE公式アカウントマネージャーでの手動チャット対応に委ねる
@@ -148,6 +176,9 @@ async function generateReply(userId, currentUserText, parts, { isCameoMode = fal
   // tanei-context等の内部データブロックはWEB版UIの解析専用で、LINEのプレーンテキスト返信には不要かつ
   // そのまま見せると不自然なため取り除く
   const strippedText = stripInternalBlocks(rawText);
+  // WEB版の選択肢ボタン（MessageBubble.tsx）と同じtanei-optionsブロックを、
+  // LINEのクイックリプライとして再現する（strip前のrawTextから抽出する必要がある）
+  const quickReplyItems = buildQuickReplyItems(rawText);
 
   // 次回の呼び出しに引き継ぐため、今回のやり取りを履歴へ追加して保存する。
   // 履歴にはstripped後のテキストのみを保持し（tanei-*ブロックはGeminiへの再入力にも不要）、
@@ -158,7 +189,7 @@ async function generateReply(userId, currentUserText, parts, { isCameoMode = fal
     context: newContext,
   });
 
-  return strippedText.slice(0, LINE_TEXT_MESSAGE_LIMIT);
+  return { text: strippedText.slice(0, LINE_TEXT_MESSAGE_LIMIT), quickReplyItems };
 }
 
 function generateReplyText(userId, userMessage) {
@@ -218,11 +249,15 @@ function buildGeminiErrorReplyText(error) {
 
 // LINEへの返信自体が失敗しても（replyTokenの期限切れ・認証エラーなど）、
 // 全体の処理は止めずログだけ残す
-async function replySafely(replyToken, text) {
+async function replySafely(replyToken, text, quickReplyItems) {
   try {
+    const message = { type: 'text', text };
+    if (quickReplyItems && quickReplyItems.length > 0) {
+      message.quickReply = { items: quickReplyItems };
+    }
     await lineClient.replyMessage({
       replyToken,
-      messages: [{ type: 'text', text }],
+      messages: [message],
     });
   } catch (error) {
     console.error('LINE bot reply error:', error);
@@ -252,20 +287,21 @@ async function handleMessageEvent(event) {
   }
 
   let replyText;
+  let quickReplyItems;
 
   try {
     if (event.message.type === 'text') {
-      replyText = await generateReplyText(userId, event.message.text);
+      ({ text: replyText, quickReplyItems } = await generateReplyText(userId, event.message.text));
     } else {
       const { base64, mimeType } = await fetchLineImageAsBase64(event.message);
-      replyText = await generateReplyForImage(userId, base64, mimeType);
+      ({ text: replyText, quickReplyItems } = await generateReplyForImage(userId, base64, mimeType));
     }
   } catch (error) {
     console.error('LINE bot Gemini error:', error);
     replyText = buildGeminiErrorReplyText(error);
   }
 
-  await replySafely(event.replyToken, replyText);
+  await replySafely(event.replyToken, replyText, quickReplyItems);
 }
 
 export async function POST(req) {
