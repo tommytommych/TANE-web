@@ -52,23 +52,21 @@ const QUICK_REPLY_MAX_ITEMS = 13;
 const QUICK_REPLY_LABEL_MAX_LENGTH = 20;
 
 // AIの回答末尾のtanei-optionsブロックを、WEB版の選択肢ボタンと同じ内容の
-// LINEクイックリプライへ変換する。「自由に入力する」は除外する（LINEでは
-// クイックリプライを無視してそのまま文章を打てるため、専用の選択肢は不要）
+// LINEクイックリプライへ変換する。「自由に入力する」も、選べる選択肢の1つが
+// 存在すること自体をユーザーに示すため他の選択肢と同様にボタン化する
+// （タップされた場合の特別扱いはhandleMessageEvent側のisFreeInputOptionチェックを参照）
 function buildQuickReplyItems(rawText) {
   const options = extractOptionsFromContent(rawText);
   if (!options) return undefined;
 
-  const items = options
-    .filter((opt) => !isFreeInputOption(opt))
-    .slice(0, QUICK_REPLY_MAX_ITEMS)
-    .map((opt) => ({
-      type: 'action',
-      action: {
-        type: 'message',
-        label: opt.length > QUICK_REPLY_LABEL_MAX_LENGTH ? `${opt.slice(0, QUICK_REPLY_LABEL_MAX_LENGTH - 1)}…` : opt,
-        text: opt,
-      },
-    }));
+  const items = options.slice(0, QUICK_REPLY_MAX_ITEMS).map((opt) => ({
+    type: 'action',
+    action: {
+      type: 'message',
+      label: opt.length > QUICK_REPLY_LABEL_MAX_LENGTH ? `${opt.slice(0, QUICK_REPLY_LABEL_MAX_LENGTH - 1)}…` : opt,
+      text: opt,
+    },
+  }));
 
   return items.length > 0 ? items : undefined;
 }
@@ -95,6 +93,12 @@ const HUMAN_HANDOFF_REPLY_MESSAGE =
 const RESET_TRIGGER_MESSAGES = ['最初からやり直す', 'リセット', '会話をリセット'];
 
 const RESET_REPLY_MESSAGE = '会話履歴をリセットしました🌱\n新しくご相談ください！';
+
+// WEB版（MessageBubble.tsx）では「自由に入力する」はクリックしても送信されず、
+// チャット入力欄にフォーカスするだけの案内用の選択肢。LINEのクイックリプライは
+// タップすると必ずtextがそのままメッセージとして送られてしまうため、送られてきた
+// テキストがisFreeInputOptionと一致する場合はGeminiには渡さず、案内だけ返す
+const FREE_INPUT_REPLY_MESSAGE = 'どうぞ、思っていることをそのまま自由に入力してください✏️';
 
 // AIとのやり取りの返信には常にこのボタンを添えて、ユーザーがいつでもワンタップで
 // リセットできるようにする（リッチメニューの設置・画像作成が不要な、コードだけで
@@ -360,6 +364,13 @@ async function handleMessageEvent(event) {
   if (event.message.type === 'text' && RESET_TRIGGER_MESSAGES.includes(event.message.text)) {
     await resetConversationState(userId);
     await replySafely(event.replyToken, RESET_REPLY_MESSAGE);
+    return;
+  }
+
+  // 「自由に入力する」ボタンがタップされた場合、その文言をそのままユーザーの回答として
+  // Geminiに渡すと不自然な回答になってしまうため、Geminiは呼ばず自由入力を促すだけ返信する
+  if (event.message.type === 'text' && isFreeInputOption(event.message.text)) {
+    await replySafely(event.replyToken, FREE_INPUT_REPLY_MESSAGE, [RESET_QUICK_REPLY_ITEM]);
     return;
   }
 
