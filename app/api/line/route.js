@@ -149,6 +149,22 @@ function buildCutSheetSummaryReply(state) {
   return `以下の寸法でホームセンターにカットをご依頼ください📐\n\n${summary}`;
 }
 
+// GeminiはMarkdown記法（**太字**・#見出し・---区切り線等）を多用して回答するが、
+// WEB版はReactMarkdownで装飾して表示するのに対し、LINEはプレーンテキストしか
+// 送れないため「＊」等の記号がそのまま見えてしまう（実機で報告された不具合）。
+// LINE向けの返信だけ、記号を人が読みやすい形へ変換・除去する（WEB版の表示には影響しない）
+function stripMarkdownForLine(text) {
+  return text
+    .replace(/^#{1,6}\s+/gm, '') // 見出し（#### 見出し → 見出し）
+    .replace(/^-{3,}$/gm, '') // 区切り線（---）を削除
+    .replace(/\*\*([^*\n]+)\*\*/g, '$1') // **太字** → 太字
+    .replace(/__([^_\n]+)__/g, '$1') // __太字__ → 太字
+    .replace(/(?<![*\w])\*([^*\n]+)\*(?!\w)/g, '$1') // *強調* → 強調
+    .replace(/^[ \t]*[-*][ \t]+/gm, '・') // 箇条書き（- 項目 / * 項目）→ ・項目
+    .replace(/\n{3,}/g, '\n\n') // 見出し・区切り線の削除で生じた余分な空行を詰める
+    .trim();
+}
+
 // Gemini呼び出しにタイムアウトが無いと、まれに応答が返らないまま無期限に待ち続け、
 // Vercelの関数タイムアウト（maxDuration）まで無反応になってしまう（実機で確認済みの不具合）。
 // LINEの返信トークンは短時間で失効するため、まだ余裕をもってエラー返信できる時間で区切る。
@@ -243,6 +259,10 @@ async function generateReply(userId, currentUserText, parts, state, { isCameoMod
   // tanei-context等の内部データブロックはWEB版UIの解析専用で、LINEのプレーンテキスト返信には不要かつ
   // そのまま見せると不自然なため取り除く
   const strippedText = stripInternalBlocks(rawText);
+  // GeminiのMarkdown記法（**太字**等）はWEB版ではReactMarkdownが装飾するが、LINEは
+  // プレーンテキストのため記号がそのまま見えてしまう。LINE向けの返信・履歴保存では
+  // 変換後のテキストを使う
+  const lineText = stripMarkdownForLine(strippedText);
   // WEB版の選択肢ボタン（MessageBubble.tsx）と同じtanei-optionsブロックを、
   // LINEのクイックリプライとして再現する（strip前のrawTextから抽出する必要がある）
   const quickReplyItems = buildQuickReplyItems(rawText);
@@ -257,7 +277,7 @@ async function generateReply(userId, currentUserText, parts, state, { isCameoMod
   const newMaterialGroups = extractCutListFromContent(rawText) ?? state.lastMaterialGroups;
   const newSheetLayouts = extractSheetLayoutFromContent(rawText) ?? state.lastSheetLayouts;
   await saveConversationState(userId, {
-    turns: [...state.turns, { role: 'user', text: currentUserText }, { role: 'model', text: strippedText }],
+    turns: [...state.turns, { role: 'user', text: currentUserText }, { role: 'model', text: lineText }],
     context: newContext,
     lastMaterialGroups: newMaterialGroups,
     lastSheetLayouts: newSheetLayouts,
@@ -265,7 +285,7 @@ async function generateReply(userId, currentUserText, parts, state, { isCameoMod
     pendingCutSheetConfirmation: false,
   });
 
-  return { text: strippedText.slice(0, LINE_TEXT_MESSAGE_LIMIT), quickReplyItems };
+  return { text: lineText.slice(0, LINE_TEXT_MESSAGE_LIMIT), quickReplyItems };
 }
 
 function generateReplyText(userId, userMessage, state) {
